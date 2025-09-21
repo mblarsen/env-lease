@@ -275,7 +275,7 @@
           6,
           7
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -283,7 +283,7 @@
             "description": "Create the core `Daemon` struct in `internal/daemon`. This struct will hold the application state and dependencies, such as the state manager and secret revoker. Use interfaces for dependencies like the clock and filesystem to facilitate testing.",
             "dependencies": [],
             "details": "Define the `Daemon` struct with fields for a state manager, a secret revoker, and a clock interface (e.g., `type Clock interface { Now() time.Time; Ticker(d time.Duration) *time.Ticker }`). This sets up the foundation for dependency injection as specified in the expansion guidance.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -294,7 +294,7 @@
               "8.1"
             ],
             "details": "Within the `Run()` method, before the main loop begins, iterate through all leases loaded from the state. For each lease, compare its expiration time with the current time provided by the clock dependency. If expired, call the revocation logic. Ensure state is saved after this initial cleanup.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -305,7 +305,7 @@
               "8.1"
             ],
             "details": "In the `Run()` method, after the initial startup check, create a `time.Ticker` using the clock dependency. Use a `select` statement within a `for` loop to listen on the ticker's channel and a separate channel for shutdown signals (e.g., from an OS signal handler).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -317,7 +317,7 @@
               "8.3"
             ],
             "details": "On each tick received from the `time.Ticker`, get the current list of active leases from the state manager. Iterate through them, comparing `lease.Expiration` with `clock.Now()`. If a lease is expired, call the injected secret revoker's `Revoke()` method and update the daemon's state by removing the lease.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:46:39.737Z",
+      "updated": "2025-09-21T13:48:22.347Z",
       "description": "Tasks for master context"
     }
   }
