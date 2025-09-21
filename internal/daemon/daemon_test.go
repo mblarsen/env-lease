@@ -1,13 +1,13 @@
 package daemon
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
 
 type mockClock struct {
 	now time.Time
-	// We don't need a real ticker for the test
 }
 
 func (m *mockClock) Now() time.Time {
@@ -15,7 +15,6 @@ func (m *mockClock) Now() time.Time {
 }
 
 func (m *mockClock) Ticker(d time.Duration) *time.Ticker {
-	// Return a ticker that will never fire, we'll manually check
 	return time.NewTicker(24 * time.Hour)
 }
 
@@ -26,10 +25,13 @@ func (m *mockClock) Advance(d time.Duration) {
 func TestDaemon(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
-	// We don't need a real IPC server for these tests
-	daemon := NewDaemon(state, clock, nil)
+	revoker := &mockRevoker{}
+	daemon := NewDaemon(state, clock, nil, revoker)
 
 	t.Run("startup revocation", func(t *testing.T) {
+		revoker.RevokeFunc = func(l Lease) error {
+			return nil
+		}
 		state.Leases["expired"] = Lease{ExpiresAt: clock.Now().Add(-1 * time.Hour)}
 		state.Leases["active"] = Lease{ExpiresAt: clock.Now().Add(1 * time.Hour)}
 
@@ -43,9 +45,42 @@ func TestDaemon(t *testing.T) {
 		}
 	})
 
+	t.Run("retry logic", func(t *testing.T) {
+		state.Leases = make(map[string]Lease) // Reset state
+		state.RetryQueue = make([]RetryItem, 0)
+		clock.now = time.Now() // Reset time
+		lease := Lease{ExpiresAt: clock.Now().Add(-1 * time.Hour)}
+		state.Leases["retry-test"] = lease
+
+		revoker.RevokeFunc = func(l Lease) error {
+			return fmt.Errorf("revoke failed")
+		}
+
+		daemon.revokeExpiredLeases()
+
+		if len(state.Leases) != 0 {
+			t.Error("lease should have been removed from main map")
+		}
+		if len(state.RetryQueue) != 1 {
+			t.Fatal("lease should have been added to retry queue")
+		}
+
+		// Advance time and check retry
+		clock.Advance(3 * time.Second)
+		daemon.processRetryQueue()
+
+		if state.RetryQueue[0].Attempts != 2 {
+			t.Errorf("expected 2 attempts, got %d", state.RetryQueue[0].Attempts)
+		}
+	})
+
 	t.Run("run loop", func(t *testing.T) {
 		state.Leases = make(map[string]Lease) // Reset state
-		clock.now = time.Now()                // Reset time
+		state.RetryQueue = make([]RetryItem, 0)
+		revoker.RevokeFunc = func(l Lease) error {
+			return nil
+		}
+		clock.now = time.Now() // Reset time
 		state.Leases["future"] = Lease{ExpiresAt: clock.Now().Add(100 * time.Millisecond)}
 
 		daemon.revokeExpiredLeases() // Initial check

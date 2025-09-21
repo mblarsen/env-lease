@@ -9,7 +9,16 @@ import (
 
 // State represents the persistent state of the daemon.
 type State struct {
-	Leases map[string]Lease `json:"leases"`
+	Leases     map[string]Lease `json:"leases"`
+	RetryQueue []RetryItem      `json:"retry_queue"`
+}
+
+// RetryItem represents a lease that failed to be revoked.
+type RetryItem struct {
+	Lease         Lease     `json:"lease"`
+	Attempts      int       `json:"attempts"`
+	NextRetryTime time.Time `json:"next_retry_time"`
+	InitialFailure time.Time `json:"initial_failure"`
 }
 
 // Lease represents a single active lease.
@@ -25,7 +34,8 @@ type Lease struct {
 // NewState creates a new, empty state.
 func NewState() *State {
 	return &State{
-		Leases: make(map[string]Lease),
+		Leases:     make(map[string]Lease),
+		RetryQueue: make([]RetryItem, 0),
 	}
 }
 

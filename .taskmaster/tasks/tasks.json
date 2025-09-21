@@ -537,7 +537,7 @@
         "dependencies": [
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -545,7 +545,7 @@
             "description": "Update the daemon's state management logic to include a new data structure for a 'retry queue'. This queue will hold leases that have failed revocation, tracking their details, the number of failed attempts, and the timestamp for the next scheduled retry. This new state must be persisted to disk along with the main lease state.",
             "dependencies": [],
             "details": "Define a new struct for a retry item containing the lease, attempt count, and next retry time. Add this structure to the main daemon state object. Modify the `SaveState()` and `LoadState()` functions to handle the serialization and deserialization of this new retry queue. When a revocation initially fails, move the lease from the active list to this queue.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -556,7 +556,7 @@
               "14.1"
             ],
             "details": "In the daemon's main processing loop, iterate through the retry queue. For each item, check if the current time is past its scheduled retry time. If so, attempt revocation. On success, remove the item from the queue. On failure, increment the attempt counter and calculate the next retry time using an exponential backoff formula (e.g., `base_delay * 2^attempts`), then update the item in the queue.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -567,7 +567,7 @@
               "14.2"
             ],
             "details": "When a lease is first added to the retry queue, record the initial failure timestamp. Within the retry processing loop, check if the time elapsed since the initial failure exceeds 5 minutes for any given lease. If the threshold is crossed and the notification file does not already exist, create the file. Ensure this check is performed efficiently and the file is created only once per persistent failure.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:52:10.416Z",
+      "updated": "2025-09-21T13:56:47.641Z",
       "description": "Tasks for master context"
     }
   }

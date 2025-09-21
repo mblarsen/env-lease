@@ -22,7 +22,8 @@ func TestDaemonServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create ipc server: %v", err)
 	}
-	daemon := NewDaemon(state, clock, ipcServer)
+	revoker := &mockRevoker{}
+	daemon := NewDaemon(state, clock, ipcServer, revoker)
 	go daemon.Run(context.Background())
 	defer ipcServer.Close()
 
