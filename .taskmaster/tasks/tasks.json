@@ -333,7 +333,7 @@
           5,
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -341,7 +341,7 @@
             "description": "Modify the `Daemon` struct in `internal/daemon` to include an instance of the `ipc.Server`. In the `Run()` method, initialize the server and launch its `Listen()` method in a separate goroutine to begin accepting client connections.",
             "dependencies": [],
             "details": "Add a new field for the `ipc.Server` to the `Daemon` struct. Ensure the server is properly initialized during the daemon's setup. The call to `go d.ipcServer.Listen()` should be placed within the `Daemon.Run()` method, along with appropriate error handling if the server fails to start.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -352,7 +352,7 @@
               "9.1"
             ],
             "details": "Define a `sync.Mutex` in the `Daemon` struct. Implement `handleGrant`, `handleRevoke`, and `handleStatus` methods. Each method must acquire the lock before reading or writing to the daemon's state (e.g., the lease map) and release it afterward. The functions should accept request data and return a corresponding response object.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -363,7 +363,7 @@
               "9.2"
             ],
             "details": "The `ipc.Server` will need a mechanism to map request types to the handler methods on the `Daemon` instance. This could be a map or a switch statement within the connection handling loop. The server should pass the request payload to the handler and send the handler's response back to the client.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:48:22.347Z",
+      "updated": "2025-09-21T13:50:39.746Z",
       "description": "Tasks for master context"
     }
   }

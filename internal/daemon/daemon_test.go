@@ -26,7 +26,8 @@ func (m *mockClock) Advance(d time.Duration) {
 func TestDaemon(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
-	daemon := NewDaemon(state, clock)
+	// We don't need a real IPC server for these tests
+	daemon := NewDaemon(state, clock, nil)
 
 	t.Run("startup revocation", func(t *testing.T) {
 		state.Leases["expired"] = Lease{ExpiresAt: clock.Now().Add(-1 * time.Hour)}

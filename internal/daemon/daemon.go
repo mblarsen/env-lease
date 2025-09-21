@@ -2,6 +2,8 @@ package daemon
 
 import (
 	"context"
+	"github.com/mblarsen/env-lease/internal/ipc"
+	"sync"
 	"time"
 )
 
@@ -24,21 +26,26 @@ func (c *RealClock) Ticker(d time.Duration) *time.Ticker {
 
 // Daemon is the main daemon struct.
 type Daemon struct {
-	state *State
-	clock Clock
+	state     *State
+	clock     Clock
+	ipcServer *ipc.Server
+	mu        sync.Mutex
 	// Other dependencies like a revoker will be added here
 }
 
 // NewDaemon creates a new daemon.
-func NewDaemon(state *State, clock Clock) *Daemon {
+func NewDaemon(state *State, clock Clock, ipcServer *ipc.Server) *Daemon {
 	return &Daemon{
-		state: state,
-		clock: clock,
+		state:     state,
+		clock:     clock,
+		ipcServer: ipcServer,
 	}
 }
 
 // Run starts the daemon's main loop.
 func (d *Daemon) Run(ctx context.Context) error {
+	go d.ipcServer.Listen(d.handleIPC)
+
 	d.revokeExpiredLeases()
 
 	ticker := d.clock.Ticker(1 * time.Second)
@@ -49,7 +56,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		case <-ticker.C:
 			d.revokeExpiredLeases()
 		case <-ctx.Done():
-			return nil
+			return d.ipcServer.Close()
 		}
 	}
 }

@@ -16,7 +16,8 @@ type Request struct {
 
 // GrantRequest is the payload for a grant request.
 type GrantRequest struct {
-	Leases []Lease
+	Command string
+	Leases  []Lease
 }
 
 // Lease is a simplified lease structure for IPC.

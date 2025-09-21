@@ -31,7 +31,8 @@ var grantCmd = &cobra.Command{
 		}
 
 		req := ipc.GrantRequest{
-			Leases: leases,
+			Command: "grant",
+			Leases:  leases,
 		}
 
 		client := ipc.NewClient(socketPath, secret)
