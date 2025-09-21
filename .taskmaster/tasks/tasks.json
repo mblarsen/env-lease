@@ -761,7 +761,7 @@
         "description": "Develop comprehensive user documentation that includes usage examples for 1Password with both environment variable and file-based leases, and a detailed security section explaining the IPC model and HMAC token protection.",
         "details": "Create a new `/docs` directory in the project repository. The documentation should be written in Markdown. The main document (e.g., `README.md` or `docs/usage.md`) should cover:\n1. **Getting Started:** A quick-start guide covering installation via Homebrew (from the automated release process) and the basic workflow: `env-lease daemon install`, `env-lease grant`, `env-lease status`.\n2. **Configuration:** Detailed explanation of the `env-lease.toml` file structure.\n3. **1Password Examples:** Provide two clear, copy-pasteable examples for the 1Password provider. The first should demonstrate leasing a secret to an environment variable. The second should show how to lease a secret to a file (e.g., for use with `direnv`), highlighting the safety of atomic file writes.\n4. **Security Model:** A dedicated 'Security' section that explains the client-daemon architecture using a Unix Domain Socket. It must detail the HMAC-SHA256 authentication mechanism, explaining that it protects against other local, non-privileged processes impersonating the CLI. Crucially, it must also state the limitations: it does not protect against a root user or sophisticated attacks that can inspect process memory or environment variables to steal the token.\n5. **Command Reference:** A brief reference for all user-facing commands, including `grant`, `revoke`, `status`, and `daemon install/uninstall`.",
         "testStrategy": "The documentation will be verified through a multi-step review process. First, a peer developer will review all technical descriptions and code examples for accuracy by running them on both macOS and Linux test environments. Second, the entire document will be proofread for clarity, grammar, and conciseness. Finally, all links within the documentation must be checked to ensure they are not broken.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           4,
           5,
@@ -779,7 +779,7 @@
             "description": "Initialize the documentation directory and write the initial 'Getting Started' section. This section will guide a new user through installation via Homebrew and the basic command workflow to get the daemon running and grant a first lease.",
             "dependencies": [],
             "details": "Create a `/docs` directory in the project root. Inside, create a new `USAGE.md` file. Write the 'Getting Started' section covering: 1. Installation instructions using Homebrew. 2. The primary workflow steps: running `env-lease daemon install`, creating a minimal `env-lease.toml`, running `env-lease grant`, and verifying the lease with `env-lease status`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "A team member follows the 'Getting Started' guide on a clean macOS machine to ensure the steps are accurate, easy to follow, and lead to a successful outcome without errors."
           },
           {
@@ -790,7 +790,7 @@
               "19.1"
             ],
             "details": "In `docs/USAGE.md`, add a 'Configuration' section. Explain the purpose of the file and detail each key in the `[leases.<name>]` table (e.g., `provider`, `source`, `destination`, `type`, `duration`). Provide a complete, commented example `env-lease.toml`. Then, add a 'Command Reference' section that lists and briefly describes `grant`, `revoke`, `status`, and the `daemon install/uninstall` subcommands.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Review the documented configuration options against the actual implementation in the Go structs (from Task 2). Verify that the command descriptions and flags match the CLI's `--help` output for accuracy."
           },
           {
@@ -802,7 +802,7 @@
               "19.2"
             ],
             "details": "In `docs/USAGE.md`, add a '1Password Examples' section. Example 1: Show the `env-lease.toml` configuration for leasing a 1Password secret to an environment variable. Include the `env-lease grant` command and how to verify it (e.g., `printenv SECRET_KEY`). Example 2: Show the configuration for leasing a secret to a file. Emphasize that this uses atomic writes for safety and is useful with tools like `direnv`. Provide the full configuration and commands for this scenario.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Execute both examples in a real terminal session with the 1Password CLI configured. Verify that the secrets are correctly leased to the environment and the file, respectively, and that they can be successfully revoked."
           },
           {
@@ -813,7 +813,7 @@
               "19.1"
             ],
             "details": "In `docs/USAGE.md`, create a 'Security' section. Explain the client-daemon architecture using a Unix Domain Socket for local IPC. Detail the HMAC-SHA256 authentication process: the daemon generates a token, the client reads it, and all subsequent requests are signed. Explicitly state that this prevents other local, non-privileged users from impersonating the client. Crucially, add a 'Limitations' subsection that clarifies it does *not* protect against a root user or attacks that can read process memory/environment to steal the token.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Peer review by a developer familiar with the IPC implementation to ensure the technical explanation of the HMAC mechanism, its purpose, and its limitations is accurate and clearly communicated to the user."
           },
           {
@@ -827,7 +827,7 @@
               "19.4"
             ],
             "details": "Read through the entire `docs/USAGE.md` file from start to finish. Check for consistent terminology and formatting. Manually verify all code blocks and command examples are correct. Proofread for spelling and grammar mistakes. Finally, edit the root `README.md` file to add a prominent 'Documentation' or 'Usage' section that links directly to `docs/USAGE.md`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Have a team member who was not involved in writing the documentation read it from the perspective of a new user. They should check if it's easy to understand, if all examples work as described, and if all internal and external links are correct."
           }
         ]
@@ -886,7 +886,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T14:43:49.101Z",
+      "updated": "2025-09-21T14:47:20.692Z",
       "description": "Tasks for master context"
     }
   }
