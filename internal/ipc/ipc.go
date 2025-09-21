@@ -59,6 +59,20 @@ type Response struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
+// ConnectionError is a custom error for IPC connection errors.
+type ConnectionError struct {
+	SocketPath string
+	Err        error
+}
+
+func (e *ConnectionError) Error() string {
+	return fmt.Sprintf("could not connect to the env-lease daemon at %s. Is the daemon running?", e.SocketPath)
+}
+
+func (e *ConnectionError) Unwrap() error {
+	return e.Err
+}
+
 // NewRequest creates a new signed request.
 func NewRequest(payload any, secret []byte) (*Request, error) {
 	payloadBytes, err := json.Marshal(payload)

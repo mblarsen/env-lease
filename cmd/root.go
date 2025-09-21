@@ -1,10 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
-	"os"
-
+	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 var rootCmd = &cobra.Command{
@@ -17,7 +18,13 @@ them after a specified lease duration.`,
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Whoops. There was an error while executing your CLI '%s'", err)
+		// Check if it's a connection error, and if so, print a cleaner message.
+		var connErr *ipc.ConnectionError
+		if errors.As(err, &connErr) {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", connErr)
+		} else {
+			// cobra will print the error, so we don't need to.
+		}
 		os.Exit(1)
 	}
 }

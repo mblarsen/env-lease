@@ -29,7 +29,7 @@ func (c *Client) Send(payload any, responsePayload any) error {
 
 	conn, err := net.Dial("unix", c.socketPath)
 	if err != nil {
-		return err
+		return &ConnectionError{SocketPath: c.socketPath, Err: err}
 	}
 	defer conn.Close()
 

@@ -928,7 +928,7 @@
         "description": "Refine the CLI's error handling to provide a clear, user-friendly message when it fails to connect to the daemon, instead of showing a generic error and stack trace.",
         "details": "Currently, when the CLI attempts to communicate with a non-running daemon, it exits with a generic connection error and a stack trace. This task involves modifying the CLI client's IPC connection logic to specifically catch socket connection errors. When such an error is detected, the CLI should print a formatted, helpful message to stderr, such as 'Error: Could not connect to the env-lease daemon at [socket_path]. Is the daemon running? Try starting it with `env-lease daemon start`.' The application should then exit with a non-zero status code without displaying a stack trace. The socket path should be dynamically retrieved from the application's configuration.",
         "testStrategy": "To test this, first ensure the `env-leased` daemon is not running. Then, execute any CLI command that requires daemon communication, like `env-lease status` or `env-lease grant`. Verify that the command fails and prints a user-friendly error message to stderr that includes the socket path and suggests the daemon may not be running. Crucially, confirm that no Go stack trace is printed. Finally, start the daemon and run the same command again to ensure it now connects and executes successfully, confirming the error handling is specific to the connection failure scenario.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           9
         ],
@@ -953,7 +953,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T16:23:05.423Z",
+      "updated": "2025-09-21T16:24:37.168Z",
       "description": "Tasks for master context"
     }
   }
