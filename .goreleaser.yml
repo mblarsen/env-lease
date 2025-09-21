@@ -1,0 +1,48 @@
+# .goreleaser.yml
+before:
+  hooks:
+    - go mod tidy
+builds:
+  - id: env-lease
+    main: ./cmd/env-lease
+    binary: env-lease
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+  - id: env-leased
+    main: ./cmd/env-leased
+    binary: env-leased
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+archives:
+  - format: tar.gz
+    name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+checksum:
+  name_template: 'checksums.txt'
+snapshot:
+  name_template: "{{ .Tag }}-next"
+changelog:
+  sort: asc
+  filters:
+    first_pull_request: true
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+brews:
+  - name: env-lease
+    tap:
+      owner: mblarsen
+      name: homebrew-tap
+    homepage: "https://github.com/mblarsen/env-lease"
+    description: "A CLI for managing temporary, leased secrets in environment files."
+    service: |
+      run [opt_bin/"env-leased", "daemon", "run"]
+      keep_alive true

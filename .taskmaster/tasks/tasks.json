@@ -721,7 +721,7 @@
           16,
           17
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -729,7 +729,7 @@
             "description": "Create the initial `.goreleaser.yml` file and configure the `builds`, `archives`, and `checksum` sections to compile binaries for macOS and Linux on both amd64 and arm64 architectures.",
             "dependencies": [],
             "details": "In the project root, create a `.goreleaser.yml` file. Define two build configurations under the `builds` section, one for `cmd/env-lease` and one for `cmd/env-leased`. For each build, set the `goos` to `[linux, darwin]` and `goarch` to `[amd64, arm64]`. Configure the `archives` section to create `.tar.gz` packages and the `checksum` section to generate a `checksums.txt` file for the release artifacts.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -738,7 +738,7 @@
             "description": "Create a new public GitHub repository that will serve as the Homebrew tap. This repository will store the formula published by GoReleaser.",
             "dependencies": [],
             "details": "Create a new public repository on GitHub with a name following the convention `homebrew-<tap-name>`, for example, `homebrew-env-lease`. Initialize it with a README.md file. Ensure that the Personal Access Token (PAT) used in the CI/CD environment has write permissions to this new repository.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -750,7 +750,7 @@
               "18.2"
             ],
             "details": "Add a `brews` section to the `.goreleaser.yml` file. Configure the `tap` to point to the repository created in subtask 18.2. Define the formula details such as `homepage` and `description`. Add a `service` block to automatically generate a `launchd` plist file for the `env-leased` binary, enabling it to be managed by `brew services` on macOS.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T14:01:17.212Z",
+      "updated": "2025-09-21T14:02:23.258Z",
       "description": "Tasks for master context"
     }
   }
