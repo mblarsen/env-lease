@@ -113,7 +113,7 @@
         "dependencies": [
           3
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -121,7 +121,7 @@
             "description": "Set up the initial file structure and define the `OnePasswordCLI` struct, implementing a basic version of the `Fetch` method to execute the `op` command.",
             "dependencies": [],
             "details": "In the `internal/provider` package, create the `onepassword.go` file. Define the `OnePasswordCLI` struct and ensure it satisfies the `SecretProvider` interface. Implement the `Fetch` method to use `os/exec` to call `op read <source>` and capture its standard output. Basic error checking for the command execution itself should be included.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -132,7 +132,7 @@
               "4.1"
             ],
             "details": "Expand the `Fetch` method to differentiate between different error conditions. Specifically, handle cases where: 1) the `op` executable is not found in the system's PATH; 2) the command returns a non-zero exit code (e.g., user not logged in, secret not found); 3) the command succeeds but produces no output. The function should return distinct and informative errors for each scenario.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -143,7 +143,7 @@
               "4.2"
             ],
             "details": "In `onepassword_test.go`, implement unit tests for the `Fetch` method. Use a mocking library or technique to replace the actual `os/exec.Command` execution. Create test cases to verify correct behavior for a successful secret retrieval, as well as for all the specific failure modes implemented in the previous subtask (command not found, non-zero exit code, empty output).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:38:11.187Z",
+      "updated": "2025-09-21T13:39:56.788Z",
       "description": "Tasks for master context"
     }
   }
