@@ -10,7 +10,39 @@
         "priority": "high",
         "dependencies": [],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Project Directory Structure",
+            "description": "Establish the standard Go project layout by creating the `/cmd` and `/internal` directories along with their required subdirectories.",
+            "dependencies": [],
+            "details": "Based on the expansion guidance, create the following directory structure: `/cmd/env-lease`, `/cmd/env-leased`, `/internal/config`, `/internal/daemon`, `/internal/ipc`, and `/internal/provider`.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Cobra Root Command and Main Entrypoints",
+            "description": "Create the main `cobra` root command and the `main.go` entrypoint files for both the CLI and daemon applications to provide a basic command structure.",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "Create a new file `/cmd/root.go` to define the main `cobra.Command`. Then, create `main.go` files within `/cmd/env-lease/` and `/cmd/env-leased/` that call the root command's `Execute()` function.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Finalize Project Structure by Removing Root main.go",
+            "description": "Remove the temporary `main.go` file from the project root to complete the transition to the standard Go project structure.",
+            "dependencies": [
+              "1.2"
+            ],
+            "details": "Delete the `main.go` file located in the project's root directory. After removal, run `go build ./...` to verify that the project builds successfully with the new entrypoints in the `/cmd` directories.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 2,
@@ -23,7 +55,40 @@
           1
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Go Structs and Basic Parsing Logic",
+            "description": "In a new package `internal/config`, define the Go structs (`Config`, `Lease`) that map to the `env-lease.toml` file structure. Implement a `Load(path string) (*Config, error)` function that uses the `github.com/BurntSushi/toml` library to parse a TOML file into these structs.",
+            "dependencies": [],
+            "details": "The `Config` struct should contain a map of leases, e.g., `Leases map[string]Lease`. The `Lease` struct should include fields like `Type`, `Format`, `Encoding`, `Source`, `Destination`, and `Duration`. The `Load` function will be the core entry point for configuration parsing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Configuration Validation and Default Values",
+            "description": "Enhance the configuration parsing logic to include validation for required fields and to set default values for optional fields. This ensures that the loaded configuration is always in a consistent and usable state.",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "After successfully parsing the TOML file into structs, iterate through the loaded leases. Validate that required fields (e.g., `Source`, `Destination`) are present. For optional fields like `Type`, set a default value (e.g., 'env') if it's not specified in the file. Return an error for any invalid or missing required configuration.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Develop Unit Tests for Configuration Parsing",
+            "description": "Create a `config_test.go` file within the `internal/config` package to thoroughly test the parsing, validation, and default value logic.",
+            "dependencies": [
+              "2.1",
+              "2.2"
+            ],
+            "details": "The test suite should cover multiple scenarios: a perfectly valid TOML file, a file with missing required fields (should error), a file with invalid data types, a file that relies on default values, and other edge cases. Use temporary files or in-memory strings to represent different TOML configurations for testing the `Load` function.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 3,
@@ -49,7 +114,39 @@
           3
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create OnePasswordCLI Struct and Basic Fetch Method",
+            "description": "Set up the initial file structure and define the `OnePasswordCLI` struct, implementing a basic version of the `Fetch` method to execute the `op` command.",
+            "dependencies": [],
+            "details": "In the `internal/provider` package, create the `onepassword.go` file. Define the `OnePasswordCLI` struct and ensure it satisfies the `SecretProvider` interface. Implement the `Fetch` method to use `os/exec` to call `op read <source>` and capture its standard output. Basic error checking for the command execution itself should be included.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Robust Error Handling for CLI Interaction",
+            "description": "Enhance the `Fetch` method to gracefully handle various failure modes specific to the `op` CLI, providing clear, user-friendly error messages for each case.",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "Expand the `Fetch` method to differentiate between different error conditions. Specifically, handle cases where: 1) the `op` executable is not found in the system's PATH; 2) the command returns a non-zero exit code (e.g., user not logged in, secret not found); 3) the command succeeds but produces no output. The function should return distinct and informative errors for each scenario.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Develop Unit Tests with Mocked Command Execution",
+            "description": "Create a test suite for the `OnePasswordCLI` provider, using a mocking strategy for `os/exec` to simulate various outcomes of running the `op` command without an actual dependency on the CLI.",
+            "dependencies": [
+              "4.2"
+            ],
+            "details": "In `onepassword_test.go`, implement unit tests for the `Fetch` method. Use a mocking library or technique to replace the actual `os/exec.Command` execution. Create test cases to verify correct behavior for a successful secret retrieval, as well as for all the specific failure modes implemented in the previous subtask (command not found, non-zero exit code, empty output).",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 5,
@@ -62,7 +159,51 @@
           1
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define IPC Message Structs and HMAC Security Functions",
+            "description": "Create the `/internal/ipc` package. Define the necessary message structs for requests (`GrantRequest`, `RevokeRequest`, `StatusRequest`) and their corresponding responses. Implement the core `Sign` and `Verify` functions using HMAC-SHA256 and a shared secret for message authentication.",
+            "dependencies": [],
+            "details": "This foundational subtask focuses on the data structures and cryptographic primitives. The `Sign` and `Verify` functions should be self-contained and unit-testable without requiring any networking code.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement IPC Server for Listening and Handling Messages",
+            "description": "Create a `Server` struct within the `internal/ipc` package. Implement a `Listen` method that sets up a Unix Domain Socket listener. The server must accept incoming connections, read message data, use the `Verify` function from subtask 5.1 to check the HMAC signature, deserialize the message, and dispatch it to a registered handler.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "The server implementation should handle the complete lifecycle of an incoming request, from accepting the raw connection to verifying its authenticity and preparing it for processing. Error handling for invalid signatures or malformed messages is critical.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement IPC Client for Sending Signed Messages",
+            "description": "Create a `Client` struct in the `internal/ipc` package. Implement a `Send` method that connects to the daemon's Unix Domain Socket, serializes a given request message, signs it using the `Sign` function from subtask 5.1, and transmits it to the server. The client should also be capable of reading and deserializing the server's response.",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "This subtask encapsulates all client-side logic for communicating with the daemon. It will be the primary interface used by the CLI commands to send requests.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Write Integration Tests for Client-Server Communication",
+            "description": "Develop a suite of integration tests to validate the end-to-end communication flow. The tests should start a mock server in a goroutine, use the client to send various signed messages, and verify that the server correctly processes valid messages and rejects tampered or invalid ones.",
+            "dependencies": [
+              "5.2",
+              "5.3"
+            ],
+            "details": "These tests are crucial to ensure the entire framework is robust. Test cases should include successful communication, communication with an invalid HMAC signature, and handling of connection errors.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 6,
@@ -88,7 +229,39 @@
           2
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define State Struct and Implement Save/Load Functions",
+            "description": "In a new `internal/daemon` package, define the `State` struct to hold active lease data and implement the `LoadState(path string)` and `SaveState(path string)` functions for JSON serialization and file I/O.",
+            "dependencies": [],
+            "details": "The `State` struct should contain a map of lease identifiers to their metadata and expiration times. The `SaveState` function must ensure the target directory exists before writing the file. The `LoadState` function should handle cases where the file doesn't exist by returning a new, empty state object.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Create Unit Tests for State Persistence Logic",
+            "description": "Write a comprehensive suite of unit tests for the `LoadState` and `SaveState` functions to ensure they are robust and handle all edge cases correctly.",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "Test cases must include: saving state and successfully loading it back; loading from a non-existent file (should result in a clean state); attempting to load from a file with corrupted JSON (should return an error); and verifying that `SaveState` correctly creates the directory structure if it's missing.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate State Management into Daemon Lifecycle",
+            "description": "Modify the main daemon logic to use the new state management functions, loading state on startup and saving state whenever the set of active leases is modified.",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "Call the `LoadState` function when the daemon process starts to restore any previously active leases from `~/.config/env-lease/state.json`. Hook the `SaveState` function into the parts of the code that grant, revoke, or otherwise modify leases to ensure the state on disk is always up-to-date.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 8,
@@ -103,7 +276,51 @@
           7
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Daemon Struct with Dependency Injection",
+            "description": "Create the core `Daemon` struct in `internal/daemon`. This struct will hold the application state and dependencies, such as the state manager and secret revoker. Use interfaces for dependencies like the clock and filesystem to facilitate testing.",
+            "dependencies": [],
+            "details": "Define the `Daemon` struct with fields for a state manager, a secret revoker, and a clock interface (e.g., `type Clock interface { Now() time.Time; Ticker(d time.Duration) *time.Ticker }`). This sets up the foundation for dependency injection as specified in the expansion guidance.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Startup Revocation Check",
+            "description": "Implement the logic that runs once when the daemon starts. This function will load the current lease state and immediately check for and revoke any leases that have already expired while the daemon was not running.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "Within the `Run()` method, before the main loop begins, iterate through all leases loaded from the state. For each lease, compare its expiration time with the current time provided by the clock dependency. If expired, call the revocation logic. Ensure state is saved after this initial cleanup.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement Main Timer Loop with time.Ticker",
+            "description": "Implement the main run loop for the daemon using a `time.Ticker`. This loop will periodically wake up (e.g., every second) to check the status of active leases and handle graceful shutdown signals.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "In the `Run()` method, after the initial startup check, create a `time.Ticker` using the clock dependency. Use a `select` statement within a `for` loop to listen on the ticker's channel and a separate channel for shutdown signals (e.g., from an OS signal handler).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement Lease Expiration Check and Revocation Trigger",
+            "description": "Within the main timer loop, implement the logic to iterate through all active leases, check if their expiration time has passed, and trigger the revocation process for any that have expired.",
+            "dependencies": [
+              "8.2",
+              "8.3"
+            ],
+            "details": "On each tick received from the `time.Ticker`, get the current list of active leases from the state manager. Iterate through them, comparing `lease.Expiration` with `clock.Now()`. If a lease is expired, call the injected secret revoker's `Revoke()` method and update the daemon's state by removing the lease.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 9,
@@ -117,7 +334,39 @@
           8
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integrate IPC Server into Daemon Struct and Run Loop",
+            "description": "Modify the `Daemon` struct in `internal/daemon` to include an instance of the `ipc.Server`. In the `Run()` method, initialize the server and launch its `Listen()` method in a separate goroutine to begin accepting client connections.",
+            "dependencies": [],
+            "details": "Add a new field for the `ipc.Server` to the `Daemon` struct. Ensure the server is properly initialized during the daemon's setup. The call to `go d.ipcServer.Listen()` should be placed within the `Daemon.Run()` method, along with appropriate error handling if the server fails to start.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Thread-Safe State Handlers",
+            "description": "Create the handler functions for grant, revoke, and status requests. These functions will modify the daemon's internal state. Introduce a `sync.Mutex` to the `Daemon` struct to ensure these state modifications are thread-safe.",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "Define a `sync.Mutex` in the `Daemon` struct. Implement `handleGrant`, `handleRevoke`, and `handleStatus` methods. Each method must acquire the lock before reading or writing to the daemon's state (e.g., the lease map) and release it afterward. The functions should accept request data and return a corresponding response object.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Register Handlers and Dispatch IPC Requests",
+            "description": "Connect the IPC server's core loop to the handler functions. The server must be able to parse incoming requests, determine the command type, and dispatch the request to the correct handler.",
+            "dependencies": [
+              "9.2"
+            ],
+            "details": "The `ipc.Server` will need a mechanism to map request types to the handler methods on the `Daemon` instance. This could be a map or a switch statement within the connection handling loop. The server should pass the request payload to the handler and send the handler's response back to the client.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 10,
@@ -130,7 +379,28 @@
           5
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Core IPC Client Communication Logic",
+            "description": "Create the basic `Client` struct in `/internal/ipc` and a core private method to handle the fundamental communication flow: dialing the daemon's socket, signing and sending a serialized request, and receiving/verifying the response. This method will be the foundation for all specific command requests.",
+            "dependencies": [],
+            "details": "This core method should handle the low-level details of establishing a connection, writing the signed payload, reading the response, and closing the connection. It will be used by the higher-level methods defined in the next subtask. Focus on robustly handling the raw byte stream and HMAC verification.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Develop High-Level, Command-Specific Client Methods",
+            "description": "Implement public, high-level methods on the `ipc.Client` struct for each specific daemon command, such as `SendGrantRequest`, `SendRevokeRequest`, and `SendStatusRequest`. These methods will use the core communication logic from the first subtask.",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "Each method will be responsible for creating the appropriate request object, calling the core communication method, and then decoding the response into the correct type. Implement clear error wrapping to distinguish between connection errors (e.g., daemon not running) and application-level errors returned by the daemon.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 11,
@@ -144,7 +414,39 @@
           10
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create `grant` Command Structure and Flags",
+            "description": "In the `cmd` package, create a new file `grant.go`. Define the `cobra.Command` for the `grant` command and add the boolean flags for `--override` and `--continue-on-error`.",
+            "dependencies": [],
+            "details": "Create the file `cmd/grant.go`. Instantiate a `cobra.Command` struct for the `grant` command. Use `cmd.Flags().Bool()` to add the `--override` and `--continue-on-error` flags. Add a placeholder `RunE` function that will contain the core logic.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Load Configuration and Construct GrantRequest",
+            "description": "Implement the logic within the `RunE` function to load the `env-lease.toml` configuration and use its contents, along with the command-line flags, to construct the `ipc.GrantRequest` message.",
+            "dependencies": [
+              "11.1"
+            ],
+            "details": "In the `grant` command's `RunE` function, call the appropriate function from the `config` package to load the `env-lease.toml` file. Handle any errors during loading. Create an instance of the `ipc.GrantRequest` struct and populate it with the lease definitions from the config and the flag values from the command.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement IPC Client Communication",
+            "description": "Finalize the `RunE` function by creating an IPC client, sending the constructed `GrantRequest` to the daemon, and printing the response or any resulting error to the user.",
+            "dependencies": [
+              "11.2"
+            ],
+            "details": "Instantiate a new `ipc.Client`. Use the client to send the `GrantRequest` object created in the previous subtask to the running daemon. Check the response from the daemon and print a success message or the returned error to the console.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 12,
@@ -157,7 +459,28 @@
           10
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create `revoke` Command Structure with Cobra",
+            "description": "Create the `revoke.go` file and define the basic `cobra.Command` for `env-lease revoke`. This includes setting up the command's name, description, and adding it to the root command.",
+            "dependencies": [],
+            "details": "In the `cmd` package, create a new file named `revoke.go`. Inside this file, define a `cobra.Command` struct for the `revoke` command. Set its `Use`, `Short`, and `Long` properties appropriately. Add a placeholder `RunE` function. Finally, ensure this new command is added to the root command so it's available in the CLI.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement IPC Logic to Send RevokeRequest",
+            "description": "Implement the `RunE` function for the `revoke` command to communicate with the daemon. This involves creating an IPC client, constructing a `RevokeRequest`, sending it, and handling the response.",
+            "dependencies": [
+              "12.1"
+            ],
+            "details": "Within the `RunE` function of the `revoke` command, instantiate an `ipc.Client`. Construct a `RevokeRequest` message, ensuring it includes the path to the current project's configuration file. Use the client to send this request to the daemon. Based on the daemon's response, print a success message to stdout or the returned error to stderr.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 13,
@@ -170,7 +493,39 @@
           10
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create `status` command boilerplate in `cmd` package",
+            "description": "Create a new file `cmd/status.go` and define the `cobra.Command` for the `status` command. This includes setting up the command's name, description, and adding it to the root command.",
+            "dependencies": [],
+            "details": "The file should be `cmd/status.go`. The command should be named `status`. The `RunE` function can be a placeholder initially. Ensure the new command is registered with the main `rootCmd`.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement IPC client call to fetch lease status",
+            "description": "In the `RunE` function of the `status` command, instantiate the `ipc.Client` and use it to send a `StatusRequest` to the daemon. Handle the response and any potential errors from the IPC communication.",
+            "dependencies": [
+              "13.1"
+            ],
+            "details": "This involves using the existing `ipc.Client` to create and send a `StatusRequest`. The response from the daemon, which will contain the list of active leases, should be stored in a variable for the next step. Implement error handling for the client connection and request sending.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Format and print lease status using `tabwriter`",
+            "description": "Using the lease status data received from the daemon, implement the output formatting. Use the `text/tabwriter` package to create a well-aligned, human-readable table that displays each lease's details, such as its destination and remaining TTL.",
+            "dependencies": [
+              "13.2"
+            ],
+            "details": "The table should have clear headers (e.g., 'Destination', 'Time Remaining'). The remaining TTL, received as a duration, should be formatted into a user-friendly string. The final formatted table should be printed to standard output.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 14,
@@ -183,7 +538,39 @@
           8
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integrate a Retry Queue into the Daemon's State",
+            "description": "Update the daemon's state management logic to include a new data structure for a 'retry queue'. This queue will hold leases that have failed revocation, tracking their details, the number of failed attempts, and the timestamp for the next scheduled retry. This new state must be persisted to disk along with the main lease state.",
+            "dependencies": [],
+            "details": "Define a new struct for a retry item containing the lease, attempt count, and next retry time. Add this structure to the main daemon state object. Modify the `SaveState()` and `LoadState()` functions to handle the serialization and deserialization of this new retry queue. When a revocation initially fails, move the lease from the active list to this queue.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Exponential Backoff Retry Mechanism",
+            "description": "Develop the core logic within the daemon's main loop to process the retry queue. This mechanism will periodically check for leases due for a retry, attempt to revoke them, and reschedule them with an exponential backoff delay upon subsequent failures.",
+            "dependencies": [
+              "14.1"
+            ],
+            "details": "In the daemon's main processing loop, iterate through the retry queue. For each item, check if the current time is past its scheduled retry time. If so, attempt revocation. On success, remove the item from the queue. On failure, increment the attempt counter and calculate the next retry time using an exponential backoff formula (e.g., `base_delay * 2^attempts`), then update the item in the queue.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Create Persistent Failure Notification File",
+            "description": "Enhance the retry logic to detect when a lease has been failing revocation for a cumulative period of more than 5 minutes. Upon detecting such a persistent failure, the daemon must use the atomic writer utility to create a `.envrc.env-lease-REVOCATION-FAILURE` file in the relevant project directory.",
+            "dependencies": [
+              "14.2"
+            ],
+            "details": "When a lease is first added to the retry queue, record the initial failure timestamp. Within the retry processing loop, check if the time elapsed since the initial failure exceeds 5 minutes for any given lease. If the threshold is crossed and the notification file does not already exist, create the file. Ensure this check is performed efficiently and the file is created only once per persistent failure.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 15,
@@ -196,7 +583,39 @@
           8
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update Lease State Model for Orphan Tracking",
+            "description": "Modify the daemon's lease state struct to include a new nullable timestamp field, `orphaned_since`. This field will track when a lease's configuration file was first detected as missing, which is essential for the 30-day cleanup logic.",
+            "dependencies": [],
+            "details": "The `orphaned_since` field should be added to the lease metadata struct managed by the state manager. The state loading and saving functions must be updated to correctly handle this new field, ensuring backward compatibility with existing state files if possible (e.g., by treating a missing field as not orphaned).",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement Core Cleanup Logic Function",
+            "description": "Develop a self-contained function within the daemon that performs the orphaned lease check. This function will iterate through all active leases, check for the existence of their corresponding `env-lease.toml` file, and update their state accordingly.",
+            "dependencies": [
+              "15.1"
+            ],
+            "details": "The function should perform two main actions: 1) For un-orphaned leases, check if the config file exists. If not, set the `orphaned_since` timestamp to the current time. 2) For already orphaned leases, check if `now() - orphaned_since > 30 days`. If true, revoke the lease's credentials and remove its entry from the daemon's state.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate Cleanup Logic into Daemon and CLI",
+            "description": "Wire the core cleanup function into the daemon's main loop for automatic execution and expose it via a manual CLI command.",
+            "dependencies": [
+              "15.2"
+            ],
+            "details": "First, add a long-interval ticker (e.g., every 24 hours) to the daemon's main event loop that calls the cleanup function. Second, add a hidden `env-leased --cleanup` command-line flag. When the daemon starts with this flag, it should execute the cleanup function once and then exit, providing a way for users or scripts to trigger the process manually.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 16,
@@ -209,7 +628,39 @@
           9
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define launchd plist Template and Command Structure",
+            "description": "Create the `com.user.env-leased.plist` template as a string constant or embedded file. Set up the basic structure for the `daemon` command and its `install`/`uninstall` subcommands in a new `cmd/daemon_darwin.go` file using Go build tags.",
+            "dependencies": [],
+            "details": "The plist template should be configured to run the daemon as a user agent and include the `KeepAlive` key to ensure it stays running. The command structure should be set up, but the core implementation logic will be in subsequent subtasks.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement `daemon install` Subcommand for macOS",
+            "description": "Implement the logic for the `install` subcommand. This includes writing the populated `launchd` plist file to `~/Library/LaunchAgents/` and loading the service using `launchctl load`.",
+            "dependencies": [
+              "16.1"
+            ],
+            "details": "The implementation must dynamically determine the path to the current executable to correctly populate the `ProgramArguments` in the plist template. It will use `os/exec` to call `launchctl load <path-to-plist>`. Ensure robust error handling for file I/O and command execution.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement `daemon uninstall` Subcommand for macOS",
+            "description": "Implement the logic for the `uninstall` subcommand. This involves unloading the service using `launchctl unload` and removing the `launchd` plist file from `~/Library/LaunchAgents/`.",
+            "dependencies": [
+              "16.1"
+            ],
+            "details": "The implementation will use `os/exec` to call `launchctl unload <path-to-plist>`. After successfully unloading the service, it should remove the plist file. It needs to handle cases where the file or service doesn't exist gracefully.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 17,
@@ -222,7 +673,39 @@
           9
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create systemd Service File Template",
+            "description": "Define the `env-leased.service` file template. This file will specify how systemd should run the `env-lease` daemon as a user service, including the command to execute and restart policies.",
+            "dependencies": [],
+            "details": "The template should be a standard `.service` file. It needs a `[Unit]` section with a description, a `[Service]` section specifying `ExecStart` (pointing to the `env-lease daemon run` command), and an `[Install]` section with `WantedBy=default.target`. This template will be embedded into the Go binary.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement `daemon install` Command for Linux",
+            "description": "Create the `daemon install` subcommand within a new `daemon_linux.go` file. This command will write the service file template to the correct user directory and enable the service using `systemctl`.",
+            "dependencies": [
+              "17.1"
+            ],
+            "details": "Use a build tag `//go:build linux`. Create a new `daemon` command in the `cmd` package. The `install` subcommand should locate the user's config directory (`~/.config/systemd/user/`), write the `env-leased.service` file from the template, and then execute `systemctl --user enable --now env-leased.service` using the `os/exec` package. Handle potential errors.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Implement `daemon uninstall` Command for Linux",
+            "description": "Create the `daemon uninstall` subcommand. This command will stop and disable the systemd service and then remove the service file from the user's configuration directory.",
+            "dependencies": [
+              "17.2"
+            ],
+            "details": "In `daemon_linux.go`, add the `uninstall` subcommand. It should first execute `systemctl --user disable --now env-leased.service` to stop and disable the service. After the command succeeds, it should remove the `env-leased.service` file from `~/.config/systemd/user/`. Provide clear feedback to the user on success or failure.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 18,
@@ -239,7 +722,38 @@
           17
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure GoReleaser for Multi-Platform Binary Builds",
+            "description": "Create the initial `.goreleaser.yml` file and configure the `builds`, `archives`, and `checksum` sections to compile binaries for macOS and Linux on both amd64 and arm64 architectures.",
+            "dependencies": [],
+            "details": "In the project root, create a `.goreleaser.yml` file. Define two build configurations under the `builds` section, one for `cmd/env-lease` and one for `cmd/env-leased`. For each build, set the `goos` to `[linux, darwin]` and `goarch` to `[amd64, arm64]`. Configure the `archives` section to create `.tar.gz` packages and the `checksum` section to generate a `checksums.txt` file for the release artifacts.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Set Up Dedicated Homebrew Tap GitHub Repository",
+            "description": "Create a new public GitHub repository that will serve as the Homebrew tap. This repository will store the formula published by GoReleaser.",
+            "dependencies": [],
+            "details": "Create a new public repository on GitHub with a name following the convention `homebrew-<tap-name>`, for example, `homebrew-env-lease`. Initialize it with a README.md file. Ensure that the Personal Access Token (PAT) used in the CI/CD environment has write permissions to this new repository.",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate Homebrew Tap Publishing with launchd Service",
+            "description": "Configure the `brews` section in `.goreleaser.yml` to publish the formula to the newly created Homebrew tap repository, including the necessary `launchd` service definition for the daemon.",
+            "dependencies": [
+              "18.1",
+              "18.2"
+            ],
+            "details": "Add a `brews` section to the `.goreleaser.yml` file. Configure the `tap` to point to the repository created in subtask 18.2. Define the formula details such as `homepage` and `description`. Add a `service` block to automatically generate a `launchd` plist file for the `env-leased` binary, enabling it to be managed by `brew services` on macOS.",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
       }
     ],
     "metadata": {
