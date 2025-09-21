@@ -74,25 +74,31 @@ func TestDaemon(t *testing.T) {
 		}
 	})
 
-	t.Run("run loop", func(t *testing.T) {
+	t.Run("orphaned lease cleanup", func(t *testing.T) {
 		state.Leases = make(map[string]Lease) // Reset state
-		state.RetryQueue = make([]RetryItem, 0)
-		revoker.RevokeFunc = func(l Lease) error {
-			return nil
+		clock.now = time.Now()                // Reset time
+		lease := Lease{ExpiresAt: clock.Now().Add(1 * time.Hour)}
+		state.Leases["orphan-test"] = lease
+
+		// To simulate a missing file, we'll just check that the timestamp is set
+		daemon.cleanupOrphanedLeases()
+
+		if state.Leases["orphan-test"].OrphanedSince == nil {
+			t.Fatal("OrphanedSince should have been set")
 		}
-		clock.now = time.Now() // Reset time
-		state.Leases["future"] = Lease{ExpiresAt: clock.Now().Add(100 * time.Millisecond)}
 
-		daemon.revokeExpiredLeases() // Initial check
-		if _, exists := state.Leases["future"]; !exists {
-			t.Fatal("lease revoked prematurely")
+		// Advance time and check that the lease is NOT removed
+		clock.Advance(29 * 24 * time.Hour)
+		daemon.cleanupOrphanedLeases()
+		if _, exists := state.Leases["orphan-test"]; !exists {
+			t.Fatal("lease should not have been removed yet")
 		}
 
-		clock.Advance(200 * time.Millisecond)
-		daemon.revokeExpiredLeases() // Manual tick
-
-		if _, exists := state.Leases["future"]; exists {
-			t.Error("future lease was not revoked after time passed")
+		// Advance time past the threshold
+		clock.Advance(2 * 24 * time.Hour)
+		daemon.cleanupOrphanedLeases()
+		if _, exists := state.Leases["orphan-test"]; exists {
+			t.Error("lease should have been removed")
 		}
 	})
 }

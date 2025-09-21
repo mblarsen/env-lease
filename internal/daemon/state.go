@@ -23,7 +23,8 @@ type RetryItem struct {
 
 // Lease represents a single active lease.
 type Lease struct {
-	ExpiresAt time.Time `json:"expires_at"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	OrphanedSince *time.Time `json:"orphaned_since,omitempty"`
 	// Other lease details...
 	Source      string `json:"source"`
 	Destination string `json:"destination"`

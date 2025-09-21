@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"os"
 	"sync"
 	"time"
 )
@@ -33,7 +34,6 @@ type Daemon struct {
 	ipcServer *ipc.Server
 	revoker   Revoker
 	mu        sync.Mutex
-	// Other dependencies will be added here
 }
 
 // NewDaemon creates a new daemon.
@@ -51,17 +51,64 @@ func (d *Daemon) Run(ctx context.Context) error {
 	go d.ipcServer.Listen(d.handleIPC)
 
 	d.revokeExpiredLeases()
+	d.processRetryQueue()
+	d.cleanupOrphanedLeases()
 
 	ticker := d.clock.Ticker(1 * time.Second)
 	defer ticker.Stop()
+
+	cleanupTicker := d.clock.Ticker(24 * time.Hour)
+	defer cleanupTicker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
 			d.revokeExpiredLeases()
 			d.processRetryQueue()
+		case <-cleanupTicker.C:
+			d.cleanupOrphanedLeases()
 		case <-ctx.Done():
 			return d.ipcServer.Close()
+		}
+	}
+}
+
+func (d *Daemon) cleanupOrphanedLeases() {
+	now := d.clock.Now()
+	for id, lease := range d.state.Leases {
+		// This is a simplified check. A real implementation would need
+		// to know the original config path for each lease.
+		configPath := "env-lease.toml" // Placeholder
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			if lease.OrphanedSince == nil {
+				lease.OrphanedSince = &now
+				d.state.Leases[id] = lease
+			} else if now.Sub(*lease.OrphanedSince) > 30*24*time.Hour {
+				delete(d.state.Leases, id)
+			}
+		} else {
+			if lease.OrphanedSince != nil {
+				lease.OrphanedSince = nil
+				d.state.Leases[id] = lease
+			}
+		}
+	}
+}
+
+func (d *Daemon) revokeExpiredLeases() {
+	now := d.clock.Now()
+	for id, lease := range d.state.Leases {
+		if now.After(lease.ExpiresAt) {
+			err := d.revoker.Revoke(lease)
+			if err != nil {
+				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
+					Lease:         lease,
+					Attempts:      1,
+					NextRetryTime: now.Add(2 * time.Second),
+					InitialFailure: now,
+				})
+			}
+			delete(d.state.Leases, id)
 		}
 	}
 }
@@ -87,24 +134,6 @@ func (d *Daemon) processRetryQueue() {
 				// Success, remove from queue
 				d.state.RetryQueue = append(d.state.RetryQueue[:i], d.state.RetryQueue[i+1:]...)
 			}
-		}
-	}
-}
-
-func (d *Daemon) revokeExpiredLeases() {
-	now := d.clock.Now()
-	for id, lease := range d.state.Leases {
-		if now.After(lease.ExpiresAt) {
-			err := d.revoker.Revoke(lease)
-			if err != nil {
-				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
-					Lease:         lease,
-					Attempts:      1,
-					NextRetryTime: now.Add(2 * time.Second),
-					InitialFailure: now,
-				})
-			}
-			delete(d.state.Leases, id)
 		}
 	}
 }

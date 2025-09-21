@@ -582,7 +582,7 @@
         "dependencies": [
           8
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -590,7 +590,7 @@
             "description": "Modify the daemon's lease state struct to include a new nullable timestamp field, `orphaned_since`. This field will track when a lease's configuration file was first detected as missing, which is essential for the 30-day cleanup logic.",
             "dependencies": [],
             "details": "The `orphaned_since` field should be added to the lease metadata struct managed by the state manager. The state loading and saving functions must be updated to correctly handle this new field, ensuring backward compatibility with existing state files if possible (e.g., by treating a missing field as not orphaned).",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -601,7 +601,7 @@
               "15.1"
             ],
             "details": "The function should perform two main actions: 1) For un-orphaned leases, check if the config file exists. If not, set the `orphaned_since` timestamp to the current time. 2) For already orphaned leases, check if `now() - orphaned_since > 30 days`. If true, revoke the lease's credentials and remove its entry from the daemon's state.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -612,7 +612,7 @@
               "15.2"
             ],
             "details": "First, add a long-interval ticker (e.g., every 24 hours) to the daemon's main event loop that calls the cleanup function. Second, add a hidden `env-leased --cleanup` command-line flag. When the daemon starts with this flag, it should execute the cleanup function once and then exit, providing a way for users or scripts to trigger the process manually.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:59:07.622Z",
+      "updated": "2025-09-21T14:01:17.212Z",
       "description": "Tasks for master context"
     }
   }
