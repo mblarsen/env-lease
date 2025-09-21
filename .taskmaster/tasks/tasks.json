@@ -158,7 +158,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -166,7 +166,7 @@
             "description": "Create the `/internal/ipc` package. Define the necessary message structs for requests (`GrantRequest`, `RevokeRequest`, `StatusRequest`) and their corresponding responses. Implement the core `Sign` and `Verify` functions using HMAC-SHA256 and a shared secret for message authentication.",
             "dependencies": [],
             "details": "This foundational subtask focuses on the data structures and cryptographic primitives. The `Sign` and `Verify` functions should be self-contained and unit-testable without requiring any networking code.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -177,7 +177,7 @@
               "5.1"
             ],
             "details": "The server implementation should handle the complete lifecycle of an incoming request, from accepting the raw connection to verifying its authenticity and preparing it for processing. Error handling for invalid signatures or malformed messages is critical.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -188,7 +188,7 @@
               "5.1"
             ],
             "details": "This subtask encapsulates all client-side logic for communicating with the daemon. It will be the primary interface used by the CLI commands to send requests.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -200,7 +200,7 @@
               "5.3"
             ],
             "details": "These tests are crucial to ensure the entire framework is robust. Test cases should include successful communication, communication with an invalid HMAC signature, and handling of connection errors.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:39:56.788Z",
+      "updated": "2025-09-21T13:41:09.669Z",
       "description": "Tasks for master context"
     }
   }
