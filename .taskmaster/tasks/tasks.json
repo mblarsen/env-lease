@@ -907,11 +907,53 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 23,
+        "title": "Implement `--override` Logic for `grant` Command",
+        "description": "Modify the `grant` command's server-side logic to fail by default if an environment variable already exists, preventing accidental overwrites. The operation should only succeed if the `--override` flag is explicitly provided.",
+        "details": "The current implementation of the `grant` command overwrites existing variables in the target `.env` file by default. This task corrects this behavior. The logic should be implemented in the daemon's `handleGrant` function. Before writing any variables, the handler must parse the target `.env` file to check for existing keys. If a variable from the grant request already exists in the file and the `override` flag in the `GrantRequest` is `false`, the entire operation must be aborted, and an error must be returned to the client. The error message should clearly state which variable caused the conflict and instruct the user to use the `--override` flag. If the flag is `true`, the existing variable should be overwritten as intended.",
+        "testStrategy": "Create a multi-part test suite. 1. **Unit Test:** In the daemon's grant handler test, create a mock `.env` file with a pre-existing variable (e.g., `API_KEY=old_value`). Send a `GrantRequest` for the same variable without the override flag and assert that an error is returned and the file remains unchanged. Then, send the same request with the override flag set to `true` and assert that the operation succeeds and the file is updated. 2. **Integration Test:** Execute the `env-lease grant` CLI command against a test `.env` file containing a conflicting variable. Verify that the command fails with a non-zero exit code and an informative error message. Then, execute `env-lease grant --override` and verify that the command succeeds and the variable in the `.env` file is correctly updated.",
+        "status": "pending",
+        "dependencies": [
+          9,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 24,
+        "title": "Improve CLI Error Handling for Daemon Connection Failure",
+        "description": "Refine the CLI's error handling to provide a clear, user-friendly message when it fails to connect to the daemon, instead of showing a generic error and stack trace.",
+        "details": "Currently, when the CLI attempts to communicate with a non-running daemon, it exits with a generic connection error and a stack trace. This task involves modifying the CLI client's IPC connection logic to specifically catch socket connection errors. When such an error is detected, the CLI should print a formatted, helpful message to stderr, such as 'Error: Could not connect to the env-lease daemon at [socket_path]. Is the daemon running? Try starting it with `env-lease daemon start`.' The application should then exit with a non-zero status code without displaying a stack trace. The socket path should be dynamically retrieved from the application's configuration.",
+        "testStrategy": "To test this, first ensure the `env-leased` daemon is not running. Then, execute any CLI command that requires daemon communication, like `env-lease status` or `env-lease grant`. Verify that the command fails and prints a user-friendly error message to stderr that includes the socket path and suggests the daemon may not be running. Crucially, confirm that no Go stack trace is printed. Finally, start the daemon and run the same command again to ensure it now connects and executes successfully, confirming the error handling is specific to the connection failure scenario.",
+        "status": "pending",
+        "dependencies": [
+          9
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 25,
+        "title": "Implement Minimal Daemon Event Logging",
+        "description": "Introduce basic logging to the daemon for key events such as successful grants, manual revocations, and automatic lease expirations to improve operational visibility.",
+        "details": "Integrate the standard `log` package into the daemon's main process. Logging should be directed to standard output to be easily captured by service managers like systemd. Add single-line log messages at the following key locations:\n1. In the `handleGrant` function, after all secrets have been successfully fetched and written, log a message like `INFO: Leases granted for project [project_config_path]`.\n2. In the `handleRevoke` function, after all leases for a project have been successfully revoked, log a message like `INFO: Leases manually revoked for project [project_config_path]`.\n3. In the core timer loop that manages lease expiration, after a lease is successfully revoked due to its TTL expiring, log a message like `INFO: Lease [lease_identifier] expired and was revoked.`",
+        "testStrategy": "Testing will be performed via integration tests that monitor the daemon's standard output. Start the daemon in a test process and capture its stdout/stderr streams. \n1. **Grant Logging:** Execute the `env-lease grant` command. Assert that the daemon's output contains the expected 'Leases granted' log message.\n2. **Revoke Logging:** After granting a lease, execute the `env-lease revoke` command. Assert that the daemon's output contains the 'Leases manually revoked' log message.\n3. **Expiration Logging:** Grant a lease with a very short TTL (e.g., 2 seconds). Wait for 3 seconds and then assert that the daemon's output contains the 'Lease expired and was revoked' log message.",
+        "status": "pending",
+        "dependencies": [
+          9,
+          14,
+          23
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T16:08:23.113Z",
+      "updated": "2025-09-21T16:22:05.718Z",
       "description": "Tasks for master context"
     }
   }
