@@ -12,9 +12,21 @@ func TestAtomicWriteFile(t *testing.T) {
 	data := []byte("hello world")
 	perm := os.FileMode(0644)
 
-	err := AtomicWriteFile(filename, data, perm)
+	created, err := AtomicWriteFile(filename, data, perm)
 	if err != nil {
 		t.Fatalf("AtomicWriteFile failed: %v", err)
+	}
+	if !created {
+		t.Error("expected created to be true")
+	}
+
+	// Write again, should not be created
+	created, err = AtomicWriteFile(filename, data, perm)
+	if err != nil {
+		t.Fatalf("AtomicWriteFile failed: %v", err)
+	}
+	if created {
+		t.Error("expected created to be false")
 	}
 
 	// Verify content

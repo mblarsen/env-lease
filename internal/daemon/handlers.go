@@ -37,21 +37,29 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to unmarshal grant request: %w", err)
 	}
 
+	var messages []string
 	for _, l := range req.Leases {
 		duration, err := time.ParseDuration(l.Duration)
 		if err != nil {
 			return nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 		}
+
+		var created bool
 		switch l.LeaseType {
 		case "env":
 			content := fmt.Sprintf(l.Format, l.Variable, l.Value)
-			if err := fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644); err != nil {
+			created, err = fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644)
+			if err != nil {
 				return nil, err
 			}
 		case "file":
-			if err := fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644); err != nil {
+			created, err = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644)
+			if err != nil {
 				return nil, err
 			}
+		}
+		if created {
+			messages = append(messages, fmt.Sprintf("Created file: %s", l.Destination))
 		}
 
 		key := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
@@ -65,7 +73,8 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		}
 	}
 
-	return nil, nil
+	resp := ipc.GrantResponse{Messages: messages}
+	return json.Marshal(resp)
 }
 
 func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {

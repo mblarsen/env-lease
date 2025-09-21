@@ -61,5 +61,6 @@ func (r *FileRevoker) clearEnvVar(path, key string) error {
 		return err
 	}
 
-	return fileutil.AtomicWriteFile(path, out.Bytes(), info.Mode())
+	_, err = fileutil.AtomicWriteFile(path, out.Bytes(), info.Mode())
+	return err
 }

@@ -31,7 +31,7 @@ var installCmd = &cobra.Command{
 		plist := fmt.Sprintf(plistTemplate, executable)
 		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-leased.plist")
 
-		if err := fileutil.AtomicWriteFile(plistPath, []byte(plist), 0644); err != nil {
+		if _, err := fileutil.AtomicWriteFile(plistPath, []byte(plist), 0644); err != nil {
 			return err
 		}
 

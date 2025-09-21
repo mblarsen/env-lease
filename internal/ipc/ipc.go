@@ -20,6 +20,11 @@ type GrantRequest struct {
 	Leases  []Lease
 }
 
+// GrantResponse is the payload for a grant response.
+type GrantResponse struct {
+	Messages []string
+}
+
 // Lease is a simplified lease structure for IPC.
 type Lease struct {
 	Source      string
