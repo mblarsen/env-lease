@@ -1,0 +1,251 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Project Scaffolding and Initialization",
+        "description": "Set up the basic Go project structure, initialize Go modules, and create the initial directory layout for the CLI and daemon components.",
+        "details": "Initialize a new Go module using `go mod init github.com/user/env-lease`. Create a standard Go project layout, for example: `/cmd/env-lease`, `/cmd/env-leased`, `/internal/config`, `/internal/daemon`, `/internal/ipc`, `/internal/provider`. Use a CLI framework like `cobra` to structure the commands.",
+        "testStrategy": "Verify that the project builds successfully with `go build ./...`. No specific tests are needed for this setup task, but it enables all future testing.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Configuration Parsing (`env-lease.toml`)",
+        "description": "Implement the logic to parse the `env-lease.toml` configuration file into Go structs. This includes defining the structs for leases and handling different lease types, formats, and encodings.",
+        "details": "Use a robust TOML parsing library like `github.com/BurntSushi/toml`. Define Go structs that map directly to the TOML structure. For example: `type Config struct { Leases map[string]Lease }`, `type Lease struct { Type string; Format string; Encoding string; Source string; Destination string; Duration string }`. Implement validation for required fields and default values (e.g., `lease_type` defaults to `\"env\"`).",
+        "testStrategy": "Create a suite of unit tests with various valid and invalid `env-lease.toml` files. Test cases should include missing fields, invalid value types, different lease types (`env`, `file`), and custom formats/encodings.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Define SecretProvider Interface",
+        "description": "Define a Go interface for abstracting the secret-fetching logic. This will allow for multiple secret backends to be implemented in the future.",
+        "details": "In the `/internal/provider` package, define the interface. `type SecretProvider interface { Fetch(source string) (string, error) }`. The `source` string will be the provider-specific identifier for the secret (e.g., a 1Password secret reference URI).",
+        "testStrategy": "This is an interface definition, so no direct tests are needed. The correctness will be validated by the tests for the concrete implementations.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Implement 1Password CLI Secret Provider",
+        "description": "Create the first implementation of the `SecretProvider` interface that uses the 1Password CLI (`op`) to fetch secrets.",
+        "details": "Create a `OnePasswordCLI` struct that implements the `SecretProvider` interface. The `Fetch` method will use the `os/exec` package to call `op read <source>`. It must handle potential errors, such as the `op` command not being in the PATH, the user not being logged in (which should result in a clear error message), or the secret not being found.",
+        "testStrategy": "Unit test the provider by mocking `os/exec`. Create test cases for successful secret retrieval, `op` command not found, and `op` returning an error (e.g., locked vault). An integration test could be added that runs only if the `op` CLI is configured and available in the test environment.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Implement IPC Framework with HMAC Security",
+        "description": "Develop the shared communication layer for the CLI and daemon using a Unix Domain Socket. Implement HMAC signatures to ensure message authenticity and integrity.",
+        "details": "Create an `/internal/ipc` package. Define message structs for commands (`GrantRequest`, `RevokeRequest`, `StatusRequest`) and responses. Use `net.Listen(\"unix\", socketPath)` for the server and `net.Dial(\"unix\", socketPath)` for the client. For security, generate a shared secret token. Each message should be serialized (e.g., JSON), and sent with an HMAC-SHA256 signature in a header or as part of the message envelope. Use the `crypto/hmac` and `crypto/sha256` standard libraries.",
+        "testStrategy": "Create unit tests for the HMAC signing and verification logic. Write an integration test that starts a mock server and has a client send a message, verifying successful and authenticated communication.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Implement Atomic File Writer Utility",
+        "description": "Create a utility function for performing atomic file writes. This ensures that destination files like `.envrc` are never left in a corrupted state.",
+        "details": "Create a helper function, e.g., `AtomicWriteFile(filename string, data []byte, perm fs.FileMode)`. The logic should be: 1. Create a temporary file in the same directory using `os.CreateTemp`. 2. Write the data to the temporary file. 3. Close the temporary file. 4. Rename the temporary file to the final destination filename using `os.Rename`. This is an atomic operation on POSIX systems.",
+        "testStrategy": "Unit test the utility using a temporary directory. Verify that the file is created with the correct content and permissions. Test edge cases like the destination directory not existing or permission errors during the rename.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Implement Daemon State Management",
+        "description": "Implement the daemon's ability to persist the state of active leases to a JSON file, allowing it to resume operations after a restart.",
+        "details": "Define a struct for the daemon's state, likely a map of lease identifiers to their expiration times and other metadata. Create `LoadState()` and `SaveState()` methods. The state file should be located at `~/.config/env-lease/state.json`. `LoadState()` should be called on daemon startup. `SaveState()` should be called whenever the set of active leases changes. Use `encoding/json` for serialization.",
+        "testStrategy": "Unit test the `LoadState` and `SaveState` methods. Use a temporary file to verify that state is correctly written to and read from disk. Test edge cases like the state file not existing, being empty, or containing corrupted JSON.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Implement Daemon Core Logic and Timer Loop",
+        "description": "Build the main loop of the `env-leased` daemon. This loop will manage lease timers, trigger expirations, and handle the automatic revocation of secrets.",
+        "details": "The daemon's main run loop will use a `time.Ticker` for periodic checks (e.g., every second). On each tick, it will iterate through the active leases from its state. If a lease's expiration time has passed, it will trigger the revocation logic (removing the line from the `.env` file or deleting the temp file). Upon startup, it should immediately check for and revoke any leases that expired while it was offline.",
+        "testStrategy": "Unit test the core loop logic with a mocked clock (`time.After`) and a mock filesystem. Verify that leases are correctly identified as expired and that the revocation function is called. Test the startup logic to ensure it correctly handles leases that expired while the daemon was not running.",
+        "priority": "high",
+        "dependencies": [
+          4,
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "Implement Daemon IPC Server",
+        "description": "Integrate the IPC framework into the daemon, allowing it to listen for and respond to commands from the `env-lease` CLI.",
+        "details": "In the daemon's main function, start a goroutine that listens on the Unix Domain Socket defined in the IPC package. It should accept connections, read incoming messages, verify their HMAC signature, and dispatch them to handler functions (e.g., `handleGrant`, `handleRevoke`). The handlers will modify the daemon's state and trigger actions in the core loop.",
+        "testStrategy": "Write integration tests where a mock client (from the IPC package tests) connects to a running instance of the daemon. Send `grant`, `revoke`, and `status` commands and verify that the daemon's internal state changes as expected.",
+        "priority": "high",
+        "dependencies": [
+          5,
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "Implement CLI IPC Client",
+        "description": "Implement the client-side logic for the `env-lease` CLI to connect to the daemon, sign messages, and send commands.",
+        "details": "Create a client struct in the `/internal/ipc` package that encapsulates dialing the socket, serializing a request, signing it with HMAC, sending it, and then reading and verifying the response. This client will be used by all CLI commands that need to interact with the daemon.",
+        "testStrategy": "The client logic will be tested implicitly through the command implementation tests. Direct unit tests can be written to verify correct message formatting and signing.",
+        "priority": "high",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Implement `env-lease grant` Command",
+        "description": "Build the `grant` command. This command will parse the configuration, communicate with the daemon to grant all defined leases, and handle user flags.",
+        "details": "Using the `cobra` framework, create the `grant` command. It will first parse `env-lease.toml`. Then, it will use the IPC client to send a `GrantRequest` to the daemon containing the lease definitions. It must implement the `--override` and `--continue-on-error` flags, passing them along in the request. By default, the operation should be transactional ('all or nothing').",
+        "testStrategy": "Write integration tests that execute the `grant` command against a mock daemon. Verify that the correct `GrantRequest` is sent. Test the default transactional behavior and the behavior when `--continue-on-error` is used.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "Implement `env-lease revoke` Command",
+        "description": "Build the `revoke` command, which allows a user to immediately revoke all active leases for the current project.",
+        "details": "Create the `revoke` command using `cobra`. The command will use the IPC client to send a `RevokeRequest` to the daemon. The daemon will then be responsible for immediately revoking all leases associated with that project's configuration file.",
+        "testStrategy": "Write an integration test. First, run `grant` to establish leases. Then, run `revoke` and query the mock daemon's state to verify that all leases have been removed.",
+        "priority": "high",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "Implement `env-lease status` Command",
+        "description": "Build the `status` command to display the state and remaining time for all active leases.",
+        "details": "Create the `status` command using `cobra`. It will use the IPC client to send a `StatusRequest` to the daemon. The daemon will respond with a list of active leases and their remaining TTLs. The CLI will then format this information and print it to the console in a user-friendly table.",
+        "testStrategy": "Write an integration test. Grant several leases with different durations, then run the `status` command. Capture the stdout and verify that it correctly displays the status and remaining time for each active lease.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "Implement Daemon Revocation Failure Handling",
+        "description": "Implement the daemon's error handling logic for when a revocation operation fails. This includes periodic retries and creating a persistent failure notification file.",
+        "details": "Modify the daemon's revocation logic. If revoking a secret fails (e.g., due to file permissions), the daemon should log the error and schedule a retry (e.g., using an exponential backoff strategy). If the failure persists for more than 5 minutes, the daemon must create a `.envrc.env-lease-REVOCATION-FAILURE` file in the project directory to alert the user.",
+        "testStrategy": "Unit test this logic by mocking a revocation that always fails. Use a mock filesystem and a mock clock to verify that the retry mechanism is triggered and that the failure file is created after the specified duration.",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Implement Orphaned Lease Cleanup",
+        "description": "Add logic to the daemon to automatically purge leases whose configuration file has been deleted, and add a manual cleanup command.",
+        "details": "Add a periodic task to the daemon (e.g., runs daily) that checks if the `env-lease.toml` file for each active lease still exists. If a config file is missing, mark the lease as orphaned. If it remains orphaned for 30 days, revoke and delete it from the state. Also, add a hidden `env-leased --cleanup` command that allows a user to trigger this process manually.",
+        "testStrategy": "Unit test the cleanup logic. Create a state file with several leases. Use a mock filesystem to 'delete' the config file for one of them. Advance a mock clock by 31 days and verify that the orphaned lease is removed from the state.",
+        "priority": "low",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "System Service Integration (launchd for macOS)",
+        "description": "Create a `launchd` service file (`.plist`) and the necessary logic within the CLI to install, uninstall, and manage the daemon as a user agent on macOS.",
+        "details": "Create a template for the `com.user.env-leased.plist` file. It should be configured to run as a user agent and keep the daemon running. Add commands like `env-lease daemon install` and `env-lease daemon uninstall` which will place/remove the plist file in `~/Library/LaunchAgents/` and use `launchctl` to load/unload it.",
+        "testStrategy": "Manual testing on a macOS machine is required. Verify that `daemon install` correctly places the file and starts the service. Check `launchctl list | grep env-leased` to confirm it's running. Test that the service restarts automatically on login/reboot.",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "System Service Integration (systemd for Linux)",
+        "description": "Create a `systemd` service file and the CLI logic to manage the daemon as a user service on Linux.",
+        "details": "Create a template for the `env-leased.service` file. It should be a user service (`--user`). Add `env-lease daemon install/uninstall` commands that place/remove the service file in `~/.config/systemd/user/` and use `systemctl --user` to enable, disable, start, and stop the service.",
+        "testStrategy": "Manual testing on a Linux machine with systemd. Verify that `daemon install` works and the service starts. Use `systemctl --user status env-leased` to check its state. Test that the service restarts automatically on login/reboot.",
+        "priority": "medium",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "Build and Release Automation",
+        "description": "Configure GoReleaser to automate the building of binaries for multiple platforms, and set up a Homebrew tap for easy distribution on macOS.",
+        "details": "Create a `.goreleaser.yml` file. Configure it to build binaries for macOS (amd64, arm64) and Linux (amd64, arm64). Set up the `brews` section to publish a formula to a new GitHub repository that will serve as the Homebrew tap (e.g., `github.com/user/homebrew-tap`). The formula should include the service definitions.",
+        "testStrategy": "Run `goreleaser release --snapshot --clean` locally to test the build process. For the Homebrew tap, a full release needs to be tagged and pushed to GitHub, followed by a manual `brew install user/tap/env-lease` to verify the installation process works correctly.",
+        "priority": "low",
+        "dependencies": [
+          11,
+          12,
+          13,
+          16,
+          17
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-09-21T13:04:46.205Z",
+      "updated": "2025-09-21T13:04:46.205Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

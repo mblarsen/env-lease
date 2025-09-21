@@ -1,0 +1,71 @@
+# Project Requirements Document: `env-lease`
+
+### 1. **Project Title**
+`env-lease`: A CLI tool for managing temporary, leased secrets in local development environment files.
+
+### 2. **Problem Statement**
+Developers frequently use sensitive secrets (API keys, tokens) in local development by manually copying them into `.env` or `.envrc` files. This process is tedious, insecure (secrets are often left indefinitely), and error-prone (cleanup is easily forgotten). This project aims to automate the lifecycle of these secrets to improve developer workflow and security.
+
+### 3. **Proposed Solution**
+`env-lease` is a command-line tool with a background daemon that automates the lifecycle of secrets. A developer defines leases in a configuration file (`env-lease.toml`). The tool fetches a secret from a secure backend (initially 1Password), injects it into a destination file (as an environment variable or a temporary file), and automatically revokes it after a specified duration.
+
+### 4. **Core Features & Workflow**
+
+#### 4.1. **Configuration (`env-lease.toml`)**
+*   A declarative TOML file defines a list of `[[lease]]` blocks.
+*   **Fields:**
+    *   `source`: The URI of the secret (e.g., `op://vault/item/secret`).
+    *   `destination`: The relative path to the target file (e.g., `.envrc`, `./cert.pem`).
+    *   `duration`: The lease duration (e.g., "10m", "1h", "8h").
+    *   `lease_type`: (Optional) `"env"` (default) or `"file"`.
+    *   `variable`: (For `lease_type="env"`) The name of the environment variable.
+    *   `format`: (Optional, for `lease_type="env"`) A Go `sprintf`-style format string. Smart defaults are applied for `.env` (`%s=%q`) and `.envrc` (`export %s=%q`). The use of `%q` is recommended for safely quoting values.
+    *   `encoding`: (Optional, for `lease_type="env"`) If set to `"base64"`, the secret value is base64-encoded.
+
+#### 4.2. **Command-Line Interface (CLI)**
+*   `env-lease grant`: Grants all leases defined in `env-lease.toml`.
+    *   It is transactional by default ("all or nothing").
+    *   `--continue-on-error` flag enables best-effort mode.
+    *   `--override` flag allows overwriting pre-existing values in destination files.
+    *   If a destination file doesn't exist, it is created with a notification to the user.
+    *   If a lease is already active, its timer is reset to the full duration.
+*   `env-lease revoke`: Immediately revokes all secrets defined in the current project's `env-lease.toml`.
+*   `env-lease status`: Lists all currently active leases managed by the daemon.
+*   `env-lease daemon --cleanup`: Manually purges all orphaned leases from the daemon's state.
+
+#### 4.3. **Background Daemon (`env-leased`)**
+*   A persistent, stateful background process that manages all active leases.
+*   **State Management:**
+    *   Maintains lease state in a file (`~/.config/env-lease/state.json`), allowing persistence across reboots.
+    *   On startup, it reloads state and immediately revokes any leases that expired while it was down.
+*   **Lease Management:**
+    *   Leases are uniquely identified by the absolute path to the `env-lease.toml` and the relative path to the destination file.
+*   **Revocation Logic:**
+    *   When a lease expires, the daemon clears the variable's value (`API_KEY=""`) or deletes the leased file, depending on `lease_type`.
+    *   It uses a "Force Revoke" policy, overwriting any manual changes to a leased variable.
+*   **Orphaned Lease Cleanup:**
+    *   Periodically checks if the `env-lease.toml` for active leases still exists.
+    *   Logs a warning for orphaned leases.
+    *   Automatically purges leases that have been orphaned for over 30 days.
+
+### 5. **Technical Design**
+*   **Language:** Go.
+*   **Architecture:**
+    1.  **CLI (`env-lease`):** Stateless user-facing binary.
+    2.  **Daemon (`env-leased`):** Stateful background service, managed by `launchd` on macOS and `systemd` on Linux as a **user service**.
+*   **Secret Fetching:** A `SecretProvider` interface will be used to abstract secret sources. The initial implementation will be for the 1Password CLI (`op`).
+*   **IPC:**
+    *   Communication between CLI and daemon via a Unix Domain Socket.
+    *   Secured using a shared secret token and HMAC signatures to ensure authenticity and integrity.
+*   **File Operations:** All writes are atomic (write-to-temp then rename).
+
+### 6. **Error Handling & Edge Cases**
+*   **1Password Locked:** The tool will "fail fast" and instruct the user to run `op signin`.
+*   **Revocation Failure (Permissions):**
+    1.  The daemon logs a critical error and retries the revocation periodically.
+    2.  After 5 minutes of failures, it writes a persistent marker file (e.g., `.envrc.env-lease-REVOCATION-FAILURE`) to the project directory.
+*   **Direnv Integration:** If a command modifies an `.envrc` file, it will print a message advising the user to run `direnv allow`.
+
+### 7. **Distribution**
+*   **GoReleaser:** To automate cross-platform builds.
+*   **Homebrew:** A tap for macOS and Linux installation.

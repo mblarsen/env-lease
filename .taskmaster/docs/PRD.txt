@@ -1,0 +1,63 @@
+<context>
+# Project Title
+`env-lease`: A CLI tool for managing temporary, leased secrets in local development environment files.
+
+# Problem Statement
+Developers frequently use sensitive secrets (API keys, tokens) in local development by manually copying them into `.env` or `.envrc` files. This process is tedious, insecure (secrets are often left indefinitely), and error-prone (cleanup is easily forgotten). This project aims to automate the lifecycle of these secrets to improve developer workflow and security.
+
+# Proposed Solution
+`env-lease` is a command-line tool with a background daemon that automates the lifecycle of secrets. A developer defines leases in a configuration file (`env-lease.toml`). The tool fetches a secret from a secure backend (initially 1Password), injects it into a destination file (as an environment variable or a temporary file), and automatically revokes it after a specified duration.
+
+# Core Features & User Workflow
+*   **Declarative Configuration:** Users define all leases in a simple `env-lease.toml` file.
+*   **Grant Command (`env-lease grant`):** A single command to fetch all secrets, write them to their destinations, and start the lease timers. It provides `--override` and `--continue-on-error` flags for more control.
+*   **Revoke Command (`env-lease revoke`):** A single command to immediately revoke all secrets for a project.
+*   **Status Command (`env-lease status`):** Allows users to see the state and remaining time for all active leases.
+*   **Automatic Revocation:** The core value proposition. The background daemon ensures secrets are automatically removed when the lease expires, even if the user forgets.
+*   **Direnv Integration:** The tool provides helpful hints for `direnv` users to ensure environment changes are loaded correctly.
+</context>
+<PRD>
+# Technical Architecture
+*   **Language:** Go.
+*   **Architecture:** A stateless CLI (`env-lease`) communicates with a stateful background daemon (`env-leased`) via a Unix Domain Socket.
+*   **Service Management:** The daemon runs as a user service, managed by `launchd` on macOS and `systemd` on Linux.
+*   **State Persistence:** The daemon maintains the state of active leases in a JSON file in `~/.config/env-lease/`, allowing it to resume operations after a reboot.
+*   **IPC Security:** Communication is secured using a shared secret token and HMAC signatures to ensure message authenticity and integrity.
+*   **Secret Provider Interface:** A `SecretProvider` interface will be used from the start to abstract the secret-fetching logic, making it easy to add new backends beyond the initial 1Password CLI implementation.
+*   **File Operations:** All file writes are atomic (write-to-temp then rename) to prevent corruption.
+
+# Feature Breakdown & Implementation Details
+*   **Configuration (`env-lease.toml`):**
+    *   `lease_type`: Supports `"env"` (default) and `"file"`.
+    *   `format`: A Go `sprintf`-style string. Defaults will use `%q` for safe quoting (`export %s=%q`).
+    *   `encoding`: Supports `"base64"` for `env` type leases.
+*   **Daemon Logic:**
+    *   **Stateful:** Reloads state on start and revokes any leases that expired while it was offline.
+    *   **Orphaned Lease Cleanup:** Implements a 30-day automatic purge for leases whose `env-lease.toml` has been deleted, with warnings logged in the interim. A manual `daemon --cleanup` command will be available.
+*   **Error Handling:**
+    *   **Transactional Grant:** `grant` is "all or nothing" by default.
+    *   **1Password Locked:** The tool will fail fast with a clear error message.
+    *   **Revocation Failure:** The daemon will log the error, retry the operation periodically, and create a persistent `.envrc.env-lease-REVOCATION-FAILURE` file after 5 minutes of continued failure.
+
+# Development Roadmap (Phase 1 - MVP)
+1.  **Daemon Core:**
+    *   Implement the state management logic (load/save state file).
+    *   Build the core timer loop for managing lease expirations.
+    *   Implement the IPC listener on the Unix Domain Socket with HMAC security.
+2.  **Secret Provider Interface:**
+    *   Define the `SecretProvider` interface.
+    *   Implement the `OnePasswordCLI` provider.
+3.  **CLI Core:**
+    *   Implement TOML parsing.
+    *   Implement the IPC client with HMAC security.
+    *   Build the `grant`, `revoke`, and `status` commands.
+4.  **Integration & Packaging:**
+    *   Set up `launchd` and `systemd` service files.
+    *   Create the GoReleaser configuration for builds.
+    *   Set up the Homebrew tap.
+
+# Risks and Mitigations
+*   **Complexity of Service Management:** Creating robust `launchd` and `systemd` installers can be tricky. Mitigation: Rely on established libraries and test thoroughly on both platforms.
+*   **IPC Security Implementation:** Cryptographic code must be implemented carefully. Mitigation: Use standard, well-vetted Go cryptographic libraries and follow best practices for HMAC implementation.
+*   **Edge Cases in File Parsing/Modification:** Modifying user-owned config files can be fragile. Mitigation: Use atomic writes for all file modifications and have a robust test suite covering various file states (missing, empty, pre-populated).
+</PRD>
