@@ -28,13 +28,6 @@ checksum:
   name_template: 'checksums.txt'
 snapshot:
   name_template: "{{ .Tag }}-next"
-changelog:
-  sort: asc
-  filters:
-    first_pull_request: true
-    exclude:
-      - '^docs:'
-      - '^test:'
 
 brews:
   - name: env-lease

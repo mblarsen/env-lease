@@ -882,11 +882,25 @@
             "testStrategy": "From a user's perspective, read through the 'Core Commands' section and manually execute each example command to ensure they are correct and the descriptions are clear. Verify that the link in the 'Next Steps' section correctly points to the location of the comprehensive documentation."
           }
         ]
+      },
+      {
+        "id": 21,
+        "title": "Add Go Package Documentation Headers",
+        "description": "Implement standard Go documentation comments (godoc) for all public packages, functions, and types to improve code maintainability and enable auto-generated documentation.",
+        "details": "Review every package in the project and add Go documentation comments where missing. The documentation should follow the official `godoc` conventions. Each public package should have a package-level comment (e.g., in a `doc.go` file) explaining its role. All exported functions, methods, types, and constants must have a clear, concise comment describing their purpose, parameters, and return values. For example, a function comment should start with the function's name: `// MyFunction does X and Y.`. Pay special attention to packages related to core logic such as IPC, configuration, daemon management, and the specific CLI commands for system service integration.",
+        "testStrategy": "Verification will be done through a combination of automated checks and manual review. First, run a linter configured to report missing comments on public APIs. Second, start a local godoc server using `godoc -http=:6060` and browse to the project's documentation. A reviewer must check that all public packages, functions, and types are documented, and that the documentation is clear, accurate, and well-formatted. The review should confirm that package overviews are present and provide sufficient context.",
+        "status": "pending",
+        "dependencies": [
+          16,
+          17
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T14:48:19.890Z",
+      "updated": "2025-09-21T15:01:58.804Z",
       "description": "Tasks for master context"
     }
   }
