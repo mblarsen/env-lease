@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -98,18 +99,21 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	}
 
 	resp := ipc.GrantResponse{Messages: messages}
+	log.Printf("Granted %d leases", len(req.Leases))
 	return json.Marshal(resp)
 }
 
 func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {
 	// TODO: This should only revoke leases for the current project context.
 	// For now, it revokes all active leases.
+	count := len(d.state.Leases)
 	for id, lease := range d.state.Leases {
 		if err := d.revoker.Revoke(lease); err != nil {
 			// Don't return the error, try to revoke as many as possible
 		}
 		delete(d.state.Leases, id)
 	}
+	log.Printf("Manually revoked %d leases", count)
 	return nil, nil
 }
 

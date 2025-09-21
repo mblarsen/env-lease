@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"log"
 	"os"
 	"sync"
 	"time"
@@ -101,12 +102,15 @@ func (d *Daemon) revokeExpiredLeases() {
 		if now.After(lease.ExpiresAt) {
 			err := d.revoker.Revoke(lease)
 			if err != nil {
+				log.Printf("Failed to revoke lease %s, adding to retry queue", id)
 				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
 					Lease:         lease,
 					Attempts:      1,
 					NextRetryTime: now.Add(2 * time.Second),
 					InitialFailure: now,
 				})
+			} else {
+				log.Printf("Lease %s expired and was revoked", id)
 			}
 			delete(d.state.Leases, id)
 		}

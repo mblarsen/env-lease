@@ -941,7 +941,7 @@
         "description": "Introduce basic logging to the daemon for key events such as successful grants, manual revocations, and automatic lease expirations to improve operational visibility.",
         "details": "Integrate the standard `log` package into the daemon's main process. Logging should be directed to standard output to be easily captured by service managers like systemd. Add single-line log messages at the following key locations:\n1. In the `handleGrant` function, after all secrets have been successfully fetched and written, log a message like `INFO: Leases granted for project [project_config_path]`.\n2. In the `handleRevoke` function, after all leases for a project have been successfully revoked, log a message like `INFO: Leases manually revoked for project [project_config_path]`.\n3. In the core timer loop that manages lease expiration, after a lease is successfully revoked due to its TTL expiring, log a message like `INFO: Lease [lease_identifier] expired and was revoked.`",
         "testStrategy": "Testing will be performed via integration tests that monitor the daemon's standard output. Start the daemon in a test process and capture its stdout/stderr streams. \n1. **Grant Logging:** Execute the `env-lease grant` command. Assert that the daemon's output contains the expected 'Leases granted' log message.\n2. **Revoke Logging:** After granting a lease, execute the `env-lease revoke` command. Assert that the daemon's output contains the 'Leases manually revoked' log message.\n3. **Expiration Logging:** Grant a lease with a very short TTL (e.g., 2 seconds). Wait for 3 seconds and then assert that the daemon's output contains the 'Lease expired and was revoked' log message.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           9,
           14,
@@ -953,7 +953,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T16:26:31.462Z",
+      "updated": "2025-09-21T16:27:55.409Z",
       "description": "Tasks for master context"
     }
   }
