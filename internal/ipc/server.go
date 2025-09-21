@@ -31,7 +31,7 @@ func NewServer(socketPath string, secret []byte) (*Server, error) {
 }
 
 // Listen starts the server's listening loop.
-func (s *Server) Listen(handler func(payload []byte) error) error {
+func (s *Server) Listen(handler func(payload []byte) ([]byte, error)) error {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
@@ -41,7 +41,7 @@ func (s *Server) Listen(handler func(payload []byte) error) error {
 	}
 }
 
-func (s *Server) handleConnection(conn net.Conn, handler func(payload []byte) error) {
+func (s *Server) handleConnection(conn net.Conn, handler func(payload []byte) ([]byte, error)) {
 	defer conn.Close()
 
 	var req Request
@@ -55,9 +55,16 @@ func (s *Server) handleConnection(conn net.Conn, handler func(payload []byte) er
 		return
 	}
 
-	if err := handler(req.Payload); err != nil {
-		fmt.Fprintf(os.Stderr, "handler error: %v\n", err)
-		// Optionally, send error back to client
+	responsePayload, err := handler(req.Payload)
+	resp := &Response{}
+	if err != nil {
+		resp.Error = err.Error()
+	} else {
+		resp.Payload = responsePayload
+	}
+
+	if err := json.NewEncoder(conn).Encode(resp); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to encode response: %v\n", err)
 	}
 }
 

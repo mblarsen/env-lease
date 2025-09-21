@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 )
 
@@ -19,8 +20,8 @@ func NewClient(socketPath string, secret []byte) *Client {
 	}
 }
 
-// Send sends a request to the server.
-func (c *Client) Send(payload interface{}) error {
+// Send sends a request to the server and decodes the response.
+func (c *Client) Send(payload interface{}, responsePayload interface{}) error {
 	req, err := NewRequest(payload, c.secret)
 	if err != nil {
 		return err
@@ -34,6 +35,22 @@ func (c *Client) Send(payload interface{}) error {
 
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return err
+	}
+
+	// Decode the response
+	if responsePayload != nil {
+		var resp Response
+		if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+			return fmt.Errorf("failed to decode response: %w", err)
+		}
+
+		if resp.Error != "" {
+			return fmt.Errorf("server error: %s", resp.Error)
+		}
+
+		if err := json.Unmarshal(resp.Payload, responsePayload); err != nil {
+			return fmt.Errorf("failed to unmarshal response payload: %w", err)
+		}
 	}
 
 	return nil

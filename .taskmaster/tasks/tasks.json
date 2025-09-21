@@ -378,7 +378,7 @@
         "dependencies": [
           5
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -386,7 +386,7 @@
             "description": "Create the basic `Client` struct in `/internal/ipc` and a core private method to handle the fundamental communication flow: dialing the daemon's socket, signing and sending a serialized request, and receiving/verifying the response. This method will be the foundation for all specific command requests.",
             "dependencies": [],
             "details": "This core method should handle the low-level details of establishing a connection, writing the signed payload, reading the response, and closing the connection. It will be used by the higher-level methods defined in the next subtask. Focus on robustly handling the raw byte stream and HMAC verification.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -397,7 +397,7 @@
               "10.1"
             ],
             "details": "Each method will be responsible for creating the appropriate request object, calling the core communication method, and then decoding the response into the correct type. Implement clear error wrapping to distinguish between connection errors (e.g., daemon not running) and application-level errors returned by the daemon.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:42:59.904Z",
+      "updated": "2025-09-21T13:44:25.360Z",
       "description": "Tasks for master context"
     }
   }

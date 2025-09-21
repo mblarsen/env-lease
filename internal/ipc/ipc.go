@@ -46,6 +46,12 @@ func Verify(payload []byte, signature string, secret []byte) error {
 	return nil
 }
 
+// Response represents a response sent from the daemon to the CLI.
+type Response struct {
+	Error   string          `json:"error,omitempty"`
+	Payload json.RawMessage `json:"payload,omitempty"`
+}
+
 // NewRequest creates a new signed request.
 func NewRequest(payload interface{}, secret []byte) (*Request, error) {
 	payloadBytes, err := json.Marshal(payload)

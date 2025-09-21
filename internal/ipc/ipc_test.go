@@ -21,9 +21,9 @@ func TestIPC(t *testing.T) {
 	defer server.Close()
 
 	handlerChan := make(chan []byte, 1)
-	handler := func(payload []byte) error {
+	handler := func(payload []byte) ([]byte, error) {
 		handlerChan <- payload
-		return nil
+		return nil, nil
 	}
 	go server.Listen(handler)
 
@@ -35,7 +35,7 @@ func TestIPC(t *testing.T) {
 		payload := GrantRequest{
 			Leases: []Lease{{Source: "test"}},
 		}
-		if err := client.Send(payload); err != nil {
+		if err := client.Send(payload, nil); err != nil {
 			t.Fatalf("client send failed: %v", err)
 		}
 
@@ -56,7 +56,7 @@ func TestIPC(t *testing.T) {
 		payload := GrantRequest{
 			Leases: []Lease{{Source: "test"}},
 		}
-		if err := client.Send(payload); err != nil {
+		if err := client.Send(payload, nil); err != nil {
 			t.Fatalf("client send failed: %v", err)
 		}
 
