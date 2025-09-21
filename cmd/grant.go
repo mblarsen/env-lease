@@ -62,9 +62,11 @@ var grantCmd = &cobra.Command{
 			}
 		}
 
+		override, _ := cmd.Flags().GetBool("override")
 		req := ipc.GrantRequest{
-			Command: "grant",
-			Leases:  leases,
+			Command:  "grant",
+			Leases:   leases,
+			Override: override,
 		}
 
 		ipcSecret, err := getSecret()

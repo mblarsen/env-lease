@@ -1,10 +1,13 @@
 package daemon
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -45,18 +48,39 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		}
 
 		var created bool
+		var writeErr error
 		switch l.LeaseType {
 		case "env":
+			if !req.Override {
+				// Check if the variable already exists
+				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
+					file, openErr := os.Open(l.Destination)
+					if openErr != nil {
+						return nil, openErr
+					}
+					defer file.Close()
+
+					scanner := bufio.NewScanner(file)
+					for scanner.Scan() {
+						line := scanner.Text()
+						if strings.HasPrefix(line, l.Variable+"=") || strings.HasPrefix(line, "export "+l.Variable+"=") {
+							return nil, fmt.Errorf("variable '%s' already exists in '%s'. Use --override to replace.", l.Variable, l.Destination)
+						}
+					}
+				}
+			}
 			content := fmt.Sprintf(l.Format, l.Variable, l.Value)
-			created, err = fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644)
-			if err != nil {
-				return nil, err
-			}
+			created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644)
 		case "file":
-			created, err = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644)
-			if err != nil {
-				return nil, err
+			if !req.Override {
+				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
+					return nil, fmt.Errorf("file '%s' already exists. Use --override to replace.", l.Destination)
+				}
 			}
+			created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644)
+		}
+		if writeErr != nil {
+			return nil, writeErr
 		}
 		if created {
 			messages = append(messages, fmt.Sprintf("Created file: %s", l.Destination))

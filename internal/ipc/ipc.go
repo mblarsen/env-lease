@@ -16,8 +16,9 @@ type Request struct {
 
 // GrantRequest is the payload for a grant request.
 type GrantRequest struct {
-	Command string
-	Leases  []Lease
+	Command  string
+	Leases   []Lease
+	Override bool
 }
 
 // GrantResponse is the payload for a grant response.

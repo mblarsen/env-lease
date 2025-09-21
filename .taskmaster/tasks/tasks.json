@@ -914,7 +914,7 @@
         "description": "Modify the `grant` command's server-side logic to fail by default if an environment variable already exists, preventing accidental overwrites. The operation should only succeed if the `--override` flag is explicitly provided.",
         "details": "The current implementation of the `grant` command overwrites existing variables in the target `.env` file by default. This task corrects this behavior. The logic should be implemented in the daemon's `handleGrant` function. Before writing any variables, the handler must parse the target `.env` file to check for existing keys. If a variable from the grant request already exists in the file and the `override` flag in the `GrantRequest` is `false`, the entire operation must be aborted, and an error must be returned to the client. The error message should clearly state which variable caused the conflict and instruct the user to use the `--override` flag. If the flag is `true`, the existing variable should be overwritten as intended.",
         "testStrategy": "Create a multi-part test suite. 1. **Unit Test:** In the daemon's grant handler test, create a mock `.env` file with a pre-existing variable (e.g., `API_KEY=old_value`). Send a `GrantRequest` for the same variable without the override flag and assert that an error is returned and the file remains unchanged. Then, send the same request with the override flag set to `true` and assert that the operation succeeds and the file is updated. 2. **Integration Test:** Execute the `env-lease grant` CLI command against a test `.env` file containing a conflicting variable. Verify that the command fails with a non-zero exit code and an informative error message. Then, execute `env-lease grant --override` and verify that the command succeeds and the variable in the `.env` file is correctly updated.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           9,
           11
@@ -953,7 +953,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T16:24:37.168Z",
+      "updated": "2025-09-21T16:26:31.462Z",
       "description": "Tasks for master context"
     }
   }
