@@ -29,6 +29,7 @@ type Lease struct {
 	Variable    string
 	Format      string
 	Encoding    string
+	Value       string
 }
 
 // Sign creates a signature for the payload.

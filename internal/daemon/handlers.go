@@ -3,6 +3,7 @@ package daemon
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"time"
 )
@@ -41,6 +42,13 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 		}
+		if l.LeaseType == "env" {
+			content := fmt.Sprintf(l.Format, l.Variable, l.Value)
+			if err := fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644); err != nil {
+				return nil, err
+			}
+		}
+
 		key := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
 		d.state.Leases[key] = Lease{
 			ExpiresAt:   d.clock.Now().Add(duration),
@@ -48,6 +56,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 			Destination: l.Destination,
 			LeaseType:   l.LeaseType,
 			Variable:    l.Variable,
+			Value:       l.Value,
 		}
 	}
 
@@ -55,9 +64,14 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 }
 
 func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {
-	// TODO: This should only revoke leases for the current project.
-	// For now, we'll just clear all leases.
-	d.state.Leases = make(map[string]Lease)
+	// TODO: This should only revoke leases for the current project context.
+	// For now, it revokes all active leases.
+	for id, lease := range d.state.Leases {
+		if err := d.revoker.Revoke(lease); err != nil {
+			// Don't return the error, try to revoke as many as possible
+		}
+		delete(d.state.Leases, id)
+	}
 	return nil, nil
 }
 

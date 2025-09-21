@@ -3,9 +3,12 @@ package cmd
 import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/spf13/cobra"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 var grantCmd = &cobra.Command{
@@ -18,16 +21,35 @@ var grantCmd = &cobra.Command{
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
+		var p provider.SecretProvider
+		if os.Getenv("ENV_LEASE_TEST") == "1" {
+			p = &provider.MockProvider{}
+		} else {
+			p = &provider.OnePasswordCLI{}
+		}
+
 		leases := make([]ipc.Lease, len(cfg.Lease))
 		for i, l := range cfg.Lease {
+			secretVal, err := p.Fetch(l.Source)
+			if err != nil {
+				// TODO: Handle --continue-on-error
+				return fmt.Errorf("failed to fetch secret for %s: %w", l.Source, err)
+			}
+
+			absDest, err := filepath.Abs(l.Destination)
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
+			}
+
 			leases[i] = ipc.Lease{
 				Source:      l.Source,
-				Destination: l.Destination,
+				Destination: absDest,
 				Duration:    l.Duration,
 				LeaseType:   l.LeaseType,
 				Variable:    l.Variable,
 				Format:      l.Format,
 				Encoding:    l.Encoding,
+				Value:       strings.TrimSpace(secretVal),
 			}
 		}
 
@@ -36,22 +58,11 @@ var grantCmd = &cobra.Command{
 			Leases:  leases,
 		}
 
-		// In a real implementation, we would fetch the secret here.
-		// For now, we'll just write a dummy value.
-		for _, l := range cfg.Lease {
-			if l.LeaseType == "env" {
-				content := fmt.Sprintf(l.Format, l.Variable, "dummy-value")
-				if err := fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644); err != nil {
-					return err
-				}
-			}
-		}
-
-		secret, err := getSecret()
+		ipcSecret, err := getSecret()
 		if err != nil {
-			return fmt.Errorf("failed to get secret: %w", err)
+			return fmt.Errorf("failed to get ipc secret: %w", err)
 		}
-		client := ipc.NewClient(getSocketPath(), secret)
+		client := ipc.NewClient(getSocketPath(), ipcSecret)
 		if err := client.Send(req, nil); err != nil {
 			return fmt.Errorf("failed to send grant request: %w", err)
 		}

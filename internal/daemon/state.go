@@ -30,6 +30,7 @@ type Lease struct {
 	Destination string `json:"destination"`
 	LeaseType   string `json:"lease_type"`
 	Variable    string `json:"variable"`
+	Value       string `json:"value"`
 }
 
 // NewState creates a new, empty state.
@@ -48,6 +49,10 @@ func LoadState(path string) (*State, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if len(data) == 0 {
+		return NewState(), nil
 	}
 
 	var state State

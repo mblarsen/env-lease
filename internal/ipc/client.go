@@ -37,17 +37,23 @@ func (c *Client) Send(payload any, responsePayload any) error {
 		return err
 	}
 
-	// Decode the response
+	// Always read the response to properly close the connection and check for errors
+	var resp Response
+	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+		// If the server sends no body, it's a successful fire-and-forget.
+		// We can treat EOF as a success signal in this specific case.
+		if err.Error() == "EOF" {
+			return nil
+		}
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if resp.Error != "" {
+		return fmt.Errorf("server error: %s", resp.Error)
+	}
+
+	// Only unmarshal a payload if the caller is expecting one
 	if responsePayload != nil {
-		var resp Response
-		if err := json.NewDecoder(conn).Decode(&resp); err != nil {
-			return fmt.Errorf("failed to decode response: %w", err)
-		}
-
-		if resp.Error != "" {
-			return fmt.Errorf("server error: %s", resp.Error)
-		}
-
 		if err := json.Unmarshal(resp.Payload, responsePayload); err != nil {
 			return fmt.Errorf("failed to unmarshal response payload: %w", err)
 		}
