@@ -413,7 +413,7 @@
           2,
           10
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -421,7 +421,7 @@
             "description": "In the `cmd` package, create a new file `grant.go`. Define the `cobra.Command` for the `grant` command and add the boolean flags for `--override` and `--continue-on-error`.",
             "dependencies": [],
             "details": "Create the file `cmd/grant.go`. Instantiate a `cobra.Command` struct for the `grant` command. Use `cmd.Flags().Bool()` to add the `--override` and `--continue-on-error` flags. Add a placeholder `RunE` function that will contain the core logic.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -432,7 +432,7 @@
               "11.1"
             ],
             "details": "In the `grant` command's `RunE` function, call the appropriate function from the `config` package to load the `env-lease.toml` file. Handle any errors during loading. Create an instance of the `ipc.GrantRequest` struct and populate it with the lease definitions from the config and the flag values from the command.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -443,7 +443,7 @@
               "11.2"
             ],
             "details": "Instantiate a new `ipc.Client`. Use the client to send the `GrantRequest` object created in the previous subtask to the running daemon. Check the response from the daemon and print a success message or the returned error to the console.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:45:27.584Z",
+      "updated": "2025-09-21T13:46:39.737Z",
       "description": "Tasks for master context"
     }
   }
