@@ -492,7 +492,7 @@
         "dependencies": [
           10
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -500,7 +500,7 @@
             "description": "Create a new file `cmd/status.go` and define the `cobra.Command` for the `status` command. This includes setting up the command's name, description, and adding it to the root command.",
             "dependencies": [],
             "details": "The file should be `cmd/status.go`. The command should be named `status`. The `RunE` function can be a placeholder initially. Ensure the new command is registered with the main `rootCmd`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -511,7 +511,7 @@
               "13.1"
             ],
             "details": "This involves using the existing `ipc.Client` to create and send a `StatusRequest`. The response from the daemon, which will contain the list of active leases, should be stored in a variable for the next step. Implement error handling for the client connection and request sending.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -522,7 +522,7 @@
               "13.2"
             ],
             "details": "The table should have clear headers (e.g., 'Destination', 'Time Remaining'). The remaining TTL, received as a duration, should be formatted into a user-friendly string. The final formatted table should be printed to standard output.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:50:39.746Z",
+      "updated": "2025-09-21T13:52:10.416Z",
       "description": "Tasks for master context"
     }
   }
