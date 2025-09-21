@@ -228,7 +228,7 @@
         "dependencies": [
           2
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -236,7 +236,7 @@
             "description": "In a new `internal/daemon` package, define the `State` struct to hold active lease data and implement the `LoadState(path string)` and `SaveState(path string)` functions for JSON serialization and file I/O.",
             "dependencies": [],
             "details": "The `State` struct should contain a map of lease identifiers to their metadata and expiration times. The `SaveState` function must ensure the target directory exists before writing the file. The `LoadState` function should handle cases where the file doesn't exist by returning a new, empty state object.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -247,7 +247,7 @@
               "7.1"
             ],
             "details": "Test cases must include: saving state and successfully loading it back; loading from a non-existent file (should result in a clean state); attempting to load from a file with corrupted JSON (should return an error); and verifying that `SaveState` correctly creates the directory structure if it's missing.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -258,7 +258,7 @@
               "7.2"
             ],
             "details": "Call the `LoadState` function when the daemon process starts to restore any previously active leases from `~/.config/env-lease/state.json`. Hook the `SaveState` function into the parts of the code that grant, revoke, or otherwise modify leases to ensure the state on disk is always up-to-date.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:41:58.611Z",
+      "updated": "2025-09-21T13:42:59.904Z",
       "description": "Tasks for master context"
     }
   }
