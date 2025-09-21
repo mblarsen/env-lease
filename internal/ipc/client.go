@@ -21,7 +21,7 @@ func NewClient(socketPath string, secret []byte) *Client {
 }
 
 // Send sends a request to the server and decodes the response.
-func (c *Client) Send(payload interface{}, responsePayload interface{}) error {
+func (c *Client) Send(payload any, responsePayload any) error {
 	req, err := NewRequest(payload, c.secret)
 	if err != nil {
 		return err

@@ -53,7 +53,7 @@ type Response struct {
 }
 
 // NewRequest creates a new signed request.
-func NewRequest(payload interface{}, secret []byte) (*Request, error) {
+func NewRequest(payload any, secret []byte) (*Request, error) {
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err

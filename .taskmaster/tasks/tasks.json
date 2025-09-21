@@ -458,7 +458,7 @@
         "dependencies": [
           10
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -466,7 +466,7 @@
             "description": "Create the `revoke.go` file and define the basic `cobra.Command` for `env-lease revoke`. This includes setting up the command's name, description, and adding it to the root command.",
             "dependencies": [],
             "details": "In the `cmd` package, create a new file named `revoke.go`. Inside this file, define a `cobra.Command` struct for the `revoke` command. Set its `Use`, `Short`, and `Long` properties appropriately. Add a placeholder `RunE` function. Finally, ensure this new command is added to the root command so it's available in the CLI.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -477,7 +477,7 @@
               "12.1"
             ],
             "details": "Within the `RunE` function of the `revoke` command, instantiate an `ipc.Client`. Construct a `RevokeRequest` message, ensuring it includes the path to the current project's configuration file. Use the client to send this request to the daemon. Based on the daemon's response, print a success message to stdout or the returned error to stderr.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:44:25.360Z",
+      "updated": "2025-09-21T13:45:27.584Z",
       "description": "Tasks for master context"
     }
   }
