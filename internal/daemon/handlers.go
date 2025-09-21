@@ -41,7 +41,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 		}
-		key := fmt.Sprintf("%s;%s", l.Source, l.Destination) // Just an example key
+		key := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
 		d.state.Leases[key] = Lease{
 			ExpiresAt:   d.clock.Now().Add(duration),
 			Source:      l.Source,
@@ -54,13 +54,13 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
-	// In a real implementation, we would revoke specific leases.
+func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {
+	// TODO: This should only revoke leases for the current project.
 	// For now, we'll just clear all leases.
 	d.state.Leases = make(map[string]Lease)
 	return nil, nil
 }
 
-func (d *Daemon) handleStatus(payload []byte) ([]byte, error) {
+func (d *Daemon) handleStatus(_ []byte) ([]byte, error) {
 	return json.Marshal(d.state)
 }

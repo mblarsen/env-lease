@@ -15,7 +15,11 @@ var statusCmd = &cobra.Command{
 	Short: "Show the status of active leases.",
 	Long:  `Show the status of active leases.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		client := ipc.NewClient(socketPath, secret)
+		secret, err := getSecret()
+		if err != nil {
+			return fmt.Errorf("failed to get secret: %w", err)
+		}
+		client := ipc.NewClient(getSocketPath(), secret)
 		req := struct{ Command string }{Command: "status"}
 		var resp daemon.State
 		if err := client.Send(req, &resp); err != nil {
