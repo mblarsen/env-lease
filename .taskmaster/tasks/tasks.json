@@ -838,7 +838,7 @@
         "description": "Develop a `README.md` file to serve as a quick-start guide for new users. It will cover essential installation, configuration, and usage steps to get started with the tool quickly.",
         "details": "The `README.md` file should be placed in the project root. It needs to be concise and focused on the most common user journey. The content should include:\n1. **Introduction:** A brief, one-paragraph summary of what `env-lease` is and the problem it solves.\n2. **Installation:** Provide the specific command for installing via the Homebrew tap, e.g., `brew install user/tap/env-lease`.\n3. **Setup:** A step-by-step guide on how to initialize the daemon for both macOS (`env-lease daemon install`) and Linux, explaining that this is a one-time setup.\n4. **Configuration:** Show a minimal `env-lease.toml` example focused solely on using the 1Password provider. The example should clearly illustrate the `op://` URI format for sourcing secrets.\n5. **Core Commands:** Demonstrate the primary workflow with simple, copy-pasteable examples for `env-lease grant`, `env-lease status`, and `env-lease revoke`.\n6. **Next Steps:** Conclude with a link to the full user documentation (from Task 19) for users seeking advanced configuration or more detailed explanations.",
         "testStrategy": "Verification will be performed by following the `README.md` guide from the perspective of a new user on a clean system. The tester must execute every command exactly as written to ensure accuracy. Key verification steps include:\n1. **Installation Check:** Run the `brew install` command on a macOS machine and confirm that the `env-lease` binary is installed correctly.\n2. **Daemon Check:** Follow the `env-lease daemon install` instructions for both macOS and Linux, and verify using `launchctl` and `systemctl` respectively that the service is running.\n3. **Functionality Check:** Use the provided example `env-lease.toml` to run `grant`, `status`, and `revoke`. Confirm that each command behaves as described in the guide.\n4. **Peer Review:** Another developer will review the document for technical accuracy, clarity, and grammatical correctness. The link to the full documentation must also be verified.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           4,
           12,
@@ -856,7 +856,7 @@
             "description": "Create the initial `README.md` file in the project root. This subtask involves writing the introductory paragraph that explains the purpose of `env-lease` and adding the 'Installation' section with the specific Homebrew command.",
             "dependencies": [],
             "details": "In the project root, create a new file named `README.md`. Add a main heading for the project. Write a concise, one-paragraph summary explaining what `env-lease` is and the problem it solves (e.g., managing short-lived secrets). Then, add a second-level heading for 'Installation' and provide the exact, copy-pasteable Homebrew command: `brew install user/tap/env-lease` within a Markdown code block.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Review the generated Markdown file. Verify that the introduction is clear and accurately describes the project's purpose. Check that the Homebrew command is syntactically correct and matches the project's tap."
           },
           {
@@ -867,7 +867,7 @@
               "20.1"
             ],
             "details": "Append a 'Setup' section to the `README.md`. Explain that this is a one-time step and provide the command `env-lease daemon install`, noting its support for both macOS and Linux. Next, add a 'Configuration' section. Explain that the configuration lives at `~/.config/env-lease/env-lease.toml`. Provide a minimal TOML code block example focused solely on a 1Password lease, clearly showing the `provider`, `source` (using `op://` URI format), and `duration` fields.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Verify that the `env-lease daemon install` command is correct. Check the `env-lease.toml` example for valid TOML syntax and ensure it clearly demonstrates the required configuration for a 1Password lease. The example should be easy for a new user to adapt."
           },
           {
@@ -878,7 +878,7 @@
               "20.2"
             ],
             "details": "Add a 'Core Commands' or 'Usage' section to the `README.md`. Provide simple, copy-pasteable examples for the main workflow: 1. `env-lease grant <lease-name> -- <command-to-run>` to grant a lease. 2. `env-lease status` to check active leases. 3. `env-lease revoke <lease-name>` to revoke a lease. Finally, add a 'Next Steps' section at the end of the file. Include a hyperlink to the full user documentation (from Task 19), directing users there for advanced topics.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "From a user's perspective, read through the 'Core Commands' section and manually execute each example command to ensure they are correct and the descriptions are clear. Verify that the link in the 'Next Steps' section correctly points to the location of the comprehensive documentation."
           }
         ]
@@ -886,7 +886,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T14:47:20.692Z",
+      "updated": "2025-09-21T14:48:19.890Z",
       "description": "Tasks for master context"
     }
   }
