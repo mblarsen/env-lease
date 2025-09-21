@@ -53,6 +53,14 @@ env-lease status
 env-lease revoke
 ```
 
+## Security
+
+`env-lease` uses a secure IPC model with HMAC-SHA256 token authentication to protect against unauthorized local processes interacting with its daemon.
+
+### Limitations
+
+The security model is designed to raise the bar for attack and prevent accidental interference. It does **not** protect against a sophisticated attacker who has already fully compromised your user account, as such an attacker could read the auth token itself.
+
 ## Next Steps
 
 For more advanced configuration, examples, and details on the security model, please see the [Full User Documentation](docs/USAGE.md).
