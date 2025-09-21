@@ -9,7 +9,7 @@
         "testStrategy": "Verify that the project builds successfully with `go build ./...`. No specific tests are needed for this setup task, but it enables all future testing.",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -17,7 +17,7 @@
             "description": "Establish the standard Go project layout by creating the `/cmd` and `/internal` directories along with their required subdirectories.",
             "dependencies": [],
             "details": "Based on the expansion guidance, create the following directory structure: `/cmd/env-lease`, `/cmd/env-leased`, `/internal/config`, `/internal/daemon`, `/internal/ipc`, and `/internal/provider`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -28,7 +28,7 @@
               "1.1"
             ],
             "details": "Create a new file `/cmd/root.go` to define the main `cobra.Command`. Then, create `main.go` files within `/cmd/env-lease/` and `/cmd/env-leased/` that call the root command's `Execute()` function.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -39,7 +39,7 @@
               "1.2"
             ],
             "details": "Delete the `main.go` file located in the project's root directory. After removal, run `go build ./...` to verify that the project builds successfully with the new entrypoints in the `/cmd` directories.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:04:46.205Z",
+      "updated": "2025-09-21T13:36:49.633Z",
       "description": "Tasks for master context"
     }
   }

@@ -1,6 +1,6 @@
 {
 	"meta": {
-		"generatedAt": "2025-09-21T13:09:13.669Z",
+		"generatedAt": "2025-09-21T13:35:40.151Z",
 		"tasksAnalyzed": 18,
 		"totalTasks": 18,
 		"analysisCount": 18,
@@ -14,144 +14,144 @@
 			"taskTitle": "Project Scaffolding and Initialization",
 			"complexityScore": 2,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "Based on the existing `go.mod`, create the standard Go project directory structure: `/cmd/env-lease`, `/cmd/env-leased`, and `/internal` with subdirectories (`config`, `daemon`, `ipc`, `provider`). Create a new `/cmd/root.go` file to house the main `cobra` root command. Create `main.go` files in each `/cmd` subdirectory to call the root command's `Execute()` function. Finally, remove the non-standard `main.go` from the project root.",
-			"reasoning": "The project is partially initialized with `go mod` and a `cobra` dependency, but lacks the standard directory structure. This task is low complexity as it primarily involves creating directories and boilerplate `main` and `cobra` command files, following a well-established pattern. It's foundational but not algorithmically complex."
+			"expansionPrompt": "Based on the existing subtasks, expand this task by creating the specified directory structure. Then, create a `cmd/root.go` file to define the main `cobra.Command` for `env-lease`. Create two entrypoint files, `cmd/env-lease/main.go` and `cmd/env-leased/main.go`, that both call the root command's `Execute()` function. Finally, remove the placeholder `main.go` from the project root and ensure `go mod tidy` and `go build ./...` run successfully.",
+			"reasoning": "Codebase analysis confirms this is a greenfield project. The task involves standard Go project setup and `cobra` boilerplate. There are no existing abstractions to leverage or complex logic to write. The complexity is low as it follows well-established patterns."
 		},
 		{
 			"taskId": 2,
 			"taskTitle": "Configuration Parsing (`env-lease.toml`)",
-			"complexityScore": 3,
+			"complexityScore": 4,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "In a new package `internal/config`, define Go structs for `Config` and `Lease` to match the `env-lease.toml` structure. Use the `github.com/BurntSushi/toml` library to implement a `Load(path string) (*Config, error)` function. Implement validation for required fields and set default values as described. Create a `config_test.go` file with unit tests for valid, invalid, and edge-case TOML files.",
-			"reasoning": "This is a greenfield task involving defining data structures and using a third-party library for parsing. The complexity is slightly above minimal due to the need for validation logic (e.g., required fields, default values) and writing a comprehensive test suite for various configuration file states, which is crucial for robustness."
+			"expansionPrompt": "Expand this task by creating a new package `internal/config`. Inside, create `config.go` to define the `Config` and `Lease` structs. Implement the `Load(path string)` function using the `github.com/BurntSushi/toml` library. After parsing, add logic to iterate through the leases to validate required fields (like `Source`) and apply default values (like `Type` defaulting to 'env'). Finally, create `config_test.go` with unit tests covering valid files, missing required fields, and default value application.",
+			"reasoning": "Codebase analysis shows the `internal/config` directory is non-existent, making this a greenfield task. The complexity comes from defining the data structures, integrating a third-party library (`toml`), and implementing custom validation and default value logic, which requires careful error handling and thorough unit testing."
 		},
 		{
 			"taskId": 3,
 			"taskTitle": "Define SecretProvider Interface",
 			"complexityScore": 1,
 			"recommendedSubtasks": 1,
-			"expansionPrompt": "In a new directory `internal/provider`, create a file `provider.go` and define the `SecretProvider` interface with a single method: `Fetch(source string) (string, error)`. Add comments explaining the purpose of the interface and its method.",
-			"reasoning": "This task is purely about defining a Go interface, which is a contract for other components. It involves creating one file with a few lines of code and has no implementation logic or tests, making it the lowest possible complexity."
-		},
-		{
-			"taskId": 4,
-			"taskTitle": "Implement 1Password CLI Secret Provider",
-			"complexityScore": 5,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "In the `internal/provider` package, create a `onepassword.go` file. Define a `OnePasswordCLI` struct that implements the `SecretProvider` interface. The `Fetch` method should use `os/exec` to call `op read <source>`. Implement robust error handling for different failure modes, such as the `op` command not being in PATH, non-zero exit codes (e.g., not logged in), and empty output. For testing, create `onepassword_test.go` and use a mocking strategy for `os/exec` to test success and failure scenarios without requiring the actual `op` CLI.",
-			"reasoning": "The complexity is moderate because it involves interacting with an external process via `os/exec`. This requires careful handling of command arguments, stdout, stderr, and exit codes. The testing strategy is also more complex as it requires mocking the external command execution, which is a common but non-trivial pattern in Go."
+			"expansionPrompt": "Create a new file `internal/provider/provider.go`. Within this file, define the `SecretProvider` interface with a single method: `Fetch(source string) (string, error)`. Add comments explaining the purpose of the interface and its method.",
+			"reasoning": "Codebase analysis confirms the `internal/provider` package needs to be created. This task is purely about defining a Go interface, which is a very simple, non-complex operation. It requires no logic, just a type definition in a new file."
 		},
 		{
 			"taskId": 5,
 			"taskTitle": "Implement IPC Framework with HMAC Security",
-			"complexityScore": 7,
+			"complexityScore": 8,
 			"recommendedSubtasks": 4,
-			"expansionPrompt": "Create a new package `internal/ipc`. Define message structs for `GrantRequest`, `RevokeRequest`, `StatusRequest` and their corresponding responses. Implement `Sign` and `Verify` functions using HMAC-SHA256 and a shared secret. Create a `Client` struct with a `Send` method that connects to a Unix socket, serializes, signs, and sends a message. Create a `Server` struct with a `Listen` method that accepts connections, reads messages, verifies signatures, and dispatches to handlers. Write integration tests for the client-server communication.",
-			"reasoning": "This task is complex because it combines three distinct domains: low-level networking with Unix sockets, data serialization (e.g., JSON), and applied cryptography for security. Getting the message framing, signing, and verification correct is critical, non-trivial, and forms a core, sensitive part of the application's architecture."
+			"expansionPrompt": "Expand this task by creating the `internal/ipc` package. Create a `protocol.go` file to define the message structs (`GrantRequest`, etc.) and a `security.go` file for the HMAC `Sign` and `Verify` functions. Create `server.go` to implement a `Server` that listens on a Unix Domain Socket, verifies, and decodes messages. Create `client.go` to implement a `Client` that encodes, signs, and sends messages. Finally, create `ipc_test.go` with an integration test that spins up a server and verifies client communication.",
+			"reasoning": "Codebase analysis confirms this is a greenfield implementation. This task is highly complex as it combines three distinct domains: low-level networking with Unix sockets, cryptographic operations for message signing (HMAC), and protocol design for serialization/deserialization. It requires careful implementation of both client and server components and robust integration testing."
 		},
 		{
 			"taskId": 6,
 			"taskTitle": "Implement Atomic File Writer Utility",
-			"complexityScore": 2,
+			"complexityScore": 3,
 			"recommendedSubtasks": 2,
-			"expansionPrompt": "Create a new package `internal/util`. Inside, create a function `AtomicWriteFile(filename string, data []byte, perm fs.FileMode) error`. Implement it by writing to a temporary file in the same directory using `os.CreateTemp` and then using `os.Rename` to move it to the final destination. Add unit tests to verify correct file content, permissions, and error handling for cases like a non-existent destination directory.",
-			"reasoning": "This is a low-complexity task. It implements a well-known, self-contained pattern for atomic writes using only the Go standard library. The logic is straightforward and easy to unit test without complex dependencies."
+			"expansionPrompt": "Create a new package `internal/atomic`. In `atomic.go`, implement the function `WriteFile(filename string, data []byte, perm fs.FileMode) error` that writes to a temp file and then renames it. In `atomic_test.go`, write unit tests that verify correct file content and permissions on success, and test failure modes like the destination directory not existing.",
+			"reasoning": "Codebase analysis shows no existing utility for this. While the logic is straightforward (temp file -> write -> rename), it requires careful handling of file system operations, permissions, and error conditions across multiple steps. The need for robust unit tests for file I/O adds to the complexity, making it more than a trivial task."
 		},
 		{
 			"taskId": 7,
 			"taskTitle": "Implement Daemon State Management",
-			"complexityScore": 3,
+			"complexityScore": 4,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "In a new `internal/daemon` package, define a `State` struct to hold active lease information (e.g., a map of lease IDs to their metadata and expiration times). Implement `LoadState(path string)` and `SaveState(path string)` methods that use `encoding/json` to read from and write to the given file path. Ensure the directory for the state file is created if it doesn't exist. Write unit tests to cover loading from a non-existent file, a valid file, and a corrupted file.",
-			"reasoning": "This task is of low-to-moderate complexity. It involves standard file I/O and JSON serialization, which are well-supported by the standard library. The main considerations are correct user-directory path handling and creating robust tests for edge cases like file corruption or non-existence."
+			"expansionPrompt": "Expand this task by creating a `state.go` file in the `internal/daemon` package. Define the necessary structs to represent the daemon's state (e.g., a map of active leases). Implement `LoadState(path)` and `SaveState(path)` functions using `encoding/json` for serialization. `LoadState` should handle a non-existent file by returning a new, empty state. `SaveState` should ensure the target directory exists. Create `state_test.go` to test these functions, including edge cases like corrupted JSON.",
+			"reasoning": "Codebase analysis confirms the `internal/daemon` package is the correct place but lacks this implementation. The task involves data structure design, file I/O, serialization with `encoding/json`, and robust error handling for edge cases like file corruption or missing paths. This combination makes it moderately complex."
 		},
 		{
 			"taskId": 8,
 			"taskTitle": "Implement Daemon Core Logic and Timer Loop",
-			"complexityScore": 6,
+			"complexityScore": 7,
 			"recommendedSubtasks": 4,
-			"expansionPrompt": "In `internal/daemon`, create a `Daemon` struct that holds the application state and dependencies. Implement a `Run()` method containing the main loop. Use a `time.Ticker` for periodic checks (e.g., every second). On each tick, iterate through active leases and check if `time.Now()` is after their expiration. If so, trigger the revocation logic. On startup, before the loop begins, perform an initial check to clean up any leases that expired while the daemon was stopped. Use dependency injection for dependencies like the filesystem and clock to facilitate testing.",
-			"reasoning": "This is a moderately complex task as it forms the core logic of the daemon. It involves managing a stateful, long-running process with time-based triggers. Concurrency (running the loop) and the need for a solid testing strategy for time-dependent behavior (e.g., using a mock clock) are the primary drivers of its complexity score."
-		},
-		{
-			"taskId": 9,
-			"taskTitle": "Implement Daemon IPC Server",
-			"complexityScore": 5,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "Modify the `Daemon` struct in `internal/daemon` to include an instance of the `ipc.Server`. In the `Run()` method, start the IPC server's `Listen()` method in a separate goroutine. Implement the handler functions for grant, revoke, and status requests. These handlers will receive requests from the IPC server, modify the daemon's state (e.g., add/remove leases), and return appropriate responses. Ensure state modifications are protected by a `sync.Mutex` to prevent race conditions.",
-			"reasoning": "While the heavy lifting of the IPC protocol is in Task 5, this task is complex due to its concurrent nature. It requires running the server in a goroutine and ensuring that the handlers, which are executed concurrently in response to CLI commands, can safely modify the daemon's central state without causing race conditions."
-		},
-		{
-			"taskId": 10,
-			"taskTitle": "Implement CLI IPC Client",
-			"complexityScore": 3,
-			"recommendedSubtasks": 2,
-			"expansionPrompt": "In the `internal/ipc` package, enhance the `Client` struct. Add specific, high-level methods for each command, such as `SendGrantRequest(req GrantRequest)`, `SendRevokeRequest(req RevokeRequest)`, etc. These methods should encapsulate the logic of connecting to the daemon, sending the signed request, and decoding the response. Implement clear error wrapping to distinguish between connection errors (e.g., daemon not running) and application-level errors returned by the daemon.",
-			"reasoning": "This task is relatively low complexity because the fundamental communication and security logic was built in Task 5. This task is about creating a user-friendly, high-level client-side API on top of that foundation for the CLI commands to consume, which is primarily a structural and error-handling exercise."
-		},
-		{
-			"taskId": 11,
-			"taskTitle": "Implement `env-lease grant` Command",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "In the `cmd` package, create a `grant.go` file. Define a new `cobra.Command` for `grant`. Add flags for `--override` and `--continue-on-error`. In the `RunE` function, implement the following logic: 1. Load the `env-lease.toml` configuration using the `config` package. 2. Create an `ipc.Client`. 3. Construct a `GrantRequest` from the loaded configuration and command flags. 4. Use the client to send the request to the daemon and print the result or error.",
-			"reasoning": "This is an integration task of moderate complexity. It doesn't involve creating new core algorithms but requires correctly using and orchestrating several other packages (cobra, config, ipc) to deliver a user-facing feature. Handling command-line flags, loading configuration, and communicating with the daemon makes it a non-trivial wiring job."
-		},
-		{
-			"taskId": 12,
-			"taskTitle": "Implement `env-lease revoke` Command",
-			"complexityScore": 2,
-			"recommendedSubtasks": 2,
-			"expansionPrompt": "In the `cmd` package, create a `revoke.go` file. Define a `cobra.Command` for `revoke`. In the `RunE` function, create an `ipc.Client`, construct a `RevokeRequest` (it will need the path to the config file to identify the project), and send it to the daemon. Print a success message or the error returned.",
-			"reasoning": "This is a low-complexity task. It's a very thin wrapper around the IPC client, sending a simple, pre-defined command to the daemon. It has significantly fewer moving parts than the `grant` command as it does not need to parse the full config details itself."
-		},
-		{
-			"taskId": 13,
-			"taskTitle": "Implement `env-lease status` Command",
-			"complexityScore": 3,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "In the `cmd` package, create a `status.go` file. Define a `cobra.Command` for `status`. In the `RunE` function, use the `ipc.Client` to send a `StatusRequest`. Upon receiving the response, use the `text/tabwriter` package to format the list of active leases, their destinations, and their remaining time-to-live (TTL) into a clean, human-readable table printed to standard output.",
-			"reasoning": "This task is of low complexity. Like `revoke`, it's a simple IPC call, but with the additional requirement of formatting the structured data received from the daemon into a human-readable table. This output formatting adds a minor implementation step compared to `revoke`."
+			"expansionPrompt": "Expand this task by creating `daemon.go` in the `internal/daemon` package. Define the main `Daemon` struct, holding dependencies like the state manager. Implement the `Run()` method which first performs a startup check to revoke any leases that expired while offline. Then, start a `time.Ticker` loop. Inside the loop, on each tick, iterate through active leases, check for expirations, and trigger the revocation logic for any that have expired. Ensure state is saved after any changes.",
+			"reasoning": "Codebase analysis shows this is the core greenfield logic for the daemon. Its complexity is high because it's the heart of the daemon, managing the application's main lifecycle, state transitions, and time-based events. It requires careful management of the state and interaction with other components (revocation, state persistence) within a continuous loop."
 		},
 		{
 			"taskId": 14,
 			"taskTitle": "Implement Daemon Revocation Failure Handling",
 			"complexityScore": 6,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "Modify the daemon's revocation logic. When a revocation fails, instead of just logging, the lease should be moved to a retry queue within the daemon's state. This queue should track the number of attempts and the next scheduled retry time. Implement an exponential backoff strategy for retries. If a lease fails to be revoked for over 5 minutes, use the atomic writer utility to create a `.envrc.env-lease-REVOCATION-FAILURE` file. Ensure this new retry state is persisted along with the main daemon state.",
-			"reasoning": "This task has moderate-to-high complexity because it adds sophisticated error handling and state management to the daemon's core loop. Implementing a robust retry mechanism with exponential backoff, managing the associated state, and handling persistent failure notifications requires careful changes to the existing state machine and time-based logic."
+			"expansionPrompt": "Expand this task by modifying the daemon's state struct in `internal/daemon/state.go` to include a retry queue for failed revocations, tracking attempt counts and next retry times. In `daemon.go`, modify the main loop to process this queue, using an exponential backoff algorithm to reschedule failed attempts. If a lease's initial failure time exceeds 5 minutes, implement logic to create a `.envrc.env-lease-REVOCATION-FAILURE` file in the project directory.",
+			"reasoning": "Codebase analysis indicates this is a significant modification to the core daemon logic (Task 8). The complexity is high because it introduces a new state management concern (the retry queue), requires implementing a time-based algorithm (exponential backoff), and adds failure-mode logic that interacts with the filesystem. This is a complex feature layered on top of the core loop."
+		},
+		{
+			"taskId": 16,
+			"taskTitle": "System Service Integration (launchd for macOS)",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Expand this task by creating a new file `cmd/daemon_darwin.go` with a `//go:build darwin` build tag. Inside, create a `daemon` subcommand for the root command. Add `install` and `uninstall` subcommands to it. The `install` command should generate a `launchd.plist` from an embedded template, write it to `~/Library/LaunchAgents/`, and run `launchctl load`. The `uninstall` command should run `launchctl unload` and remove the file.",
+			"reasoning": "Codebase analysis shows no existing OS integration. This task is moderately complex because it involves OS-specific logic, requiring the use of build tags. It necessitates generating configuration files from templates, performing file I/O in system-specific directories, and interacting with external system commands (`launchctl`) via `os/exec`, which requires careful error handling."
+		},
+		{
+			"taskId": 17,
+			"taskTitle": "System Service Integration (systemd for Linux)",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Expand this task by creating a new file `cmd/daemon_linux.go` with a `//go:build linux` build tag. Inside, create a `daemon` subcommand and add `install` and `uninstall` subcommands. The `install` command should generate a `env-leased.service` file from an embedded template, write it to `~/.config/systemd/user/`, and run `systemctl --user enable --now`. The `uninstall` command should run `systemctl --user disable --now` and remove the file.",
+			"reasoning": "Codebase analysis confirms this is a new, OS-specific feature. Similar to the macOS task, its complexity comes from requiring build tags, generating service files from templates, writing to specific user directories, and executing external system commands (`systemctl`) via `os/exec`. The logic is platform-specific and requires robust error handling for external process interaction."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Implement 1Password CLI Secret Provider",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement 1password cli secret provider.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Implement Daemon IPC Server",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement daemon ipc server.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Implement CLI IPC Client",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement cli ipc client.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Implement `env-lease grant` Command",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement `env-lease grant` command.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Implement `env-lease revoke` Command",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement `env-lease revoke` command.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Implement `env-lease status` Command",
+			"complexityScore": 5,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break down this task with a focus on implement `env-lease status` command.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
 		},
 		{
 			"taskId": 15,
 			"taskTitle": "Implement Orphaned Lease Cleanup",
 			"complexityScore": 5,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "Add a new long-interval ticker (e.g., every 24 hours) to the daemon's main loop. On each tick, iterate through all active leases. For each lease, check if its corresponding `env-lease.toml` file still exists on disk. If not, update the lease's state with an `orphaned_since` timestamp. If a lease is already marked as orphaned, check if it has been orphaned for more than 30 days. If so, permanently revoke and remove it from the state. Also, add a hidden `env-leased --cleanup` command to trigger this check manually.",
-			"reasoning": "This task is moderately complex as it introduces a new, long-running background process to the daemon. It requires adding new fields to the state model, performing periodic file I/O operations, and implementing time-based logic (the 30-day check), all of which must be integrated carefully into the existing daemon structure to avoid performance issues or bugs."
-		},
-		{
-			"taskId": 16,
-			"taskTitle": "System Service Integration (launchd for macOS)",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "In the `cmd` package, create a `daemon_darwin.go` file (using build tags). Add `install` and `uninstall` subcommands to a new `daemon` command. The `install` command should create a `com.user.env-leased.plist` file in `~/Library/LaunchAgents/` from a template, then use `os/exec` to run `launchctl load ...`. The `uninstall` command should run `launchctl unload ...` and remove the file.",
-			"reasoning": "The complexity is moderate not because of the Go code itself (which is straightforward file writing and command execution), but because it requires specific knowledge of an external system tool (`launchctl`) and its `.plist` file format. The use of build tags to provide OS-specific implementations is a standard but slightly more advanced Go feature. Testing is also manual."
-		},
-		{
-			"taskId": 17,
-			"taskTitle": "System Service Integration (systemd for Linux)",
-			"complexityScore": 4,
-			"recommendedSubtasks": 3,
-			"expansionPrompt": "In the `cmd` package, create a `daemon_linux.go` file (using build tags). Add `install` and `uninstall` subcommands to a new `daemon` command. The `install` command should create an `env-leased.service` file in `~/.config/systemd/user/` from a template, then use `os/exec` to run `systemctl --user enable --now ...`. The `uninstall` command should run `systemctl --user disable --now ...` and remove the file.",
-			"reasoning": "Similar to the launchd task, the complexity is moderate due to the need for specific knowledge of `systemd` user services and commands. The Go code is simple, but correctly creating the service file and interacting with `systemctl` requires platform-specific expertise. It also uses build tags and requires manual testing."
+			"expansionPrompt": "Break down this task with a focus on implement orphaned lease cleanup.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
 		},
 		{
 			"taskId": 18,
 			"taskTitle": "Build and Release Automation",
-			"complexityScore": 4,
+			"complexityScore": 5,
 			"recommendedSubtasks": 3,
-			"expansionPrompt": "Create a `.goreleaser.yml` file in the project root. Configure the `builds` section to create binaries for `env-lease` and `env-leased` for macOS (amd64, arm64) and Linux (amd64, arm64). Configure the `archives` and `checksum` sections. Add a `brews` section to publish a formula to a new GitHub repository that will serve as the Homebrew tap. The formula should include the service definitions for `launchd`.",
-			"reasoning": "This is a configuration-heavy DevOps task that relies on external tooling. While it doesn't involve writing Go code, correctly configuring GoReleaser, especially the Homebrew tap integration which requires setting up a separate repository and formula, requires specific domain knowledge and can involve significant trial and error to get right."
+			"expansionPrompt": "Break down this task with a focus on build and release automation.",
+			"reasoning": "Automatically added due to missing analysis in AI response."
 		}
 	]
 }
