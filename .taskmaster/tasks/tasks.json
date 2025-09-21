@@ -903,7 +903,7 @@
         "description": "Modify the `env-lease grant` command to display a warning message to the user when they request a lease with a duration longer than 12 hours, promoting security best practices.",
         "details": "The `grant` command logic needs to be updated. After parsing the lease duration provided by the user (e.g., via a `--duration` flag), a check must be added to compare it against a 12-hour threshold (12 * 60 * 60 seconds). If the requested duration is greater than 12 hours, a warning message should be printed to standard error (stderr). The message should be informative, for example: \"Warning: Leases longer than 12 hours are discouraged for security reasons. Please consider a shorter duration.\" The command should then proceed with granting the lease as usual; this is a non-blocking warning, not an error.",
         "testStrategy": "Verification will be done via manual CLI testing and automated unit tests.\n1. **Manual Test Cases:**\n   - Run `env-lease grant --duration 8h ...` and confirm no warning is displayed.\n   - Run `env-lease grant --duration 12h ...` and confirm no warning is displayed.\n   - Run `env-lease grant --duration '12h1m' ...` and confirm the warning message is printed to stderr and the lease is still created successfully.\n   - Run `env-lease grant --duration 2d ...` and confirm the warning is printed to stderr.\n2. **Automated Tests:**\n   - Add a new unit test for the grant command's execution logic. The test should capture the output to stderr and assert that the warning message is present for durations greater than 12 hours and absent for durations less than or equal to 12 hours.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
@@ -953,7 +953,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T16:22:05.718Z",
+      "updated": "2025-09-21T16:23:05.423Z",
       "description": "Tasks for master context"
     }
   }

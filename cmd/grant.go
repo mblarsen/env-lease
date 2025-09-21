@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 var grantCmd = &cobra.Command{
@@ -30,6 +31,14 @@ var grantCmd = &cobra.Command{
 
 		leases := make([]ipc.Lease, len(cfg.Lease))
 		for i, l := range cfg.Lease {
+			duration, err := time.ParseDuration(l.Duration)
+			if err != nil {
+				return fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
+			}
+			if duration > 12*time.Hour {
+				fmt.Fprintf(os.Stderr, "Warning: Leases longer than 12 hours are discouraged for security reasons.\n")
+			}
+
 			secretVal, err := p.Fetch(l.Source)
 			if err != nil {
 				// TODO: Handle --continue-on-error
