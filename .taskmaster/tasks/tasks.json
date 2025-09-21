@@ -54,7 +54,7 @@
         "dependencies": [
           1
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -62,7 +62,7 @@
             "description": "In a new package `internal/config`, define the Go structs (`Config`, `Lease`) that map to the `env-lease.toml` file structure. Implement a `Load(path string) (*Config, error)` function that uses the `github.com/BurntSushi/toml` library to parse a TOML file into these structs.",
             "dependencies": [],
             "details": "The `Config` struct should contain a map of leases, e.g., `Leases map[string]Lease`. The `Lease` struct should include fields like `Type`, `Format`, `Encoding`, `Source`, `Destination`, and `Duration`. The `Load` function will be the core entry point for configuration parsing.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -73,7 +73,7 @@
               "2.1"
             ],
             "details": "After successfully parsing the TOML file into structs, iterate through the loaded leases. Validate that required fields (e.g., `Source`, `Destination`) are present. For optional fields like `Type`, set a default value (e.g., 'env') if it's not specified in the file. Return an error for any invalid or missing required configuration.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -85,7 +85,7 @@
               "2.2"
             ],
             "details": "The test suite should cover multiple scenarios: a perfectly valid TOML file, a file with missing required fields (should error), a file with invalid data types, a file that relies on default values, and other edge cases. Use temporary files or in-memory strings to represent different TOML configurations for testing the `Load` function.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:36:49.633Z",
+      "updated": "2025-09-21T13:37:49.426Z",
       "description": "Tasks for master context"
     }
   }
