@@ -627,7 +627,7 @@
         "dependencies": [
           9
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -635,7 +635,7 @@
             "description": "Create the `com.user.env-leased.plist` template as a string constant or embedded file. Set up the basic structure for the `daemon` command and its `install`/`uninstall` subcommands in a new `cmd/daemon_darwin.go` file using Go build tags.",
             "dependencies": [],
             "details": "The plist template should be configured to run the daemon as a user agent and include the `KeepAlive` key to ensure it stays running. The command structure should be set up, but the core implementation logic will be in subsequent subtasks.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -646,7 +646,7 @@
               "16.1"
             ],
             "details": "The implementation must dynamically determine the path to the current executable to correctly populate the `ProgramArguments` in the plist template. It will use `os/exec` to call `launchctl load <path-to-plist>`. Ensure robust error handling for file I/O and command execution.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           },
           {
@@ -657,7 +657,7 @@
               "16.1"
             ],
             "details": "The implementation will use `os/exec` to call `launchctl unload <path-to-plist>`. After successfully unloading the service, it should remove the plist file. It needs to handle cases where the file or service doesn't exist gracefully.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": ""
           }
         ]
@@ -758,7 +758,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T13:56:47.641Z",
+      "updated": "2025-09-21T13:58:00.146Z",
       "description": "Tasks for master context"
     }
   }
