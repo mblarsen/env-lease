@@ -172,4 +172,35 @@ func TestHandleGrant_Idempotency(t *testing.T) {
 			t.Fatalf("expected content '%s', got '%s'", expectedContent, string(finalContent))
 		}
 	})
+
+	t.Run("file_mode for file lease", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, "file_mode_test.txt")
+		lease := ipc.Lease{
+			Source:      "1password",
+			Destination: destFile,
+			LeaseType:   "file",
+			Value:       "my_value",
+			Duration:    "1h",
+			FileMode:    "0600",
+		}
+		req := ipc.GrantRequest{
+			Command:  "grant",
+			Leases:   []ipc.Lease{lease},
+			Override: false,
+		}
+		payload, _ := json.Marshal(req)
+
+		_, err := daemon.handleGrant(payload)
+		if err != nil {
+			t.Fatalf("grant failed: %v", err)
+		}
+
+		info, err := os.Stat(destFile)
+		if err != nil {
+			t.Fatalf("failed to stat file: %v", err)
+		}
+		if info.Mode().Perm() != 0600 {
+			t.Fatalf("expected file mode 0600, got %o", info.Mode().Perm())
+		}
+	})
 }

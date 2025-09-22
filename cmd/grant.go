@@ -59,6 +59,7 @@ var grantCmd = &cobra.Command{
 				Format:      l.Format,
 				Encoding:    l.Encoding,
 				Value:       strings.TrimSpace(secretVal),
+				FileMode:    l.FileMode,
 			}
 		}
 

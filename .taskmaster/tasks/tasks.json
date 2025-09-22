@@ -1026,7 +1026,7 @@
         "description": "Add a `file_mode` option to the `env-lease.toml` configuration for `file`-type leases, allowing users to specify custom file permissions for the created secret files.",
         "details": "1. **Configuration Parsing:** Modify the Go struct representing a lease in the configuration parser (related to Task 2). Add a new optional field, such as `FileMode string`, to capture the `file_mode` setting from the TOML file. 2. **Daemon Logic:** Update the daemon's lease granting logic. When processing a `file`-type lease, check if the `FileMode` field is set. If it is, parse the string (e.g., \"0600\") into an `os.FileMode` (octal integer). Implement validation to ensure the provided string is a valid file mode. 3. **Default Value:** If the `FileMode` field is empty or not present in the configuration, the daemon must use a default file mode of `0644`. 4. **File Writing:** Pass the determined file mode (either the user-specified one or the default) to the `AtomicWriteFile` utility (from Task 6) when writing the secret to the destination file.",
         "testStrategy": "1. **Unit Tests (Configuration):** Add unit tests for the TOML parser. Create test cases with `file`-type leases that: a) include a valid `file_mode` like \"0600\", b) omit the `file_mode` key, and c) include an invalid `file_mode` like \"not_a_mode\". Verify the parser correctly populates the struct or returns an error. 2. **Unit Tests (Daemon):** Write unit tests for the daemon's file-lease handler. Using a mock filesystem, verify that the `AtomicWriteFile` utility is called with the correct `os.FileMode`: `0600` when specified, and `0644` when omitted. 3. **Integration Test:** Create an end-to-end test. Define an `env-lease.toml` with a `file`-type lease and `file_mode = \"0600\"`. Execute the `env-lease grant` command. After execution, use `os.Stat` to inspect the created file on the filesystem and assert that its permissions are exactly `0600`. Run a second integration test without the `file_mode` key and assert the permissions are `0644`.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           6,
@@ -1037,7 +1037,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-22T02:38:00.417Z",
+      "updated": "2025-09-22T02:40:31.497Z",
       "description": "Tasks for master context"
     }
   }

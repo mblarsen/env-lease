@@ -36,6 +36,7 @@ type Lease struct {
 	Format      string
 	Encoding    string
 	Value       string
+	FileMode    string
 }
 
 // Sign creates a signature for the payload.

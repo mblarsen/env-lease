@@ -7,6 +7,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -100,6 +101,14 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 			}
 
 		case "file":
+			mode := os.FileMode(0644)
+			if l.FileMode != "" {
+				parsedMode, err := strconv.ParseUint(l.FileMode, 8, 32)
+				if err != nil {
+					return nil, fmt.Errorf("invalid file_mode: %w", err)
+				}
+				mode = os.FileMode(parsedMode)
+			}
 			if !req.Override {
 				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
 					existingContent, readErr := os.ReadFile(l.Destination)
@@ -114,7 +123,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 				}
 			}
 			if !skipWrite {
-				created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644)
+				created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), mode)
 			}
 		}
 
