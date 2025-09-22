@@ -50,46 +50,63 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 
 		var created bool
 		var writeErr error
+		var skipWrite bool 
+
 		switch l.LeaseType {
 		case "env":
+			content := fmt.Sprintf(l.Format, l.Variable, l.Value)
 			if !req.Override {
-				// Check if the variable already exists
 				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
 					file, openErr := os.Open(l.Destination)
 					if openErr != nil {
 						return nil, openErr
 					}
-					defer file.Close()
 
 					scanner := bufio.NewScanner(file)
+					var foundKey bool
 					for scanner.Scan() {
 						line := scanner.Text()
+						if line == content {
+							skipWrite = true
+							break
+						}
 						parts := strings.SplitN(line, "=", 2)
 						key := strings.TrimSpace(parts[0])
 						key = strings.TrimPrefix(key, "export ")
-						
+
 						if key == l.Variable {
-							value := ""
-							if len(parts) > 1 {
-								value = strings.TrimSpace(parts[1])
-							}
-							if value != "" && value != `""` && value != `''` {
-								return nil, fmt.Errorf("variable '%s' already exists in '%s'. Use --override to replace.", l.Variable, l.Destination)
-							}
+							foundKey = true
 						}
+					}
+					file.Close() 
+
+					if !skipWrite && foundKey {
+						return nil, fmt.Errorf("variable '%s' already exists in '%s' with a different value. Use --override to replace.", l.Variable, l.Destination)
 					}
 				}
 			}
-			content := fmt.Sprintf(l.Format, l.Variable, l.Value)
-			created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644)
+			if !skipWrite {
+				created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644)
+			}
 		case "file":
 			if !req.Override {
 				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
-					return nil, fmt.Errorf("file '%s' already exists. Use --override to replace.", l.Destination)
+					existingContent, readErr := os.ReadFile(l.Destination)
+					if readErr != nil {
+						return nil, readErr
+					}
+					if string(existingContent) == l.Value {
+						skipWrite = true
+					} else {
+						return nil, fmt.Errorf("file '%s' already exists with different content. Use --override to replace.", l.Destination)
+					}
 				}
 			}
-			created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644)
+			if !skipWrite {
+				created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(l.Value), 0644)
+			}
 		}
+
 		if writeErr != nil {
 			return nil, writeErr
 		}
