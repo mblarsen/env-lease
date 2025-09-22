@@ -956,7 +956,7 @@
         "description": "Fixes a critical bug where daemon state was only saved on graceful shutdown. This change ensures the state is written to disk immediately after any lease is granted, manually revoked, or automatically expired, preventing data loss on unexpected termination.",
         "details": "The current implementation only calls `SaveState()` during a graceful shutdown sequence. This creates a race condition where a `kill -9` or system crash can cause recently granted leases to be lost. To fix this, the `SaveState()` method, defined in Task 7, must be invoked immediately after any operation that modifies the daemon's lease map. Specifically, a call to `this.SaveState()` should be added in the following locations:\n1. In the `handleGrant` function (from Task 9), after a new lease has been successfully added to the state map.\n2. In the `handleRevoke` function (from Task 9), after a lease has been successfully removed from the state map.\n3. In the daemon's core timer loop (from Task 8), immediately after the logic that removes an expired lease from the state map.\nAny error returned by `SaveState()` should be logged as a warning, but should not cause the primary operation (grant/revoke) to fail.",
         "testStrategy": "Testing must verify that state is persisted correctly after each type of modification and survives an unclean shutdown.\n1. **Integration Test (Grant):** Start the daemon. Execute `env-lease grant`. Use `kill -9` to terminate the daemon process immediately. Manually inspect the `~/.config/env-lease/state.json` file to confirm the new lease is present. Restart the daemon and use `env-lease status` to verify the lease is active.\n2. **Integration Test (Manual Revoke):** Start the daemon with an existing lease. Execute `env-lease revoke`. Use `kill -9` to terminate the daemon. Inspect `state.json` to confirm the lease has been removed.\n3. **Unit Test (Timed Revocation):** In a unit test for the core daemon loop, use a mock clock and a mock filesystem. Grant a lease with a short duration (e.g., 1 second). Advance the mock clock to trigger the expiration. Verify that the mock `SaveState` function is called exactly once after the lease is removed from the internal state map.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           7,
           8,
@@ -964,11 +964,39 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 27,
+        "title": "Bugfix: Refine `grant` Override Logic to Ignore Empty Variables",
+        "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
+        "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted if the key exists, its value is non-empty, and the `override` flag is false.",
+        "testStrategy": "Create a test suite targeting the daemon's `handleGrant` function. Prepare a target `.env` file containing `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. Send a GrantRequest for `EMPTY_VAR` without the override flag; assert that the operation succeeds and the file is updated. 2. Send a GrantRequest for `EXISTING_VAR` without the override flag; assert that the operation fails with an error. 3. Send a GrantRequest for `EXISTING_VAR` with the override flag; assert that the operation succeeds and the file is updated. 4. Send a GrantRequest for a completely new variable; assert it succeeds.",
+        "status": "pending",
+        "dependencies": [
+          11,
+          23
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 28,
+        "title": "Bugfix: Refine `grant` Override Logic to Ignore Empty Variables",
+        "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
+        "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted with an error if a grant is attempted for an existing key that has a non-empty value and the `--override` flag is false.",
+        "testStrategy": "Create a comprehensive test suite targeting the daemon's `handleGrant` function. Prepare a target `.env` file containing `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. Send a GrantRequest for `EMPTY_VAR` with a new value but without the override flag; assert that the operation succeeds and the file is updated. 2. Send a GrantRequest for `EXISTING_VAR` without the override flag; assert that the operation fails and the file remains unchanged. 3. Send a GrantRequest for `EXISTING_VAR` with the override flag; assert that the operation succeeds and the file is updated. 4. Send a GrantRequest for a new variable not present in the file; assert it is added successfully.",
+        "status": "pending",
+        "dependencies": [
+          11,
+          23
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-21T16:39:39.963Z",
+      "updated": "2025-09-22T01:55:17.306Z",
       "description": "Tasks for master context"
     }
   }
