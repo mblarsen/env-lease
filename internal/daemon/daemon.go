@@ -31,6 +31,7 @@ func (c *RealClock) Ticker(d time.Duration) *time.Ticker {
 // Daemon is the main daemon struct.
 type Daemon struct {
 	state     *State
+	statePath string
 	clock     Clock
 	ipcServer *ipc.Server
 	revoker   Revoker
@@ -38,9 +39,10 @@ type Daemon struct {
 }
 
 // NewDaemon creates a new daemon.
-func NewDaemon(state *State, clock Clock, ipcServer *ipc.Server, revoker Revoker) *Daemon {
+func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Server, revoker Revoker) *Daemon {
 	return &Daemon{
 		state:     state,
+		statePath: statePath,
 		clock:     clock,
 		ipcServer: ipcServer,
 		revoker:   revoker,
@@ -113,6 +115,9 @@ func (d *Daemon) revokeExpiredLeases() {
 				log.Printf("Lease %s expired and was revoked", id)
 			}
 			delete(d.state.Leases, id)
+			if err := d.state.SaveState(d.statePath); err != nil {
+				log.Printf("Failed to save state after lease expiration: %v", err)
+			}
 		}
 	}
 }

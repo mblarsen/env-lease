@@ -956,7 +956,7 @@
         "description": "Fixes a critical bug where daemon state was only saved on graceful shutdown. This change ensures the state is written to disk immediately after any lease is granted, manually revoked, or automatically expired, preventing data loss on unexpected termination.",
         "details": "The current implementation only calls `SaveState()` during a graceful shutdown sequence. This creates a race condition where a `kill -9` or system crash can cause recently granted leases to be lost. To fix this, the `SaveState()` method, defined in Task 7, must be invoked immediately after any operation that modifies the daemon's lease map. Specifically, a call to `this.SaveState()` should be added in the following locations:\n1. In the `handleGrant` function (from Task 9), after a new lease has been successfully added to the state map.\n2. In the `handleRevoke` function (from Task 9), after a lease has been successfully removed from the state map.\n3. In the daemon's core timer loop (from Task 8), immediately after the logic that removes an expired lease from the state map.\nAny error returned by `SaveState()` should be logged as a warning, but should not cause the primary operation (grant/revoke) to fail.",
         "testStrategy": "Testing must verify that state is persisted correctly after each type of modification and survives an unclean shutdown.\n1. **Integration Test (Grant):** Start the daemon. Execute `env-lease grant`. Use `kill -9` to terminate the daemon process immediately. Manually inspect the `~/.config/env-lease/state.json` file to confirm the new lease is present. Restart the daemon and use `env-lease status` to verify the lease is active.\n2. **Integration Test (Manual Revoke):** Start the daemon with an existing lease. Execute `env-lease revoke`. Use `kill -9` to terminate the daemon. Inspect `state.json` to confirm the lease has been removed.\n3. **Unit Test (Timed Revocation):** In a unit test for the core daemon loop, use a mock clock and a mock filesystem. Grant a lease with a short duration (e.g., 1 second). Advance the mock clock to trigger the expiration. Verify that the mock `SaveState` function is called exactly once after the lease is removed from the internal state map.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           7,
           8,
@@ -996,7 +996,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-22T01:55:17.306Z",
+      "updated": "2025-09-22T01:58:45.477Z",
       "description": "Tasks for master context"
     }
   }

@@ -49,7 +49,7 @@ var runCmd = &cobra.Command{
 		}
 
 		// Create and run daemon
-		d := daemon.NewDaemon(state, clock, ipcServer, revoker)
+		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker)
 		
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()

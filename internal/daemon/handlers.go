@@ -98,6 +98,11 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		}
 	}
 
+	if err := d.state.SaveState(d.statePath); err != nil {
+		log.Printf("Failed to save state after grant: %v", err)
+		// Do not return error to client, as the grant itself succeeded
+	}
+
 	resp := ipc.GrantResponse{Messages: messages}
 	log.Printf("Granted %d leases", len(req.Leases))
 	return json.Marshal(resp)
@@ -113,6 +118,11 @@ func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {
 		}
 		delete(d.state.Leases, id)
 	}
+
+	if err := d.state.SaveState(d.statePath); err != nil {
+		log.Printf("Failed to save state after revoke: %v", err)
+	}
+
 	log.Printf("Manually revoked %d leases", count)
 	return nil, nil
 }

@@ -26,7 +26,7 @@ func TestDaemon(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
 	revoker := &mockRevoker{}
-	daemon := NewDaemon(state, clock, nil, revoker)
+	daemon := NewDaemon(state, "/dev/null", clock, nil, revoker)
 
 	t.Run("startup revocation", func(t *testing.T) {
 		revoker.RevokeFunc = func(l Lease) error {
