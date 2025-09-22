@@ -985,7 +985,7 @@
         "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
         "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted with an error if a grant is attempted for an existing key that has a non-empty value and the `--override` flag is false.",
         "testStrategy": "Create a comprehensive test suite targeting the daemon's `handleGrant` function. Prepare a target `.env` file containing `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. Send a GrantRequest for `EMPTY_VAR` with a new value but without the override flag; assert that the operation succeeds and the file is updated. 2. Send a GrantRequest for `EXISTING_VAR` without the override flag; assert that the operation fails and the file remains unchanged. 3. Send a GrantRequest for `EXISTING_VAR` with the override flag; assert that the operation succeeds and the file is updated. 4. Send a GrantRequest for a new variable not present in the file; assert it is added successfully.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           23
@@ -996,16 +996,15 @@
       {
         "id": 29,
         "title": "Bugfix: Make `grant` Command Idempotent by Ignoring Same-Value Overrides",
-        "description": "Modify the `grant` command's override check to permit overwriting a variable if the new secret value is identical to the existing value. This makes the command idempotent and prevents unnecessary failures when re-running.",
-        "details": "The current override protection in the daemon's `handleGrant` function is too strict. It prevents writing to a destination variable or file if it already exists, without checking its content. This change will make the check smarter. Before writing a secret, the daemon must first read the existing value at the destination (if any). If the destination exists and its current content is byte-for-byte identical to the new secret value, the write operation should be skipped and treated as a success. If the content is different, the existing override logic (fail unless `--override` is specified) should apply. This idempotency check must be implemented for both `env` lease types (checking the value of a specific key in a `.env` file) and `file` lease types (checking the entire content of the target file).",
-        "testStrategy": "Create integration tests that target the daemon's grant handling logic. 1. **Env Lease Idempotency:** Prepare a `.env` file with `API_KEY=secret123`. Send a GrantRequest for `API_KEY` with the same value (`secret123`) without the override flag. Assert the command succeeds. 2. **Env Lease Conflict:** Using the same file, send a GrantRequest for `API_KEY` with a different value (`secret456`) without the override flag. Assert the command fails with an override error. 3. **File Lease Idempotency:** Prepare a file `secret.txt` containing `secret123`. Send a GrantRequest for a `file` lease targeting `secret.txt` with the same value. Assert the command succeeds. 4. **File Lease Conflict:** Using the same file, send a GrantRequest for a `file` lease with a different value. Assert the command fails with an override error.",
+        "description": "Modify the `grant` command's override check to permit overwriting a variable if the exact line to be written already exists in the destination file. This makes the command idempotent and prevents unnecessary failures when re-running.",
         "status": "pending",
         "dependencies": [
           11,
           27
         ],
         "priority": "medium",
-        "subtasks": []
+        "details": "The current override protection in the daemon's `handleGrant` function is too strict. This change will make the check smarter by comparing the formatted output rather than parsing existing values.\n\nFor `env` lease types:\n1. The daemon must first format the new secret into the exact line that would be written to the file (e.g., `export API_KEY=\"secret123\"`).\n2. It will then read the destination file line by line.\n3. If any existing line is a byte-for-byte match for the newly formatted line, the write operation is skipped and the grant is considered a success. This avoids complex parsing of keys and values.\n\nFor `file` lease types:\n1. The daemon will read the entire content of the target file.\n2. If the existing content is byte-for-byte identical to the new secret value, the write is skipped and the grant succeeds.\n\nIf no match is found and the variable/file already exists with different content, the existing override logic (fail unless `--override` is specified) should still apply.",
+        "testStrategy": "Create integration tests that target the daemon's grant handling logic.\n1. **Env Lease Idempotency:** Prepare a `.env` file containing the exact line `API_KEY=secret123`. Send a GrantRequest for `API_KEY` with the value `secret123` without the override flag. Assert the command succeeds because an identical line is found.\n2. **Env Lease Conflict:** Using the same file, send a GrantRequest for `API_KEY` with a different value (`secret456`) without the override flag. Assert the command fails with an override error because no identical line is found and the key already exists.\n3. **File Lease Idempotency:** Prepare a file `secret.txt` containing `secret123`. Send a GrantRequest for a `file` lease targeting `secret.txt` with the same value. Assert the command succeeds based on a full content match.\n4. **File Lease Conflict:** Using the same file, send a GrantRequest for a `file` lease with a different value. Assert the command fails with an override error."
       },
       {
         "id": 30,
@@ -1019,13 +1018,26 @@
           27,
           29
         ],
-        "priority": "medium",
-        "subtasks": []
+        "priority": "medium"
+      },
+      {
+        "id": 31,
+        "title": "Implement `file_mode` Option for File-Type Leases",
+        "description": "Add a `file_mode` option to the `env-lease.toml` configuration for `file`-type leases, allowing users to specify custom file permissions for the created secret files.",
+        "details": "1. **Configuration Parsing:** Modify the Go struct representing a lease in the configuration parser (related to Task 2). Add a new optional field, such as `FileMode string`, to capture the `file_mode` setting from the TOML file. 2. **Daemon Logic:** Update the daemon's lease granting logic. When processing a `file`-type lease, check if the `FileMode` field is set. If it is, parse the string (e.g., \"0600\") into an `os.FileMode` (octal integer). Implement validation to ensure the provided string is a valid file mode. 3. **Default Value:** If the `FileMode` field is empty or not present in the configuration, the daemon must use a default file mode of `0644`. 4. **File Writing:** Pass the determined file mode (either the user-specified one or the default) to the `AtomicWriteFile` utility (from Task 6) when writing the secret to the destination file.",
+        "testStrategy": "1. **Unit Tests (Configuration):** Add unit tests for the TOML parser. Create test cases with `file`-type leases that: a) include a valid `file_mode` like \"0600\", b) omit the `file_mode` key, and c) include an invalid `file_mode` like \"not_a_mode\". Verify the parser correctly populates the struct or returns an error. 2. **Unit Tests (Daemon):** Write unit tests for the daemon's file-lease handler. Using a mock filesystem, verify that the `AtomicWriteFile` utility is called with the correct `os.FileMode`: `0600` when specified, and `0644` when omitted. 3. **Integration Test:** Create an end-to-end test. Define an `env-lease.toml` with a `file`-type lease and `file_mode = \"0600\"`. Execute the `env-lease grant` command. After execution, use `os.Stat` to inspect the created file on the filesystem and assert that its permissions are exactly `0600`. Run a second integration test without the `file_mode` key and assert the permissions are `0644`.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          6,
+          11
+        ],
+        "priority": "medium"
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-22T02:20:49.854Z",
+      "updated": "2025-09-22T02:25:03.378Z",
       "description": "Tasks for master context"
     }
   }
