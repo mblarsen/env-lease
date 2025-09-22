@@ -64,8 +64,18 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 					scanner := bufio.NewScanner(file)
 					for scanner.Scan() {
 						line := scanner.Text()
-						if strings.HasPrefix(line, l.Variable+"=") || strings.HasPrefix(line, "export "+l.Variable+"=") {
-							return nil, fmt.Errorf("variable '%s' already exists in '%s'. Use --override to replace.", l.Variable, l.Destination)
+						parts := strings.SplitN(line, "=", 2)
+						key := strings.TrimSpace(parts[0])
+						key = strings.TrimPrefix(key, "export ")
+						
+						if key == l.Variable {
+							value := ""
+							if len(parts) > 1 {
+								value = strings.TrimSpace(parts[1])
+							}
+							if value != "" && value != `""` && value != `''` {
+								return nil, fmt.Errorf("variable '%s' already exists in '%s'. Use --override to replace.", l.Variable, l.Destination)
+							}
 						}
 					}
 				}

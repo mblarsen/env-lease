@@ -971,7 +971,7 @@
         "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
         "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted if the key exists, its value is non-empty, and the `override` flag is false.",
         "testStrategy": "Create a test suite targeting the daemon's `handleGrant` function. Prepare a target `.env` file containing `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. Send a GrantRequest for `EMPTY_VAR` without the override flag; assert that the operation succeeds and the file is updated. 2. Send a GrantRequest for `EXISTING_VAR` without the override flag; assert that the operation fails with an error. 3. Send a GrantRequest for `EXISTING_VAR` with the override flag; assert that the operation succeeds and the file is updated. 4. Send a GrantRequest for a completely new variable; assert it succeeds.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           23
@@ -996,7 +996,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-22T01:58:45.477Z",
+      "updated": "2025-09-22T01:59:52.033Z",
       "description": "Tasks for master context"
     }
   }
