@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -133,6 +134,42 @@ func TestHandleGrant_Idempotency(t *testing.T) {
 		content, _ := os.ReadFile(destFile)
 		if string(content) != "new_value" {
 			t.Fatalf("expected content 'new_value', got '%s'", string(content))
+		}
+	})
+
+	t.Run("preserve unrelated content", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, "preserve_test.env")
+		initialContent := "EXISTING_VAR=123\n\n# A comment\n"
+		err := os.WriteFile(destFile, []byte(initialContent), 0644)
+		if err != nil {
+			t.Fatalf("failed to write initial content: %v", err)
+		}
+
+		lease := ipc.Lease{
+			Source:      "1password",
+			Destination: destFile,
+			LeaseType:   "env",
+			Variable:    "NEW_VAR",
+			Value:       "new_value",
+			Duration:    "1h",
+			Format:      "export %s=%s",
+		}
+		req := ipc.GrantRequest{
+			Command:  "grant",
+			Leases:   []ipc.Lease{lease},
+			Override: false,
+		}
+		payload, _ := json.Marshal(req)
+
+		_, err = daemon.handleGrant(payload)
+		if err != nil {
+			t.Fatalf("grant failed: %v", err)
+		}
+
+		finalContent, _ := os.ReadFile(destFile)
+		expectedContent := "EXISTING_VAR=123\n\n# A comment\n\nexport NEW_VAR=new_value"
+		if strings.TrimSpace(string(finalContent)) != strings.TrimSpace(expectedContent) {
+			t.Fatalf("expected content '%s', got '%s'", expectedContent, string(finalContent))
 		}
 	})
 }

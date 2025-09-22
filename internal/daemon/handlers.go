@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
@@ -55,39 +54,51 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		switch l.LeaseType {
 		case "env":
 			content := fmt.Sprintf(l.Format, l.Variable, l.Value)
-			if !req.Override {
-				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
-					file, openErr := os.Open(l.Destination)
-					if openErr != nil {
-						return nil, openErr
+			if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {
+				existingContent, readErr := os.ReadFile(l.Destination)
+				if readErr != nil {
+					return nil, readErr
+				}
+				lines := strings.Split(string(existingContent), "\n")
+				var newLines []string
+				var found bool
+				for _, line := range lines {
+					if strings.TrimSpace(line) == "" {
+						newLines = append(newLines, line)
+						continue
 					}
-
-					scanner := bufio.NewScanner(file)
-					var foundKey bool
-					for scanner.Scan() {
-						line := scanner.Text()
+					parts := strings.SplitN(line, "=", 2)
+					key := strings.TrimSpace(parts[0])
+					key = strings.TrimPrefix(key, "export ")
+					if key == l.Variable {
 						if line == content {
 							skipWrite = true
 							break
 						}
-						parts := strings.SplitN(line, "=", 2)
-						key := strings.TrimSpace(parts[0])
-						key = strings.TrimPrefix(key, "export ")
-
-						if key == l.Variable {
-							foundKey = true
+						if !req.Override {
+							return nil, fmt.Errorf("variable '%s' already exists in '%s' with a different value. Use --override to replace.", l.Variable, l.Destination)
 						}
-					}
-					file.Close() 
-
-					if !skipWrite && foundKey {
-						return nil, fmt.Errorf("variable '%s' already exists in '%s' with a different value. Use --override to replace.", l.Variable, l.Destination)
+						newLines = append(newLines, content)
+						found = true
+					} else {
+						newLines = append(newLines, line)
 					}
 				}
+				if skipWrite {
+					break
+				}
+				if !found {
+					if len(newLines) > 0 && newLines[len(newLines)-1] != "" {
+						newLines = append(newLines, "")
+					}
+					newLines = append(newLines, content)
+				}
+				content = strings.Join(newLines, "\n")
 			}
 			if !skipWrite {
-				created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(content+"\n"), 0644)
+				created, writeErr = fileutil.AtomicWriteFile(l.Destination, []byte(content), 0644)
 			}
+
 		case "file":
 			if !req.Override {
 				if _, statErr := os.Stat(l.Destination); !os.IsNotExist(statErr) {

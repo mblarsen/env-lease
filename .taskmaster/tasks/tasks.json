@@ -1012,7 +1012,7 @@
         "description": "Fix a bug where the `grant` command for `env`-type leases overwrites the entire destination file. The logic must be updated to parse the file, modify only the relevant lines, and preserve all other content.",
         "details": "The current implementation for handling `env`-type leases writes the secret directly to the destination file, truncating any existing content. This needs to be changed to a read-modify-write approach. The daemon's `handleGrant` function, when processing a lease for a `.env` file, must first read the entire file into memory. It should then parse the file line-by-line, identifying existing key-value pairs, comments, and empty lines. For each secret to be granted, the logic will check if the key already exists. If it does, the existing line will be replaced with the new `KEY=VALUE` pair. If it does not exist, a new line will be appended to the file content. All other lines, including comments and blank lines, must be preserved in their original order. Finally, the newly constructed content will be written back to the file, completely replacing the old content in an atomic operation (e.g., write to a temp file and rename).",
         "testStrategy": "Create a comprehensive integration test suite. Start with a predefined `.env` file containing:\n```\n# API Keys\nEXISTING_KEY=old_value\n\n# This should be preserved\nUNRELATED_KEY=abc\n```\n1. **Update Existing Variable:** Run `grant` for `EXISTING_KEY` with a new value. Verify that only the value for `EXISTING_KEY` is updated and all other lines (comments, blank lines, `UNRELATED_KEY`) are preserved.\n2. **Append New Variable:** Run `grant` for a `NEW_KEY`. Verify that `NEW_KEY=new_value` is appended to the file and the original content is untouched.\n3. **Target Non-Existent File:** Run `grant` targeting a file that does not exist. Verify the file is created with the correct content.\n4. **Multiple Operations:** Run a single `grant` command that updates `EXISTING_KEY` and adds `NEW_KEY`. Verify both operations are successful and the file integrity is maintained.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           27,
@@ -1037,7 +1037,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-22T02:35:53.016Z",
+      "updated": "2025-09-22T02:38:00.417Z",
       "description": "Tasks for master context"
     }
   }
