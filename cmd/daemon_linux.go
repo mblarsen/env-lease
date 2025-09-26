@@ -31,7 +31,7 @@ var installCmd = &cobra.Command{
 		service := fmt.Sprintf(serviceTemplate, executable)
 		servicePath := filepath.Join(os.Getenv("HOME"), ".config", "systemd", "user", "env-leased.service")
 
-		if err := fileutil.AtomicWriteFile(servicePath, []byte(service), 0644); err != nil {
+		if _, err := fileutil.AtomicWriteFile(servicePath, []byte(service), 0644); err != nil {
 			return err
 		}
 
