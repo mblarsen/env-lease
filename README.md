@@ -1,5 +1,8 @@
 # env-lease
 
+> [!WARNING]
+> Disclaimer: This is a toy project and is not intended for use. Please do not use this software.
+
 A command-line tool for managing temporary, leased secrets in local development environment files. It fetches secrets from a backend (like 1Password), writes them to a file, and automatically clears them after a specified "lease" duration expires.
 
 ## Installation
