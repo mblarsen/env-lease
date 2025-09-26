@@ -36,6 +36,8 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: "https://github.com/mblarsen/env-lease"
     description: "A CLI for managing temporary, leased secrets in environment files."
-    service: |
-      run [opt_bin/"env-leased", "daemon", "run"]
-      keep_alive true
+    custom_block: |
+      service do
+        run [opt_bin/"env-leased", "daemon", "run"]
+        keep_alive true
+      end
