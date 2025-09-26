@@ -1,4 +1,5 @@
 # .goreleaser.yml
+version: 2
 before:
   hooks:
     - go mod tidy
@@ -26,10 +27,8 @@ archives:
     name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
 checksum:
   name_template: 'checksums.txt'
-snapshot:
-  name_template: "{{ .Tag }}-next"
 
-brews:
+homebrew_casks:
   - name: env-lease
     repository:
       owner: mblarsen
