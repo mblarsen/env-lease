@@ -1,0 +1,48 @@
+# .github/workflows/release.yml
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # to create github releases
+
+jobs:
+  goreleaser:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: set up go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.3'
+
+      - name: configure git for private modules
+        run: git config --global url."https://x-access-token:${{ secrets.github_token }}@github.com/".insteadof "https://github.com/"
+
+      - name: install cross-compilers
+        run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: run goreleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          # either 'goreleaser' (default) or 'goreleaser-pro'
+          distribution: goreleaser
+          # 'latest', 'nightly', or a semver
+          # version: '~> v2'
+          version: 'nightly'
+          args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
+        env:
+          # token for creating the github release
+          github_token: ${{ secrets.github_token }}
+          # token for pushing to the private homebrew tap repository
+          homebrew_tap_token: ${{ secrets.homebrew_tap_token }}
+          # tell go to fetch private modules directly from github
+          goprivate: github.com/mblarsen/*

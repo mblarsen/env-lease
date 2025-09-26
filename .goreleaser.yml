@@ -31,9 +31,10 @@ snapshot:
 
 brews:
   - name: env-lease
-    tap:
+    repository:
       owner: mblarsen
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: "https://github.com/mblarsen/env-lease"
     description: "A CLI for managing temporary, leased secrets in environment files."
     service: |
