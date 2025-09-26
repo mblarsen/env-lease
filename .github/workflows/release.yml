@@ -25,7 +25,7 @@ jobs:
           go-version: '1.24.3'
 
       - name: configure git for private modules
-        run: git config --global url."https://x-access-token:${{ secrets.github_token }}@github.com/".insteadof "https://github.com/"
+        run: git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadof "https://github.com/"
 
       - name: install cross-compilers
         run: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
@@ -41,8 +41,8 @@ jobs:
           args: release --clean ${{ github.event_name == 'workflow_dispatch' && '--snapshot' || '' }}
         env:
           # token for creating the github release
-          github_token: ${{ secrets.github_token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # token for pushing to the private homebrew tap repository
-          homebrew_tap_token: ${{ secrets.homebrew_tap_token }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           # tell go to fetch private modules directly from github
-          goprivate: github.com/mblarsen/*
+          GOPRIVATE: github.com/mblarsen/*
