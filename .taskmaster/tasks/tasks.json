@@ -1304,11 +1304,22 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 48,
+        "title": "Add op_account field to lease configuration",
+        "description": "Add an optional 'op_account' field to the lease configuration for 1Password secrets. Update the documentation to explain that this field specifies the 1Password account, taking precedence over the OP_ACCOUNT environment variable and the CLI's default. Also, investigate and implement a non-interactive mode for the 'op' command to ensure it errors out instead of hanging when an account prompt is required.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T13:17:22.187Z",
+      "updated": "2025-09-27T14:49:48.403Z",
       "description": "Tasks for master context"
     }
   }
