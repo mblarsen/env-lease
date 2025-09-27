@@ -32,10 +32,10 @@ var statusCmd = &cobra.Command{
 		}
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "SOURCE\tDESTINATION\tEXPIRES IN")
+		fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
 		for _, lease := range resp.Leases {
 			expiresIn := time.Until(lease.ExpiresAt).Round(time.Second)
-			fmt.Fprintf(w, "%s\t%s\t%s\n", lease.Source, lease.Destination, expiresIn)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", lease.Variable, lease.Source, lease.Destination, expiresIn)
 		}
 		return w.Flush()
 	},
