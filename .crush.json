@@ -1,5 +1,12 @@
 {
   "$schema": "https://charm.land/crush.json",
+  "options": {
+    "debug": true,
+    "attribution": {
+      "co_authored_by": false,
+      "generated_with": false
+    }
+  },
   "mcp": {
     "tm": {
       "type": "stdio",

@@ -1062,11 +1062,153 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 34,
+        "title": "Add HashiCorp Vault Provider",
+        "description": "Implement a new secret provider for HashiCorp Vault. The implementation should follow the existing pattern of the 1Password provider, using the Vault CLI ('vault') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (e.g., 'secret/data/my-secret key') and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Vault-specific errors.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 35,
+        "title": "Add AWS Secrets Manager Provider",
+        "description": "Implement a new secret provider for AWS Secrets Manager. The implementation should follow the existing pattern of the 1Password provider, using the AWS CLI ('aws') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret ARN) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for AWS-specific errors.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 36,
+        "title": "Implement `--continue-on-error` Flag for `grant` Command",
+        "description": "Modify the `grant` command to support a `--continue-on-error` flag. When enabled, the command will attempt to fetch all requested secrets, aggregate any errors encountered, and report them at the end, rather than exiting on the first failure.",
+        "details": "This task involves modifying both the CLI and the daemon. On the CLI side, a new `--continue-on-error` boolean flag will be added to the `grant` command. The IPC `GrantRequest` struct must be updated to include a corresponding boolean field to transmit the flag's state to the daemon. On the daemon side, the `handleGrant` function will be updated. If the `ContinueOnError` field is true, the secret fetching loop should not exit on the first error. Instead, it should collect each error encountered into a slice. After iterating through all requested leases, if the error slice is not empty, the daemon should return a single, aggregated error message to the client detailing all the failures. Successfully fetched secrets should still be written to the environment file.",
+        "testStrategy": "Testing will be multi-layered. First, create unit tests for the daemon's `handleGrant` function using a mock secret provider. Configure the mock to successfully return some secrets but fail on others. Test two scenarios: 1) With `ContinueOnError` set to false, assert that the handler returns immediately on the first failure. 2) With `ContinueOnError` set to true, assert that the handler processes all secrets, writes the successful ones, and returns a single aggregated error containing details for all failures. Second, add an end-to-end integration test. Configure a project with multiple secrets, run `env-lease grant --continue-on-error`, and verify that the command exits with a non-zero status, reports the specific failures to stderr, and that the successfully fetched secrets are present in the output file.",
+        "status": "pending",
+        "dependencies": [
+          9,
+          10,
+          23
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 37,
+        "title": "Modify `revoke` Command for Project-Scoped Revocation with `--all` Flag",
+        "description": "Update the `revoke` command to only revoke leases for the current project by default, based on the `env-lease.toml` configuration. Introduce an `--all` flag to preserve the original global revocation behavior.",
+        "details": "The current `revoke` command is too broad, clearing all active leases regardless of their origin. This task refactors it to be project-aware. The default behavior will be to revoke only the leases associated with the current project's `env-lease.toml` file. This includes leases that are currently active for the project but may have been removed from the configuration file since they were last granted. To support the original functionality, a new `--all` flag will be added to perform a global revocation of all active leases. This will require modifying the CLI command to parse the configuration and updating the IPC message and daemon logic to handle both scoped and global revocation requests.",
+        "testStrategy": "Testing will be performed through a series of integration tests. \n1. **Default Scoped Revoke:** Create two separate project directories with distinct `env-lease.toml` files. Grant leases for both projects. `cd` into one project directory and run `env-lease revoke`. Use `env-lease status` to verify that only the leases for that specific project have been revoked, while the other project's leases remain active. \n2. **`--all` Flag Revoke:** Set up the same multi-project scenario as above. Run `env-lease revoke --all` from one of the project directories. Use `env-lease status` to verify that all leases from *both* projects have been revoked. \n3. **Stale Lease Revocation:** Grant leases for a project. Then, edit the `env-lease.toml` to remove one of the lease definitions. Run `env-lease revoke` in that project. Verify that all original leases for that project, including the one no longer in the config file, are successfully revoked.",
+        "status": "pending",
+        "dependencies": [
+          12,
+          11,
+          2
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 38,
+        "title": "Add Google Secret Manager Provider",
+        "description": "Implement a new secret provider for Google Secret Manager. The implementation should follow the existing pattern of the 1Password provider, using the Google Cloud CLI ('gcloud') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret name and version) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Google Cloud-specific errors.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 39,
+        "title": "Add Azure Key Vault Provider",
+        "description": "Implement a new secret provider for Azure Key Vault. The implementation should follow the existing pattern of the 1Password provider, using the Azure CLI ('az') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret name and vault name) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Azure-specific errors.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 40,
+        "title": "Add --print Flag to `daemon install` Command",
+        "description": "Implement a `--print` flag for the `daemon install` command. This flag will output the generated service configuration file to stdout and prevent the actual installation, facilitating debugging and manual setup.",
+        "details": "Modify the `daemon install` Cobra command, which was established as part of the unified binary in Task 32. Add a new persistent boolean flag named `--print`. The command's execution logic should be updated to check if this flag is present. If `--print` is true, the command must generate the appropriate service configuration content (a `.plist` file for macOS, a `.service` file for Linux) as a string. This string should be printed directly to standard output. Concurrently, a warning message, such as 'WARNING: Service configuration printed but not installed.', should be printed to standard error. The command should then exit without attempting to write any files to system directories or execute service management commands (`launchctl`, `systemctl`). If the `--print` flag is not provided, the command should execute its original installation logic without change.",
+        "testStrategy": "Testing will involve running the command on both supported platforms and verifying the output streams and system state. 1. On Linux, run `env-lease daemon install --print`. Capture stdout and assert that its content is a valid systemd `.service` file. Capture stderr and assert it contains the warning message. Verify that no file was created in `~/.config/systemd/user/` and `systemctl` was not invoked. 2. On macOS, run `env-lease daemon install --print`. Capture stdout and assert its content is a valid XML `.plist` file. Capture stderr and assert it contains the warning message. Verify no file was created in `~/Library/LaunchAgents/` and `launchctl` was not invoked. 3. On both platforms, run `env-lease daemon install` without the flag to confirm that the original installation behavior is preserved and that nothing is printed to stdout.",
+        "status": "pending",
+        "dependencies": [
+          32
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 41,
+        "title": "Refine `grant` Override Logic to Allow Overwriting Empty Variables",
+        "description": "Modify the `grant` command's override check to permit overwriting an environment variable if its existing value is empty, without requiring the `--override` flag. This improves usability when re-granting leases for variables that have been cleared.",
+        "details": "The current override protection within the daemon's `handleGrant` function is overly strict and incorrectly flags a variable with an empty value as a conflict, contrary to the intent of previous fixes. This task will correct the logic. When the daemon processes a `GrantRequest`, it must parse the target file (e.g., `.env`) and check for existing variables. The check must be refined to differentiate between a variable with a non-empty value and one with an empty value. If a variable exists but its value is an empty string (e.g., `API_KEY=`), the operation should succeed without the `--override` flag, overwriting the line with the new key and secret. The conflict requiring `--override` should only be triggered if the existing variable has a non-empty value (e.g., `API_KEY=\"old_secret\"`).",
+        "testStrategy": "Create a comprehensive integration test suite targeting the daemon's grant handling logic. Prepare a target `.env` file with the following contents: `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. **Empty Value Overwrite:** Send a GrantRequest for `EMPTY_VAR` with a new value, but without the `--override` flag. Assert that the operation succeeds and the file is correctly updated. 2. **Non-Empty Conflict:** Send a GrantRequest for `EXISTING_VAR` with a new value, without the `--override` flag. Assert that the operation fails with an error indicating the variable already exists. 3. **Override Success:** Send a GrantRequest for `EXISTING_VAR` with a new value and the `--override` flag. Assert the operation succeeds and the file is updated.",
+        "status": "pending",
+        "dependencies": [
+          11,
+          27
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 42,
+        "title": "Implement `direnv` Integration for `grant` Command",
+        "description": "Enhance the `grant` command to detect when it modifies a `.envrc` file and, if `direnv` is installed, suggest that the user run `direnv allow` to apply the new environment variables.",
+        "details": "This logic should be implemented within the `grant` command's client-side execution flow. After the IPC client receives a successful response from the daemon for a grant operation, the CLI should check if the target output file specified in the configuration is named `.envrc`. If it is, the client should then check if the `direnv` executable is available in the system's `PATH` using `exec.LookPath(\"direnv\")`. If both conditions are met, a helpful, non-blocking message should be printed to standard output, such as \"💡 .envrc modified. Run 'direnv allow' to apply changes.\". This feature should not alter the command's exit code.",
+        "testStrategy": "Create a suite of integration tests for the `grant` command's client-side logic. 1. **Success Case:** Configure a grant to write to `.envrc` and ensure a mock `direnv` executable is in the test's `PATH`. Execute the command and assert that the stdout contains the `direnv allow` suggestion. 2. **Wrong Filename Case:** Configure the grant to write to `.env` instead. Verify the suggestion is not printed. 3. **`direnv` Missing Case:** Configure the grant to write to `.envrc` but ensure `direnv` is not in the `PATH`. Verify the suggestion is not printed. 4. **Failed Grant Case:** Simulate a failed grant operation (e.g., due to a pre-existing variable without the `--override` flag). Assert that the command fails and the suggestion is not printed.",
+        "status": "pending",
+        "dependencies": [
+          10,
+          23,
+          25
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 43,
+        "title": "Fully Implement Orphaned Lease Cleanup Daemon Logic and Command",
+        "description": "Implement the complete daemon logic for detecting, marking, and purging orphaned leases. This includes a periodic background check and updating the `env-lease daemon cleanup` command to trigger the process manually.",
+        "details": "This task involves two main components. First, enhance the daemon's core loop to include a periodic background job that runs, for example, every 24 hours. This job will iterate through all active leases managed in the state file (from Task 7). For each lease, it will check for the existence of the source `env-lease.toml` file. If the file does not exist, the lease's entry in the state file should be updated with a new field, such as `orphaned_since`, containing the current timestamp. The job should also check for leases already marked as orphaned. If the current time is more than 30 days past the `orphaned_since` timestamp, the daemon must trigger the internal revocation logic for that lease and remove its entry from the state entirely. Second, the `env-lease daemon cleanup` command must be updated. It will use the IPC client (from Task 10) to send a new `CleanupRequest` to the daemon. A corresponding handler must be added to the daemon's IPC server to receive this request and immediately execute the full orphan detection and purging logic on demand.",
+        "testStrategy": "A multi-layered testing approach is required. For unit tests, mock the daemon's state manager and the filesystem. Create a test state with several leases. In one test case, 'delete' the config file for one lease and run the cleanup logic; assert that the lease is now marked as orphaned in the state with a correct timestamp. In another case, create a lease already marked as orphaned 29 days ago, advance a mock clock by two days, run the cleanup logic, and assert that the lease has been completely removed from the state. For integration testing, start a live daemon with a temporary state file, grant a lease, then manually delete the associated `env-lease.toml`. Execute the `env-lease daemon cleanup` command and then use `env-lease status` to verify the lease is now correctly identified as orphaned.",
+        "status": "pending",
+        "dependencies": [
+          7,
+          10,
+          15
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 44,
+        "title": "Implement Lease Expiration Notifications for macOS/Linux",
+        "description": "Implement desktop notifications for lease expirations on macOS and Linux. The daemon should detect the operating system and use the appropriate native notification command (`osascript` for macOS, `notify-send` for Linux) to inform the user when a lease has been revoked due to expiration. The notification message should clearly identify which lease has expired.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T10:52:46.020Z",
+      "updated": "2025-09-27T11:35:32.662Z",
       "description": "Tasks for master context"
     }
   }
