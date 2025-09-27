@@ -203,4 +203,112 @@ func TestHandleGrant_Idempotency(t *testing.T) {
 			t.Fatalf("expected file mode 0600, got %o", info.Mode().Perm())
 		}
 	})
+
+	t.Run("overwrite empty variable without override", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, "overwrite_empty.env")
+		initialContent := "EMPTY_VAR=\n"
+		err := os.WriteFile(destFile, []byte(initialContent), 0644)
+		if err != nil {
+			t.Fatalf("failed to write initial content: %v", err)
+		}
+
+		lease := ipc.Lease{
+			Source:      "1password",
+			Destination: destFile,
+			LeaseType:   "env",
+			Variable:    "EMPTY_VAR",
+			Value:       "new_value",
+			Duration:    "1h",
+			Format:      "%s=%s",
+		}
+		req := ipc.GrantRequest{
+			Command:  "grant",
+			Leases:   []ipc.Lease{lease},
+			Override: false,
+		}
+		payload, _ := json.Marshal(req)
+
+		_, err = daemon.handleGrant(payload)
+		if err != nil {
+			t.Fatalf("grant failed: %v", err)
+		}
+
+		finalContent, _ := os.ReadFile(destFile)
+		expectedContent := "EMPTY_VAR=new_value"
+		if strings.TrimSpace(string(finalContent)) != strings.TrimSpace(expectedContent) {
+			t.Fatalf("expected content '%s', got '%s'", expectedContent, string(finalContent))
+		}
+	})
+
+	t.Run("overwrite empty quoted variable without override", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, "overwrite_empty_quoted.env")
+		initialContent := `EMPTY_QUOTED_VAR=""` + "\n"
+		err := os.WriteFile(destFile, []byte(initialContent), 0644)
+		if err != nil {
+			t.Fatalf("failed to write initial content: %v", err)
+		}
+
+		lease := ipc.Lease{
+			Source:      "1password",
+			Destination: destFile,
+			LeaseType:   "env",
+			Variable:    "EMPTY_QUOTED_VAR",
+			Value:       "new_value",
+			Duration:    "1h",
+			Format:      "%s=%s",
+		}
+		req := ipc.GrantRequest{
+			Command:  "grant",
+			Leases:   []ipc.Lease{lease},
+			Override: false,
+		}
+		payload, _ := json.Marshal(req)
+
+		_, err = daemon.handleGrant(payload)
+		if err != nil {
+			t.Fatalf("grant failed: %v", err)
+		}
+
+		finalContent, _ := os.ReadFile(destFile)
+		expectedContent := `EMPTY_QUOTED_VAR=new_value`
+		if strings.TrimSpace(string(finalContent)) != strings.TrimSpace(expectedContent) {
+			t.Fatalf("expected content '%s', got '%s'", expectedContent, string(finalContent))
+		}
+	})
+
+	t.Run("overwrite empty var with comment without override", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, "overwrite_empty_comment.env")
+		initialContent := `EMPTY_COMMENT_VAR="" # some comment` + "\n"
+		err := os.WriteFile(destFile, []byte(initialContent), 0644)
+		if err != nil {
+			t.Fatalf("failed to write initial content: %v", err)
+		}
+
+		lease := ipc.Lease{
+			Source:      "1password",
+			Destination: destFile,
+			LeaseType:   "env",
+			Variable:    "EMPTY_COMMENT_VAR",
+			Value:       "new_value",
+			Duration:    "1h",
+			Format:      "%s=%s",
+		}
+		req := ipc.GrantRequest{
+			Command:  "grant",
+			Leases:   []ipc.Lease{lease},
+			Override: false,
+		}
+		payload, _ := json.Marshal(req)
+
+		_, err = daemon.handleGrant(payload)
+		if err != nil {
+			t.Fatalf("grant failed: %v", err)
+		}
+
+		finalContent, _ := os.ReadFile(destFile)
+		expectedContent := `EMPTY_COMMENT_VAR=new_value # some comment`
+		if strings.TrimSpace(string(finalContent)) != strings.TrimSpace(expectedContent) {
+			t.Fatalf("expected content '%s', got '%s'", expectedContent, string(finalContent))
+		}
+	})
 }

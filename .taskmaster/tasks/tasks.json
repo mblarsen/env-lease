@@ -1156,7 +1156,7 @@
         "description": "Modify the `grant` command's override check to permit overwriting an environment variable if its existing value is empty, without requiring the `--override` flag. This improves usability when re-granting leases for variables that have been cleared.",
         "details": "The current override protection within the daemon's `handleGrant` function is overly strict and incorrectly flags a variable with an empty value as a conflict, contrary to the intent of previous fixes. This task will correct the logic. When the daemon processes a `GrantRequest`, it must parse the target file (e.g., `.env`) and check for existing variables. The check must be refined to differentiate between a variable with a non-empty value and one with an empty value. If a variable exists but its value is an empty string (e.g., `API_KEY=`), the operation should succeed without the `--override` flag, overwriting the line with the new key and secret. The conflict requiring `--override` should only be triggered if the existing variable has a non-empty value (e.g., `API_KEY=\"old_secret\"`).",
         "testStrategy": "Create a comprehensive integration test suite targeting the daemon's grant handling logic. Prepare a target `.env` file with the following contents: `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. **Empty Value Overwrite:** Send a GrantRequest for `EMPTY_VAR` with a new value, but without the `--override` flag. Assert that the operation succeeds and the file is correctly updated. 2. **Non-Empty Conflict:** Send a GrantRequest for `EXISTING_VAR` with a new value, without the `--override` flag. Assert that the operation fails with an error indicating the variable already exists. 3. **Override Success:** Send a GrantRequest for `EXISTING_VAR` with a new value and the `--override` flag. Assert the operation succeeds and the file is updated.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           27
@@ -1208,7 +1208,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T11:35:32.662Z",
+      "updated": "2025-09-27T11:38:00.328Z",
       "description": "Tasks for master context"
     }
   }

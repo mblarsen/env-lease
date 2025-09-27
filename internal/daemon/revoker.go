@@ -29,7 +29,7 @@ func (r *FileRevoker) Revoke(lease Lease) error {
 	}
 }
 
-func (r *FileRevoker) clearEnvVar(path, key string) error {
+func (r *FileRevoker) clearEnvVar(path, keyToRevoke string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -43,10 +43,23 @@ func (r *FileRevoker) clearEnvVar(path, key string) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, key+"=") || strings.HasPrefix(line, "export "+key+"=") {
-			// Clear the value
-			parts := strings.SplitN(line, "=", 2)
-			out.WriteString(parts[0] + "=\n")
+
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) < 2 {
+			out.WriteString(line + "\n")
+			continue
+		}
+
+		keyPart := strings.TrimSpace(parts[0])
+		keyPart = strings.TrimPrefix(keyPart, "export ")
+
+		if keyPart == keyToRevoke {
+			originalKeyPart := parts[0]
+			comment := ""
+			if commentIndex := strings.Index(line, "#"); commentIndex > strings.Index(line, "=") {
+				comment = " " + strings.TrimSpace(line[commentIndex:])
+			}
+			out.WriteString(originalKeyPart + "=" + comment + "\n")
 		} else {
 			out.WriteString(line + "\n")
 		}
@@ -55,7 +68,7 @@ func (r *FileRevoker) clearEnvVar(path, key string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	
+
 	info, err := f.Stat()
 	if err != nil {
 		return err

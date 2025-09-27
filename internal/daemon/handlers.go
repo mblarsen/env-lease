@@ -72,14 +72,42 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 					key := strings.TrimSpace(parts[0])
 					key = strings.TrimPrefix(key, "export ")
 					if key == l.Variable {
-						if line == content {
+						// This is the desired state of the line, without comments.
+						newContent := fmt.Sprintf(l.Format, l.Variable, l.Value)
+
+						// Extract the current value, ignoring comments and quotes.
+						var existingValue string
+						if len(parts) > 1 {
+							valuePart := strings.SplitN(parts[1], "#", 2)[0]
+							valuePart = strings.TrimSpace(valuePart)
+							if len(valuePart) >= 2 && valuePart[0] == '"' && valuePart[len(valuePart)-1] == '"' {
+								valuePart = valuePart[1 : len(valuePart)-1]
+							} else if len(valuePart) >= 2 && valuePart[0] == '\'' && valuePart[len(valuePart)-1] == '\'' {
+								valuePart = valuePart[1 : len(valuePart)-1]
+							}
+							existingValue = valuePart
+						}
+
+						// If values are the same, it's an idempotent grant. Skip writing.
+						if existingValue == l.Value {
 							skipWrite = true
 							break
 						}
+
+						// If values differ, check for override flag.
 						if !req.Override {
-							return nil, fmt.Errorf("variable '%s' already exists in '%s' with a different value. Use --override to replace.", l.Variable, l.Destination)
+							if existingValue != "" {
+								return nil, fmt.Errorf("variable '%s' already exists in '%s' with a different value. Use --override to replace.", l.Variable, l.Destination)
+							}
 						}
-						newLines = append(newLines, content)
+
+						// Preserve comment from original line.
+						if commentIndex := strings.Index(line, "#"); commentIndex != -1 {
+							comment := line[commentIndex:]
+							newContent += " " + strings.TrimSpace(comment)
+						}
+
+						newLines = append(newLines, newContent)
 						found = true
 					} else {
 						newLines = append(newLines, line)
