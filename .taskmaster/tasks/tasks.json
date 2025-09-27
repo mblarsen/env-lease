@@ -1040,7 +1040,7 @@
         "description": "Analyze the feasibility and benefits of merging the `env-lease` CLI and `env-leased` daemon into a single executable. Refactor the Cobra command structure to support both client and daemon subcommands within one binary.",
         "details": "The CLI and daemon currently exist as two separate binaries but share a common Cobra command structure, suggesting an opportunity for consolidation. This task involves refactoring the project to produce a single `env-lease` binary. The daemon's functionality will be moved under a new subcommand, for example, `env-lease daemon start`. All existing CLI commands (`grant`, `revoke`, `status`, etc.) will remain as top-level commands of the unified binary. This will involve merging the `main.go` files, reorganizing the Cobra command definitions, and updating the build process to produce only one artifact. The goal is to simplify distribution, reduce build complexity, and eliminate code duplication.",
         "testStrategy": "Verification will be performed end-to-end. First, update the build scripts and confirm that only a single `env-lease` binary is generated. Second, start the daemon in the background using the new subcommand (`env-lease daemon start`) and verify its logs (Task 25) indicate a successful startup. Third, execute all existing CLI commands (`grant`, `status`, `revoke`) against the running daemon and confirm they function identically to the previous two-binary setup. Finally, stop the daemon and run a command like `env-lease status` to ensure the user-friendly connection error message (from Task 24) is still displayed correctly.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           9,
           24
@@ -1054,7 +1054,7 @@
         "description": "Modify the systemd service template and the `daemon install` command to support the new single-binary architecture, ensuring the service correctly starts the daemon using the `daemon start` subcommand.",
         "details": "Following the consolidation of the CLI and daemon into a single executable in Task 32, the systemd service integration from Task 17 is now broken. This task involves updating the service file template to execute the daemon via its new subcommand. The `ExecStart` directive in the service template must be changed from pointing to the old `env-leased` binary to invoking `env-lease daemon start`. The `env-lease daemon install` command logic needs to be updated to generate this new configuration. The path to the executable in `ExecStart` should be dynamically determined using a function like `os.Executable()` to ensure it points to the correct location of the running `env-lease` binary. The service file should also be renamed from `env-leased.service` to `env-lease.service` for consistency.",
         "testStrategy": "Testing must be performed on a Linux system with systemd. First, build the unified binary from Task 32. Then, run the updated `env-lease daemon install` command. Verify that a file named `env-lease.service` is created in `~/.config/systemd/user/`. Inspect the contents of this file to confirm the `ExecStart` line correctly points to the absolute path of the binary and uses the `daemon start` subcommand. Use `systemctl --user daemon-reload`, then `systemctl --user start env-lease.service`. Check the service's status with `systemctl --user status env-lease.service` to ensure it is active and running. Finally, check the daemon's logs via `journalctl --user -u env-lease.service` to confirm a successful startup message is present.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           17,
           32,
@@ -1066,7 +1066,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-26T16:44:52.389Z",
+      "updated": "2025-09-27T10:52:46.020Z",
       "description": "Tasks for master context"
     }
   }

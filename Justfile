@@ -8,7 +8,6 @@ build:
 	@echo "Building binaries..."
 	@mkdir -p ./bin
 	@go build -o ./bin/env-lease ./cmd/env-lease
-	@go build -o ./bin/env-leased ./cmd/env-leased
 
 # Run linter
 lint:
