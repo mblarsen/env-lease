@@ -33,3 +33,6 @@ homebrew_casks:
         run [opt_bin/"env-lease", "daemon", "run"]
         keep_alive true
       end
+      post_install do
+        system_command "xattr", args: ["-d", "com.apple.quarantine", "#{staged_path}/env-lease"]
+      end

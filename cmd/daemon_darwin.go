@@ -33,9 +33,6 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		// Remove the quarantine attribute to prevent Gatekeeper issues
-		_ = exec.Command("xattr", "-d", "com.apple.quarantine", executable).Run()
-
 		plist := fmt.Sprintf(plistTemplate, executable)
 		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-lease.plist")
 
