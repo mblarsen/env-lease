@@ -1167,9 +1167,7 @@
       {
         "id": 42,
         "title": "Implement `direnv` Integration for `grant` Command",
-        "description": "Enhance the `grant` command to detect when it modifies a `.envrc` file and, if `direnv` is installed, suggest that the user run `direnv allow` to apply the new environment variables.",
-        "details": "This logic should be implemented within the `grant` command's client-side execution flow. After the IPC client receives a successful response from the daemon for a grant operation, the CLI should check if the target output file specified in the configuration is named `.envrc`. If it is, the client should then check if the `direnv` executable is available in the system's `PATH` using `exec.LookPath(\"direnv\")`. If both conditions are met, a helpful, non-blocking message should be printed to standard output, such as \"💡 .envrc modified. Run 'direnv allow' to apply changes.\". This feature should not alter the command's exit code.",
-        "testStrategy": "Create a suite of integration tests for the `grant` command's client-side logic. 1. **Success Case:** Configure a grant to write to `.envrc` and ensure a mock `direnv` executable is in the test's `PATH`. Execute the command and assert that the stdout contains the `direnv allow` suggestion. 2. **Wrong Filename Case:** Configure the grant to write to `.env` instead. Verify the suggestion is not printed. 3. **`direnv` Missing Case:** Configure the grant to write to `.envrc` but ensure `direnv` is not in the `PATH`. Verify the suggestion is not printed. 4. **Failed Grant Case:** Simulate a failed grant operation (e.g., due to a pre-existing variable without the `--override` flag). Assert that the command fails and the suggestion is not printed.",
+        "description": "Enhance the `grant` and `revoke` commands to automatically execute `direnv allow` when they modify a `.envrc` file. This behavior will be the default if `direnv` is installed. A `--no-direnv` flag will be added to both commands to disable the automatic execution and instead print a suggestion to the user.",
         "status": "pending",
         "dependencies": [
           10,
@@ -1177,7 +1175,64 @@
           25
         ],
         "priority": "medium",
-        "subtasks": []
+        "details": "This logic should be implemented within the client-side execution flow for both the `grant` and `revoke` commands. After a successful operation, the CLI should check if the target output file is named `.envrc`. If it is, the client should check if the `direnv` executable is available in the system's `PATH`. If both conditions are met, the CLI should execute `direnv allow` and stream its output to the user. A new boolean flag, `--no-direnv`, should be added to both commands. If this flag is provided, the automatic execution should be skipped, and the message \".envrc modified. Run 'direnv allow' to apply changes.\" should be printed to standard output instead. The command's exit code should not be affected by the `direnv` integration logic.",
+        "testStrategy": "Update the integration test suite to cover both `grant` and `revoke` commands. 1. **Default Success Case:** For both commands, configure them to write to `.envrc` with a mock `direnv` in the `PATH`. Execute the command without the flag and assert that the mock `direnv allow` was executed and its output was displayed. 2. **Opt-out Case:** For both commands, run with the `--no-direnv` flag. Assert that the mock `direnv` was *not* executed and that the suggestion message was printed to stdout. 3. **Wrong Filename Case:** Configure the commands to write to a different filename (e.g., `.env`). Verify that `direnv` is not executed and no message is printed. 4. **`direnv` Missing Case:** Configure the commands to write to `.envrc` but ensure `direnv` is not in the `PATH`. Verify that no execution is attempted and no message is printed. 5. **Failed Operation Case:** Simulate a failed `grant` or `revoke` operation. Assert that the `direnv` logic is not triggered.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "",
+            "description": "Modify the `grant` command to check for `.envrc` and `direnv`, and execute `direnv allow` by default.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "",
+            "description": "Add a `--no-direnv` flag to the `grant` command to suppress automatic execution and print a suggestion instead.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "",
+            "description": "Extend the `direnv` integration logic to the `revoke` command, making it automatically execute `direnv allow`.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "",
+            "description": "Add the `--no-direnv` flag to the `revoke` command.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "",
+            "description": "Update integration tests for `grant` to cover automatic execution, the `--no-direnv` flag, and edge cases.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "",
+            "description": "Update integration tests for `revoke` to cover automatic execution, the `--no-direnv` flag, and edge cases.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          }
+        ]
       },
       {
         "id": 43,
@@ -1204,11 +1259,25 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 45,
+        "title": "Clear Environment Variable Value in .envrc on Automatic Revocation",
+        "description": "Enhance the daemon's automatic lease revocation process to clear the value of the corresponding environment variable in the user's .envrc file, ensuring secrets are removed upon expiration while preserving the variable declaration and any associated comments.",
+        "details": "This task modifies the daemon's core revocation logic, triggered when a lease expires. Instead of deleting the line from the .envrc file, the logic will now set the environment variable's value to an empty string. The implementation should be located within the daemon's main loop where expired leases are processed (established in Task 8). The process involves reading the target .envrc file, identifying the specific line for the expired secret's variable, and replacing it. A regular expression should be used to match lines like `export VAR_NAME=...`, capturing the variable name and any trailing comments. The replacement line will be formatted as `export VAR_NAME=\"\"`, preserving the captured comment. This ensures that user-managed comments and the structure of the .envrc file remain intact. The file write operation should be atomic to prevent data corruption in case of an interruption.",
+        "testStrategy": "Testing will be divided into unit and integration tests. For unit tests, create a dedicated function that takes a string representing the content of an .envrc file and the name of a variable to clear. Test this function with various inputs: a standard variable assignment, a variable with a trailing comment, a variable with complex quoting, and a file where the variable is not present. Assert that the returned string has the correct line modified to `export VAR_NAME=\"\"` while all other lines and comments are unchanged. For integration testing, start the daemon with a mock clock. Grant a lease with a short TTL (e.g., 1 second). Advance the mock clock to trigger the expiration. Read the content of the test .envrc file from disk and verify that the secret variable's value has been set to an empty string and that any associated comment on that line was preserved.",
+        "status": "pending",
+        "dependencies": [
+          8,
+          14
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T11:38:00.328Z",
+      "updated": "2025-09-27T12:43:00.439Z",
       "description": "Tasks for master context"
     }
   }
