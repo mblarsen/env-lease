@@ -1168,7 +1168,7 @@
         "id": 42,
         "title": "Implement `direnv` Integration for `grant` Command",
         "description": "Enhance the `grant` and `revoke` commands to automatically execute `direnv allow` when they modify a `.envrc` file. This behavior will be the default if `direnv` is installed. A `--no-direnv` flag will be added to both commands to disable the automatic execution and instead print a suggestion to the user.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           10,
           23,
@@ -1182,7 +1182,7 @@
             "id": 1,
             "title": "",
             "description": "Modify the `grant` command to check for `.envrc` and `direnv`, and execute `direnv allow` by default.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1191,7 +1191,7 @@
             "id": 2,
             "title": "",
             "description": "Add a `--no-direnv` flag to the `grant` command to suppress automatic execution and print a suggestion instead.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1200,7 +1200,7 @@
             "id": 3,
             "title": "",
             "description": "Extend the `direnv` integration logic to the `revoke` command, making it automatically execute `direnv allow`.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1209,7 +1209,7 @@
             "id": 4,
             "title": "",
             "description": "Add the `--no-direnv` flag to the `revoke` command.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1218,7 +1218,7 @@
             "id": 5,
             "title": "",
             "description": "Update integration tests for `grant` to cover automatic execution, the `--no-direnv` flag, and edge cases.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1227,7 +1227,7 @@
             "id": 6,
             "title": "",
             "description": "Update integration tests for `revoke` to cover automatic execution, the `--no-direnv` flag, and edge cases.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1280,10 +1280,27 @@
         "description": "Profile the `env-lease grant` command to identify and resolve significant latency issues, particularly when fetching multiple secrets from providers like 1Password.",
         "details": "The `grant` command exhibits slow performance (~25s for a single lease), far exceeding the execution time of a direct `op read` command. The primary hypothesis is that secrets are being fetched sequentially within the daemon, with each call incurring the full startup overhead of the underlying provider's CLI (e.g., `op`). The investigation will start by using Go's `pprof` to profile the daemon's handling of a grant request to confirm the bottleneck. Based on the findings, the daemon's secret fetching logic will be refactored to process multiple secret requests in parallel using goroutines and a `sync.WaitGroup`. This change must preserve the existing transactional behavior: if any secret fetch fails, the entire grant operation should be rolled back unless the `--continue-on-error` flag is used. Error aggregation from the concurrent operations will be a key part of the implementation.",
         "testStrategy": "First, establish a performance baseline by creating a test configuration with at least five 1Password leases and measuring the execution time of the `grant` command. After implementing optimizations, re-run the benchmark and verify a significant reduction in execution time, expecting it to be closer to the time of a single `op` call rather than the sum of all calls. Second, create a new integration test with a mock `SecretProvider` that simulates a fixed delay. When granting multiple leases, assert that the total execution time is approximately equal to the single delay, not the sum of all delays, confirming parallel execution. Finally, ensure all existing integration tests for `grant`, especially those covering error handling and transactional behavior, continue to pass.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           4,
           11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 47,
+        "title": "Enhance Daemon Startup Logging for Better Visibility",
+        "description": "Add detailed logging messages to the daemon's startup sequence to confirm successful initialization, state loading, and IPC server status, providing clear feedback that the daemon is running correctly.",
+        "details": "Modify the daemon's main startup function (invoked by `env-lease daemon start`). After the initial 'Starting daemon...' message, add new log lines using the standard `log` package established in Task 25. The new logs should report on the outcome of key initialization steps:\n1. **State Loading (Task 7):** After attempting to load `state.json`, log either `INFO: Loaded state with N active leases.` or `INFO: No state file found, initializing new state.`\n2. **Expired Lease Check (Task 8):** After the initial scan for leases that expired while the daemon was offline, log `INFO: Revoked M expired leases on startup.`\n3. **IPC Server (Task 9):** After successfully creating and starting the listener on the Unix Domain Socket, log `INFO: IPC server listening at [socket_path].`\n4. **Final Confirmation:** Once all initialization is complete and the main timer loop is about to begin, log a final summary message like `INFO: Daemon startup successful. Ready to manage leases.`",
+        "testStrategy": "Testing will be done via integration tests that capture the daemon's standard output. \n1. **Test Case: Clean Start:** Ensure no `state.json` file exists. Start the daemon using `env-lease daemon start`. Verify that stdout contains the expected sequence of logs: 'No state file found', 'IPC server listening', and 'Daemon startup successful'.\n2. **Test Case: Resuming with State:** Create a `state.json` file containing several leases, including at least one that is already expired. Start the daemon. Verify that stdout contains logs confirming the state was loaded (e.g., 'Loaded state with N active leases'), that expired leases were revoked ('Revoked M expired leases on startup'), and the final success message.",
+        "status": "pending",
+        "dependencies": [
+          7,
+          8,
+          9,
+          25,
+          32
         ],
         "priority": "medium",
         "subtasks": []
@@ -1291,7 +1308,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T13:00:42.109Z",
+      "updated": "2025-09-27T13:15:17.501Z",
       "description": "Tasks for master context"
     }
   }
