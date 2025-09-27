@@ -1273,11 +1273,25 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 46,
+        "title": "Investigate and Optimize `grant` Command Performance",
+        "description": "Profile the `env-lease grant` command to identify and resolve significant latency issues, particularly when fetching multiple secrets from providers like 1Password.",
+        "details": "The `grant` command exhibits slow performance (~25s for a single lease), far exceeding the execution time of a direct `op read` command. The primary hypothesis is that secrets are being fetched sequentially within the daemon, with each call incurring the full startup overhead of the underlying provider's CLI (e.g., `op`). The investigation will start by using Go's `pprof` to profile the daemon's handling of a grant request to confirm the bottleneck. Based on the findings, the daemon's secret fetching logic will be refactored to process multiple secret requests in parallel using goroutines and a `sync.WaitGroup`. This change must preserve the existing transactional behavior: if any secret fetch fails, the entire grant operation should be rolled back unless the `--continue-on-error` flag is used. Error aggregation from the concurrent operations will be a key part of the implementation.",
+        "testStrategy": "First, establish a performance baseline by creating a test configuration with at least five 1Password leases and measuring the execution time of the `grant` command. After implementing optimizations, re-run the benchmark and verify a significant reduction in execution time, expecting it to be closer to the time of a single `op` call rather than the sum of all calls. Second, create a new integration test with a mock `SecretProvider` that simulates a fixed delay. When granting multiple leases, assert that the total execution time is approximately equal to the single delay, not the sum of all delays, confirming parallel execution. Finally, ensure all existing integration tests for `grant`, especially those covering error handling and transactional behavior, continue to pass.",
+        "status": "pending",
+        "dependencies": [
+          4,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T12:43:00.439Z",
+      "updated": "2025-09-27T13:00:42.109Z",
       "description": "Tasks for master context"
     }
   }

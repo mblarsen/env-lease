@@ -84,13 +84,25 @@ var grantCmd = &cobra.Command{
 			fmt.Println(msg)
 		}
 
+		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
+		for _, l := range leases {
+			if filepath.Base(l.Destination) == ".envrc" {
+				HandleDirenv(noDirenv, os.Stdout)
+				break
+			}
+		}
+
 		fmt.Println("Grant request sent successfully.")
 		return nil
 	},
 }
 
+
+
+
 func init() {
 	grantCmd.Flags().Bool("override", false, "Override existing values in destination files.")
 	grantCmd.Flags().Bool("continue-on-error", false, "Continue granting leases even if one fails.")
+	grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
 	rootCmd.AddCommand(grantCmd)
 }

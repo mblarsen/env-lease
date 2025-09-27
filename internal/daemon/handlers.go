@@ -186,12 +186,20 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {
 	// TODO: This should only revoke leases for the current project context.
 	// For now, it revokes all active leases.
+	var revokedLeases []ipc.Lease
 	count := len(d.state.Leases)
 	for id, lease := range d.state.Leases {
 		if err := d.revoker.Revoke(lease); err != nil {
 			// Don't return the error, try to revoke as many as possible
 		}
 		delete(d.state.Leases, id)
+		revokedLeases = append(revokedLeases, ipc.Lease{
+			Source:      lease.Source,
+			Destination: lease.Destination,
+			LeaseType:   lease.LeaseType,
+			Variable:    lease.Variable,
+			Value:       lease.Value,
+		})
 	}
 
 	if err := d.state.SaveState(d.statePath); err != nil {
@@ -199,9 +207,21 @@ func (d *Daemon) handleRevoke(_ []byte) ([]byte, error) {
 	}
 
 	log.Printf("Manually revoked %d leases", count)
-	return nil, nil
+	resp := ipc.RevokeResponse{Messages: []string{fmt.Sprintf("Revoked %d leases.", count)}}
+	return json.Marshal(resp)
 }
 
 func (d *Daemon) handleStatus(_ []byte) ([]byte, error) {
-	return json.Marshal(d.state)
+	var leases []ipc.Lease
+	for _, l := range d.state.Leases {
+		leases = append(leases, ipc.Lease{
+			Source:      l.Source,
+			Destination: l.Destination,
+			LeaseType:   l.LeaseType,
+			Variable:    l.Variable,
+			Value:       l.Value,
+		})
+	}
+	resp := ipc.StatusResponse{Leases: leases}
+	return json.Marshal(resp)
 }

@@ -26,6 +26,26 @@ type GrantResponse struct {
 	Messages []string
 }
 
+// StatusRequest is the payload for a status request.
+type StatusRequest struct {
+	Command string
+}
+
+// StatusResponse is the payload for a status response.
+type StatusResponse struct {
+	Leases []Lease
+}
+
+// RevokeRequest is the payload for a revoke request.
+type RevokeRequest struct {
+	Command string
+}
+
+// RevokeResponse is the payload for a revoke response.
+type RevokeResponse struct {
+	Messages []string
+}
+
 // Lease is a simplified lease structure for IPC.
 type Lease struct {
 	Source      string
