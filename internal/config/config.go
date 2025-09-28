@@ -20,6 +20,7 @@ type Lease struct {
 	Format      string `toml:"format"`
 	Encoding    string `toml:"encoding"`
 	FileMode    string `toml:"file_mode"`
+	OpAccount   string `toml:"op_account"`
 }
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.

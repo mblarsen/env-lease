@@ -72,6 +72,7 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 | `variable`    | Yes      | The name of the environment variable to set (for `lease_type="env"`).                                   | `"API_KEY"`                           |
 | `format`      | No       | A Go `sprintf`-style format string for `env` leases. Defaults are applied for `.env` and `.envrc`.    | `"export %s=%q"`                      |
 | `encoding`    | No       | If set to `"base64"`, the secret value is base64-encoded (for `lease_type="env"`).                        | `"base64"`                            |
+| `op_account`  | No       | The 1Password account to use. Overrides the `OP_ACCOUNT` environment variable.                      | `"my-account"`                        |
 
 ---
 

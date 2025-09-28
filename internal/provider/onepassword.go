@@ -6,11 +6,18 @@ import (
 )
 
 // OnePasswordCLI is a SecretProvider that fetches secrets using the 1Password CLI.
-type OnePasswordCLI struct{}
+type OnePasswordCLI struct {
+	// Account is the 1Password account to use.
+	Account string
+}
 
 // Fetch retrieves a secret from 1Password using the `op read` command.
 func (p *OnePasswordCLI) Fetch(sourceURI string) (string, error) {
-	cmd := cmdExecer.Command("op", "read", sourceURI)
+	args := []string{"read", sourceURI}
+	if p.Account != "" {
+		args = append(args, "--account", p.Account)
+	}
+	cmd := cmdExecer.Command("op", args...)
 	output, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {

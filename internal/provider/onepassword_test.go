@@ -69,4 +69,37 @@ func TestOnePasswordCLI_Fetch(t *testing.T) {
 			t.Errorf("expected exit code 1, got %d", opErr.ExitCode)
 		}
 	})
+
+	t.Run("with account", func(t *testing.T) {
+		var capturedArgs []string
+		cmdExecer = &mockExecer{
+			CommandFunc: func(name string, arg ...string) *exec.Cmd {
+				capturedArgs = arg
+				return exec.Command("echo", "my-secret")
+			},
+		}
+
+		provider := &OnePasswordCLI{Account: "my-account"}
+		_, err := provider.Fetch("op://vault/item/secret")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		expectedArgs := []string{"read", "op://vault/item/secret", "--account", "my-account"}
+		if !equal(capturedArgs, expectedArgs) {
+			t.Errorf("expected args %v, got %v", expectedArgs, capturedArgs)
+		}
+	})
+}
+
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }

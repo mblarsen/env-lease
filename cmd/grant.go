@@ -24,14 +24,15 @@ var grantCmd = &cobra.Command{
 		}
 
 		var p provider.SecretProvider
-		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			p = &provider.MockProvider{}
-		} else {
-			p = &provider.OnePasswordCLI{}
-		}
-
 		leases := make([]ipc.Lease, len(cfg.Lease))
 		for i, l := range cfg.Lease {
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{
+					Account: l.OpAccount,
+				}
+			}
 			duration, err := time.ParseDuration(l.Duration)
 			if err != nil {
 				return fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
