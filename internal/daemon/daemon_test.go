@@ -65,7 +65,7 @@ func TestDaemon_revokeExpiredLeases(t *testing.T) {
 	// Add a lease that is already expired
 	state.Leases["test"] = &config.Lease{
 		Source:    "onepassword://vault/item/field",
-		ExpiresAt: time.Now().Add(-1 * time.Hour),
+		ExpiresAt: clock.Now().Add(-1 * time.Hour),
 	}
 
 	// Act

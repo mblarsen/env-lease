@@ -13,11 +13,7 @@ var revokeCmd = &cobra.Command{
 	Short: "Revoke all active leases for the current project.",
 	Long:  `Revoke all active leases for the current project.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		secret, err := getSecret()
-		if err != nil {
-			return fmt.Errorf("failed to get secret: %w", err)
-		}
-		client := ipc.NewClient(getSocketPath(), secret)
+		client := newClient()
 
 		configFile, err := filepath.Abs("env-lease.toml")
 		if err != nil {
@@ -30,7 +26,7 @@ var revokeCmd = &cobra.Command{
 		}
 		var revokeResp ipc.RevokeResponse
 		if err := client.Send(req, &revokeResp); err != nil {
-			return fmt.Errorf("failed to send revoke request: %w", err)
+			handleClientError(err)
 		}
 
 		for _, msg := range revokeResp.Messages {
@@ -42,6 +38,7 @@ var revokeCmd = &cobra.Command{
 		statusReq := ipc.StatusRequest{Command: "status"}
 		if err := client.Send(statusReq, &leasesResp); err != nil {
 			// If we can't get the status, we can't check for .envrc, so we'll just print the message and return.
+			handleClientError(err)
 		} else {
 			noDirenv, _ := cmd.Flags().GetBool("no-direnv")
 			for _, l := range leasesResp.Leases {

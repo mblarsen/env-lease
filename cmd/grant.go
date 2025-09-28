@@ -80,14 +80,10 @@ var grantCmd = &cobra.Command{
 			ConfigFile: configFile,
 		}
 
-		ipcSecret, err := getSecret()
-		if err != nil {
-			return fmt.Errorf("failed to get ipc secret: %w", err)
-		}
-		client := ipc.NewClient(getSocketPath(), ipcSecret)
+		client := newClient()
 		var resp ipc.GrantResponse
 		if err := client.Send(req, &resp); err != nil {
-			return fmt.Errorf("failed to send grant request: %w", err)
+			handleClientError(err)
 		}
 
 		for _, msg := range resp.Messages {
