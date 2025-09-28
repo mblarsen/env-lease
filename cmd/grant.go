@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -49,6 +48,18 @@ var grantCmd = &cobra.Command{
 			}
 			slog.Info("Fetched secret", "source", l.Source)
 
+			// Write the secret to the destination file.
+			override, _ := cmd.Flags().GetBool("override")
+			created, err := writeLease(l, secretVal, override)
+			if err != nil {
+				return fmt.Errorf("failed to write lease for %s: %w", l.Source, err)
+			}
+			clearString(secretVal)
+			if created {
+				fmt.Printf("Created file: %s\n", l.Destination)
+			}
+
+
 			absDest, err := filepath.Abs(l.Destination)
 			if err != nil {
 				return fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
@@ -62,7 +73,6 @@ var grantCmd = &cobra.Command{
 				Variable:    l.Variable,
 				Format:      l.Format,
 				Encoding:    l.Encoding,
-				Value:       strings.TrimSpace(secretVal),
 				FileMode:    l.FileMode,
 			}
 		}

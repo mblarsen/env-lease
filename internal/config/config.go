@@ -24,7 +24,6 @@ type Lease struct {
 	OpAccount     string `toml:"op_account"`
 	ExpiresAt     time.Time
 	OrphanedSince *time.Time
-	Value         string
 	ConfigFile    string
 }
 
