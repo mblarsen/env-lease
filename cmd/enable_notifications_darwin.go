@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
@@ -23,11 +24,27 @@ send you notifications when your leases expire.`,
 		fmt.Println("Please click the 'Run' button (the triangle) in Script Editor.")
 		fmt.Println("Then, click 'Allow' when prompted for notification permissions.")
 
-		// Use osascript to open Script Editor with the content, as it's more direct
-		// than creating a temporary file.
-		command := fmt.Sprintf("tell application \"Script Editor\" to make new document with properties {contents:\"%s\"}\nactivate", appleScriptContent)
-		runCmd := exec.Command("osascript", "-e", command)
-		return runCmd.Run()
+		// Create a temporary file to hold the AppleScript.
+		// This is more robust than passing the script as a command-line argument.
+		tmpfile, err := os.CreateTemp("", "env-lease-*.applescript")
+		if err != nil {
+			return fmt.Errorf("failed to create temporary script file: %w", err)
+		}
+		defer os.Remove(tmpfile.Name()) // Ensure cleanup.
+
+		if _, err := tmpfile.WriteString(appleScriptContent); err != nil {
+			return fmt.Errorf("failed to write to temporary script file: %w", err)
+		}
+		if err := tmpfile.Close(); err != nil {
+			return fmt.Errorf("failed to close temporary script file: %w", err)
+		}
+
+		// Use 'open' to launch the script file in Script Editor.
+		runCmd := exec.Command("open", "-a", "Script Editor", tmpfile.Name())
+		if err := runCmd.Run(); err != nil {
+			return fmt.Errorf("failed to open Script Editor: %w", err)
+		}
+		return nil
 	},
 }
 
