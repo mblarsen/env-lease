@@ -2,7 +2,10 @@ package daemon
 
 import (
 	"context"
+	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
@@ -10,7 +13,6 @@ import (
 type mockClock struct {
 	now time.Time
 }
-
 func (m *mockClock) Now() time.Time {
 	return m.now
 }
@@ -28,11 +30,12 @@ func TestDaemon_Run(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
 	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
 	server, err := ipc.NewServer("/tmp/env-lease-test.sock", []byte("secret"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	daemon := NewDaemon(state, "/dev/null", clock, server, revoker)
+	daemon := NewDaemon(state, "/dev/null", clock, server, revoker, notifier)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -46,4 +49,32 @@ func TestDaemon_Run(t *testing.T) {
 	if err != nil && err != context.Canceled {
 		t.Errorf("unexpected error: %v", err)
 	}
+}
+
+func TestDaemon_revokeExpiredLeases(t *testing.T) {
+	// Arrange
+	state := NewState()
+	socketPath := "/tmp/env-lease-test.sock"
+	clock := &mockClock{}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+	server, err := ipc.NewServer(socketPath, []byte("secret"))
+	require.NoError(t, err)
+	daemon := NewDaemon(state, "/dev/null", clock, server, revoker, notifier)
+
+	// Add a lease that is already expired
+	state.Leases["test"] = &config.Lease{
+		Source:    "onepassword://vault/item/field",
+		ExpiresAt: time.Now().Add(-1 * time.Hour),
+	}
+
+	// Act
+	daemon.revokeExpiredLeases()
+
+	// Assert
+	assert.Equal(t, 1, revoker.RevokeCount)
+	assert.Equal(t, 1, notifier.NotifyCount)
+	assert.Equal(t, "Lease Expired", notifier.LastTitle)
+	assert.Equal(t, "Lease for onepassword://vault/item/field has expired and was revoked.", notifier.LastMessage)
+	assert.Empty(t, state.Leases)
 }

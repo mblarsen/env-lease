@@ -16,7 +16,8 @@ func TestHandleGrant_Idempotency(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
 	revoker := &mockRevoker{}
-	daemon := NewDaemon(state, "/dev/null", clock, nil, revoker)
+	notifier := &mockNotifier{}
+	daemon := NewDaemon(state, "/dev/null", clock, nil, revoker, notifier)
 
 	// Test case for env lease
 	t.Run("env lease idempotency", func(t *testing.T) {

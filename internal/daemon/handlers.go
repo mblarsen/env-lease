@@ -3,6 +3,7 @@ package daemon
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"log/slog"
@@ -163,14 +164,20 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		}
 
 		key := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
-		d.state.Leases[key] = Lease{
-			ExpiresAt:   d.clock.Now().Add(duration),
-			Source:      l.Source,
-			Destination: l.Destination,
-			LeaseType:   l.LeaseType,
-			Variable:    l.Variable,
-			Value:       l.Value,
-			ConfigFile:  req.ConfigFile,
+		d.state.Leases[key] = &config.Lease{
+			Source:        l.Source,
+			Destination:   l.Destination,
+			Duration:      l.Duration,
+			LeaseType:     l.LeaseType,
+			Variable:      l.Variable,
+			Format:        l.Format,
+			Encoding:      l.Encoding,
+			FileMode:      l.FileMode,
+			OpAccount:     l.OpAccount,
+			ExpiresAt:     d.clock.Now().Add(duration),
+			OrphanedSince: nil,
+			Value:         l.Value,
+			ConfigFile:    req.ConfigFile,
 		}
 	}
 

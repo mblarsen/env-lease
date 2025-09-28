@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"os"
 	"strings"
@@ -11,14 +12,14 @@ import (
 
 // Revoker is an interface for revoking leases.
 type Revoker interface {
-	Revoke(lease Lease) error
+	Revoke(lease *config.Lease) error
 }
 
 // FileRevoker is a revoker that modifies the filesystem.
 type FileRevoker struct{}
 
 // Revoke revokes a lease by either deleting a file or clearing a variable in a file.
-func (r *FileRevoker) Revoke(lease Lease) error {
+func (r *FileRevoker) Revoke(lease *config.Lease) error {
 	switch lease.LeaseType {
 	case "file":
 		return os.Remove(lease.Destination)

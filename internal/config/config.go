@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"time"
 )
 
 // Config represents the structure of the env-lease.toml file.
@@ -12,15 +13,19 @@ type Config struct {
 
 // Lease represents a single lease block in the config.
 type Lease struct {
-	Source      string `toml:"source"`
-	Destination string `toml:"destination"`
-	Duration    string `toml:"duration"`
-	LeaseType   string `toml:"lease_type"`
-	Variable    string `toml:"variable"`
-	Format      string `toml:"format"`
-	Encoding    string `toml:"encoding"`
-	FileMode    string `toml:"file_mode"`
-	OpAccount   string `toml:"op_account"`
+	Source        string `toml:"source"`
+	Destination   string `toml:"destination"`
+	Duration      string `toml:"duration"`
+	LeaseType     string `toml:"lease_type"`
+	Variable      string `toml:"variable"`
+	Format        string `toml:"format"`
+	Encoding      string `toml:"encoding"`
+	FileMode      string `toml:"file_mode"`
+	OpAccount     string `toml:"op_account"`
+	ExpiresAt     time.Time
+	OrphanedSince *time.Time
+	Value         string
+	ConfigFile    string
 }
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.

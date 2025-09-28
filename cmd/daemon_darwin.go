@@ -102,13 +102,14 @@ var runCmd = &cobra.Command{
 		// Set up dependencies
 		clock := &daemon.RealClock{}
 		revoker := &daemon.FileRevoker{}
+		notifier := &daemon.OsaScriptNotifier{}
 		ipcServer, err := ipc.NewServer(socketPath, secret)
 		if err != nil {
 			return err
 		}
 
 		// Create and run daemon
-		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker)
+		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker, notifier)
 		slog.Info("Daemon startup successful.", "socket", ipcServer.SocketPath())
 
 

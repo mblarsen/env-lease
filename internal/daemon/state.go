@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/json"
+	"github.com/mblarsen/env-lease/internal/config"
 	"os"
 	"path/filepath"
 	"time"
@@ -9,35 +10,22 @@ import (
 
 // State represents the persistent state of the daemon.
 type State struct {
-	Leases     map[string]Lease `json:"leases"`
-	RetryQueue []RetryItem      `json:"retry_queue"`
+	Leases     map[string]*config.Lease `json:"leases"`
+	RetryQueue []RetryItem              `json:"retry_queue"`
 }
 
 // RetryItem represents a lease that failed to be revoked.
 type RetryItem struct {
-	Lease         Lease     `json:"lease"`
-	Attempts      int       `json:"attempts"`
-	NextRetryTime time.Time `json:"next_retry_time"`
+	Lease         *config.Lease `json:"lease"`
+	Attempts      int           `json:"attempts"`
+	NextRetryTime time.Time     `json:"next_retry_time"`
 	InitialFailure time.Time `json:"initial_failure"`
-}
-
-// Lease represents a single active lease.
-type Lease struct {
-	ExpiresAt     time.Time  `json:"expires_at"`
-	OrphanedSince *time.Time `json:"orphaned_since,omitempty"`
-	// Other lease details...
-	Source      string `json:"source"`
-	Destination string `json:"destination"`
-	LeaseType   string `json:"lease_type"`
-	Variable    string `json:"variable"`
-	Value       string `json:"value"`
-	ConfigFile  string `json:"config_file"`
 }
 
 // NewState creates a new, empty state.
 func NewState() *State {
 	return &State{
-		Leases:     make(map[string]Lease),
+		Leases:     make(map[string]*config.Lease),
 		RetryQueue: make([]RetryItem, 0),
 	}
 }

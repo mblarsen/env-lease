@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"github.com/mblarsen/env-lease/internal/config"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,7 +14,7 @@ func TestState(t *testing.T) {
 
 	t.Run("save and load", func(t *testing.T) {
 		state := NewState()
-		state.Leases["lease1"] = Lease{
+		state.Leases["lease1"] = &config.Lease{
 			ExpiresAt: time.Now().Add(1 * time.Hour),
 			Source:    "test",
 		}

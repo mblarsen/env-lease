@@ -35,17 +35,19 @@ type Daemon struct {
 	clock     Clock
 	ipcServer *ipc.Server
 	revoker   Revoker
+	notifier Notifier
 	mu        sync.Mutex
 }
 
 // NewDaemon creates a new daemon.
-func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Server, revoker Revoker) *Daemon {
+func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Server, revoker Revoker, notifier Notifier) *Daemon {
 	return &Daemon{
 		state:     state,
 		statePath: statePath,
 		clock:     clock,
 		ipcServer: ipcServer,
 		revoker:   revoker,
+		notifier: notifier,
 	}
 }
 
@@ -113,6 +115,13 @@ func (d *Daemon) revokeExpiredLeases() {
 				})
 			} else {
 				slog.Info("Lease expired and was revoked", "id", id)
+				if d.notifier != nil {
+					title := "Lease Expired"
+					message := fmt.Sprintf("Lease for %s has expired and was revoked.", lease.Source)
+					if err := d.notifier.Notify(title, message); err != nil {
+						slog.Error("Failed to send notification", "err", err)
+					}
+				}
 			}
 			delete(d.state.Leases, id)
 			if err := d.state.SaveState(d.statePath); err != nil {

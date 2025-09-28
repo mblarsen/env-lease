@@ -62,6 +62,7 @@ type Lease struct {
 	FileMode    string
 	ExpiresAt   time.Time
 	ConfigFile  string
+	OpAccount   string
 }
 
 // Sign creates a signature for the payload.

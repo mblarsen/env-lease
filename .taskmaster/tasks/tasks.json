@@ -1255,7 +1255,7 @@
         "description": "Implement desktop notifications for lease expirations on macOS and Linux. The daemon should detect the operating system and use the appropriate native notification command (`osascript` for macOS, `notify-send` for Linux) to inform the user when a lease has been revoked due to expiration. The notification message should clearly identify which lease has expired.",
         "details": "",
         "testStrategy": "",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
@@ -1330,11 +1330,42 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 50,
+        "title": "Refactor CLI Error Handling to Use `slog` and Exit Codes",
+        "description": "Standardize error handling across all client-side commands (`status`, `grant`, `revoke`) to use the `slog` library for structured logging and ensure failures, especially daemon connection errors, result in a clean, single error message and a non-zero exit code.",
+        "details": "The current error handling for client commands can produce redundant messages and does not use a standardized logging or exit code mechanism. This task involves refactoring the IPC client logic used by the `grant`, `revoke`, and `status` commands. A centralized helper function should be created to handle the connection to the daemon's Unix socket. If a connection fails, this function will be responsible for logging a structured error message using `slog.Error()` with relevant attributes like the socket path. It will then print a single, user-friendly error message to stderr (e.g., \"Error: could not connect to the env-lease daemon. Is it running?\") and terminate the process with `os.Exit(1)`.",
+        "testStrategy": "Testing will focus on verifying the command's behavior when the daemon is not running. For each of the `grant`, `revoke`, and `status` commands: 1. Ensure the env-lease daemon process is not active. 2. Execute the command (e.g., `./bin/env-lease status`). 3. Verify that the command's exit code is non-zero (specifically `1`). 4. Capture the standard error stream and assert that it contains a single, clean, and user-friendly error message, and that the original redundant error is no longer present. 5. Start the daemon and run the commands again to ensure they still function correctly in the success case.",
+        "status": "pending",
+        "dependencies": [
+          11,
+          12,
+          13,
+          32
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 51,
+        "title": "Refactor Daemon to Manage Lease Metadata Only, Not Secrets",
+        "description": "Perform a security-focused refactoring to ensure the daemon process never handles raw secret values. The daemon will be responsible only for managing lease metadata, while the client will handle fetching and writing the secrets.",
+        "details": "To enhance security, the daemon's role must be limited to orchestration and lifecycle management. The `env-lease grant` client command will be updated to perform the secret fetching and writing. The new workflow will be: 1. The client (`env-lease grant`) fetches the secret from the provider. 2. The client writes the secret directly to the target `.env` file. 3. The client communicates with the daemon via IPC, sending only the lease metadata (e.g., variable name, file path, expiration timestamp). 4. The daemon will update its state file (`state.json` from Task 7) to track this new lease using only the metadata. The state file must be scrubbed of any secret values. 5. The daemon's core loop (Task 8) will continue to monitor for expirations. Upon expiration, it will use the stored file path and variable name to remove the correct line from the `.env` file, performing revocation without ever needing to know the secret's value.",
+        "testStrategy": "1. **State Verification:** After running `env-lease grant`, inspect the `~/.config/env-lease/state.json` file. Confirm that it contains entries with the correct variable name, file path, and expiration, but strictly no secret values. 2. **End-to-End Grant:** Execute a `grant` command. Verify the secret is correctly appended to the target `.env` file and that the daemon logs the registration of the new lease metadata. 3. **End-to-End Expiration:** Allow a granted lease to expire. Verify the daemon's core loop identifies the expired lease and successfully removes the corresponding line from the `.env` file. 4. **Process Inspection:** In a test environment, inspect the daemon's logs and standard output during a grant operation to ensure no secret values are ever printed. 5. **Unit Tests:** Update unit tests for the daemon's state management and IPC handling to assert that secret payloads are neither expected nor processed.",
+        "status": "pending",
+        "dependencies": [
+          7,
+          8,
+          26
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-28T09:46:14.217Z",
+      "updated": "2025-09-28T10:32:22.382Z",
       "description": "Tasks for master context"
     }
   }
