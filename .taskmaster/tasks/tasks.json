@@ -1294,7 +1294,7 @@
         "description": "Add detailed logging messages to the daemon's startup sequence to confirm successful initialization, state loading, and IPC server status, providing clear feedback that the daemon is running correctly.",
         "details": "Modify the daemon's main startup function (invoked by `env-lease daemon start`). After the initial 'Starting daemon...' message, add new log lines using the standard `log` package established in Task 25. The new logs should report on the outcome of key initialization steps:\n1. **State Loading (Task 7):** After attempting to load `state.json`, log either `INFO: Loaded state with N active leases.` or `INFO: No state file found, initializing new state.`\n2. **Expired Lease Check (Task 8):** After the initial scan for leases that expired while the daemon was offline, log `INFO: Revoked M expired leases on startup.`\n3. **IPC Server (Task 9):** After successfully creating and starting the listener on the Unix Domain Socket, log `INFO: IPC server listening at [socket_path].`\n4. **Final Confirmation:** Once all initialization is complete and the main timer loop is about to begin, log a final summary message like `INFO: Daemon startup successful. Ready to manage leases.`",
         "testStrategy": "Testing will be done via integration tests that capture the daemon's standard output. \n1. **Test Case: Clean Start:** Ensure no `state.json` file exists. Start the daemon using `env-lease daemon start`. Verify that stdout contains the expected sequence of logs: 'No state file found', 'IPC server listening', and 'Daemon startup successful'.\n2. **Test Case: Resuming with State:** Create a `state.json` file containing several leases, including at least one that is already expired. Start the daemon. Verify that stdout contains logs confirming the state was loaded (e.g., 'Loaded state with N active leases'), that expired leases were revoked ('Revoked M expired leases on startup'), and the final success message.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           7,
           8,
@@ -1315,11 +1315,26 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 49,
+        "title": "Implement Automatic Revocation for Leases Removed from Configuration",
+        "description": "Enhance the daemon to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file, ensuring the system state stays synchronized with the declared configuration.",
+        "details": "The daemon's main processing loop, which currently checks for expired leases, needs to be extended. On each cycle, for every project it manages, the daemon should re-read and parse the corresponding `env-lease.toml` file. It will then compare its list of active leases for that project against the leases currently defined in the configuration. If an active lease from the daemon's state does not have a corresponding definition in the configuration file, it should be treated as orphaned and immediately revoked. The revocation process must use the same logic established in Task 45, which involves clearing the environment variable's value in the target `.envrc` file rather than deleting the line. A log message should be generated to indicate that a lease was revoked due to its removal from the configuration.",
+        "testStrategy": "1. Set up a project with an `env-lease.toml` file containing two distinct lease definitions (e.g., for `API_KEY_A` and `API_KEY_B`). 2. Run `env-lease grant` to acquire both leases. 3. Verify using `env-lease status` that both leases are active and check the `.envrc` file to confirm both variables are set. 4. Manually edit the `env-lease.toml` file to remove the configuration block for `API_KEY_B`. 5. Wait for the daemon's next periodic check to occur. 6. Run `env-lease status` again and assert that only the lease for `API_KEY_A` is active. 7. Inspect the `.envrc` file and confirm that the line for `API_KEY_B` has been modified to have an empty value (e.g., `export API_KEY_B=`). 8. Check the daemon's logs for a message confirming the revocation of the lease for `API_KEY_B` due to a configuration change.",
+        "status": "pending",
+        "dependencies": [
+          8,
+          37,
+          45
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-28T09:21:18.147Z",
+      "updated": "2025-09-28T09:46:14.217Z",
       "description": "Tasks for master context"
     }
   }

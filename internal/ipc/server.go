@@ -9,8 +9,9 @@ import (
 
 // Server is the IPC server.
 type Server struct {
-	listener net.Listener
-	secret   []byte
+	listener   net.Listener
+	secret     []byte
+	socketPath string
 }
 
 // NewServer creates a new IPC server.
@@ -25,8 +26,9 @@ func NewServer(socketPath string, secret []byte) (*Server, error) {
 	}
 
 	return &Server{
-		listener: listener,
-		secret:   secret,
+		listener:   listener,
+		secret:     secret,
+		socketPath: socketPath,
 	}, nil
 }
 
@@ -71,4 +73,9 @@ func (s *Server) handleConnection(conn net.Conn, handler func(payload []byte) ([
 // Close closes the server's listener.
 func (s *Server) Close() error {
 	return s.listener.Close()
+}
+
+// SocketPath returns the path to the server's socket file.
+func (s *Server) SocketPath() string {
+	return s.socketPath
 }

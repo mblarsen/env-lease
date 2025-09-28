@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
+	"log"
 )
 
 var daemonCmd = &cobra.Command{
@@ -64,7 +65,7 @@ var runCmd = &cobra.Command{
 	Short: "Run the env-lease daemon.",
 	Long:  `Run the env-lease daemon.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Starting daemon...")
+		log.Println("Starting daemon...")
 
 		// Configuration paths
 		configDir := filepath.Join(os.Getenv("HOME"), ".config", "env-lease")
@@ -84,7 +85,9 @@ var runCmd = &cobra.Command{
 		// Load state
 		state, err := daemon.LoadState(statePath)
 		if err != nil {
-			return err
+			log.Printf("No state file found, initializing new state.")
+		} else {
+			log.Printf("Loaded state with %d active leases.", len(state.Leases))
 		}
 
 		// Set up dependencies
@@ -97,6 +100,8 @@ var runCmd = &cobra.Command{
 
 		// Create and run daemon
 		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker)
+		log.Printf("Daemon startup successful. Ready to manage leases.")
+
 
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()

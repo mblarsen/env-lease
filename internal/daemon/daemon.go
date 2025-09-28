@@ -52,6 +52,7 @@ func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Serve
 // Run starts the daemon's main loop.
 func (d *Daemon) Run(ctx context.Context) error {
 	go d.ipcServer.Listen(d.handleIPC)
+	log.Printf("IPC server listening at %s", d.ipcServer.SocketPath())
 
 	d.revokeExpiredLeases()
 	d.processRetryQueue()
