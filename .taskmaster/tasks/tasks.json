@@ -1368,7 +1368,7 @@
         "description": "Introduce an environment variable `ENVLEASE_LOG_LEVEL` to control the application's logging verbosity, with 'warning' as the default. Update the systemd service template to explicitly set the log level to 'info' for the daemon process.",
         "details": "This task builds upon the structured logging implemented in Task 50. The core objective is to make the log level configurable at runtime.\n\n1.  **Environment Variable Handling:** In the application's main initialization logic, read the `ENVLEASE_LOG_LEVEL` environment variable. The value should be parsed case-insensitively.\n2.  **Log Level Mapping:** Support standard log levels: `debug`, `info`, `warn` (or `warning`), and `error`. Map these string values to the corresponding `slog.Level` constants (e.g., `slog.LevelDebug`, `slog.LevelInfo`, `slog.LevelWarn`, `slog.LevelError`).\n3.  **Default Level:** If `ENVLEASE_LOG_LEVEL` is not set or contains an unrecognized value, the logging level must default to `warn` (`slog.LevelWarn`).\n4.  **Logger Initialization:** The global `slog` logger should be initialized using `slog.HandlerOptions` with the `Level` field set based on the logic above.\n5.  **Systemd Template Update:** Modify the systemd service template (updated in Task 33) to include a new directive in the `[Service]` section: `Environment=\"ENVLEASE_LOG_LEVEL=info\"`. This ensures that when the daemon runs as a background service, it provides more detailed logs for easier debugging via `journalctl`, overriding the `warn` default.\n6.  **macOS Template Update (Optional but Recommended):** For consistency, update the `launchd` plist template (from Task 16) to include a similar configuration. Add a key-value pair to the `EnvironmentVariables` dictionary: `<key>ENVLEASE_LOG_LEVEL</key><string>info</string>`.",
         "testStrategy": "Testing will be divided into CLI behavior and service integration.\n\n1.  **CLI Log Level Verification:**\n    *   **Default (Warn):** Run a command like `env-lease status` with the daemon stopped and `ENVLEASE_LOG_LEVEL` unset. Verify that only the warning/error message about the connection failure is printed.\n    *   **Info Level:** Run `ENVLEASE_LOG_LEVEL=info env-lease status`. Verify that any informational logs (if present) are displayed in addition to warnings/errors.\n    *   **Debug Level:** Add a temporary debug log message. Run `ENVLEASE_LOG_LEVEL=debug env-lease status`. Verify the debug message is visible.\n    *   **Invalid Level:** Run `ENVLEASE_LOG_LEVEL=foo env-lease status`. Verify the behavior is identical to the default 'warn' level.\n\n2.  **Systemd Service Verification:**\n    *   Run `env-lease daemon install` on a Linux system.\n    *   Inspect the contents of `~/.config/systemd/user/env-lease.service` and confirm the line `Environment=\"ENVLEASE_LOG_LEVEL=info\"` exists.\n    *   Start the service with `systemctl --user start env-lease.service`.\n    *   Check the service logs using `journalctl --user -u env-lease.service`. Verify that the informational startup logs from Task 47 (e.g., 'Loaded state...', 'IPC server listening...') are visible, confirming the `info` log level was correctly applied.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           50,
           47,
@@ -1380,7 +1380,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-28T11:06:15.178Z",
+      "updated": "2025-09-28T11:08:05.628Z",
       "description": "Tasks for master context"
     }
   }

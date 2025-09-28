@@ -153,6 +153,11 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 	<true/>
 	<key>KeepAlive</key>
 	<true/>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>ENVLEASE_LOG_LEVEL</key>
+		<string>info</string>
+	</dict>
 </dict>
 </plist>
 `

@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
-	"os"
 	"log/slog"
-	"github.com/lmittmann/tint"
+	"os"
+	"strings"
 	"time"
+	"github.com/lmittmann/tint"
 )
 
 var rootCmd = &cobra.Command{
@@ -19,9 +20,19 @@ development files. It fetches secrets, injects them into files, and revokes
 them after a specified lease duration.`,
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		logLevel := slog.LevelWarn
+		switch strings.ToLower(os.Getenv("ENVLEASE_LOG_LEVEL")) {
+		case "debug":
+			logLevel = slog.LevelDebug
+		case "info":
+			logLevel = slog.LevelInfo
+		case "error":
+			logLevel = slog.LevelError
+		}
+
 		slog.SetDefault(slog.New(
 			tint.NewHandler(os.Stderr, &tint.Options{
-				Level:      slog.LevelDebug,
+				Level:      logLevel,
 				TimeFormat: time.Kitchen,
 			}),
 		))
