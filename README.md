@@ -56,6 +56,16 @@ env-lease status
 env-lease revoke
 ```
 
+### Enabling Notifications on macOS
+
+On macOS, `env-lease` can send desktop notifications when a lease expires. Due to security settings, you must manually grant permission once.
+
+```sh
+env-lease enable-notifications
+```
+
+This command will open Apple's Script Editor with a simple script. Click the "Run" button and then "Allow" the notification permission prompt. This one-time setup is all that's needed.
+
 ## Security
 
 `env-lease` uses a secure IPC model with HMAC-SHA256 token authentication to protect against unauthorized local processes interacting with its daemon.

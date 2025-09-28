@@ -83,6 +83,7 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 | `env-lease grant`        | Grants all leases defined in `env-lease.toml`. Flags: `--override`, `--continue-on-error`.                 |
 | `env-lease revoke`       | Immediately revokes all secrets defined in the current project's `env-lease.toml`.                          |
 | `env-lease status`       | Lists all currently active leases managed by the daemon.                                                  |
+| `env-lease enable-notifications` | (macOS only) Guides the user to grant notification permissions.                                           |
 | `env-lease daemon install`| Installs and starts the daemon as a user service.                                                         |
 | `env-lease daemon uninstall`| Stops and uninstalls the daemon.                                                                          |
 | `env-lease daemon cleanup`| Manually purges all orphaned leases from the daemon's state.                                              |
