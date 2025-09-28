@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/daemon"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 	"os"
@@ -20,14 +19,20 @@ var statusCmd = &cobra.Command{
 			return fmt.Errorf("failed to get secret: %w", err)
 		}
 		client := ipc.NewClient(getSocketPath(), secret)
-		req := struct{ Command string }{Command: "status"}
-		var resp daemon.State
+		req := ipc.StatusRequest{Command: "status"}
+		var resp ipc.StatusResponse
 		if err := client.Send(req, &resp); err != nil {
 			return fmt.Errorf("failed to get status: %w", err)
 		}
 
 		if len(resp.Leases) == 0 {
 			fmt.Println("No active leases.")
+			return nil
+		}
+
+		showAll, _ := cmd.Flags().GetBool("all")
+		if !showAll {
+			fmt.Printf("%d active leases. Use --all to show all leases.\n", len(resp.Leases))
 			return nil
 		}
 
@@ -42,5 +47,6 @@ var statusCmd = &cobra.Command{
 }
 
 func init() {
+	statusCmd.Flags().Bool("all", false, "Show all active leases.")
 	rootCmd.AddCommand(statusCmd)
 }

@@ -220,6 +220,7 @@ func (d *Daemon) handleStatus(_ []byte) ([]byte, error) {
 			LeaseType:   l.LeaseType,
 			Variable:    l.Variable,
 			Value:       l.Value,
+			ExpiresAt:   l.ExpiresAt,
 		})
 	}
 	resp := ipc.StatusResponse{Leases: leases}

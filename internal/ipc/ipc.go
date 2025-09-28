@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // Request represents a request sent from the CLI to the daemon.
@@ -59,6 +60,7 @@ type Lease struct {
 	Encoding    string
 	Value       string
 	FileMode    string
+	ExpiresAt   time.Time
 }
 
 // Sign creates a signature for the payload.
