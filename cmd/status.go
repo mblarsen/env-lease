@@ -5,6 +5,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 	"os"
+	"path/filepath"
 	"text/tabwriter"
 	"time"
 )
@@ -30,19 +31,50 @@ var statusCmd = &cobra.Command{
 			return nil
 		}
 
-		showAll, _ := cmd.Flags().GetBool("all")
-		if !showAll {
-			fmt.Printf("%d active leases. Use --all to show all leases.\n", len(resp.Leases))
-			return nil
+		configFile, err := filepath.Abs("env-lease.toml")
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
+		var projectLeases []ipc.Lease
+		var otherLeases []ipc.Lease
 		for _, lease := range resp.Leases {
-			expiresIn := time.Until(lease.ExpiresAt).Round(time.Second)
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", lease.Variable, lease.Source, lease.Destination, expiresIn)
+			if lease.ConfigFile == configFile {
+				projectLeases = append(projectLeases, lease)
+			} else {
+				otherLeases = append(otherLeases, lease)
+			}
 		}
-		return w.Flush()
+
+		showAll, _ := cmd.Flags().GetBool("all")
+		if showAll {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+			fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
+			for _, lease := range resp.Leases {
+				expiresIn := time.Until(lease.ExpiresAt).Round(time.Second)
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", lease.Variable, lease.Source, lease.Destination, expiresIn)
+			}
+			return w.Flush()
+		}
+
+		if len(projectLeases) == 0 {
+			fmt.Println("No active leases for this project.")
+		} else {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+			fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
+			for _, lease := range projectLeases {
+				expiresIn := time.Until(lease.ExpiresAt).Round(time.Second)
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", lease.Variable, lease.Source, lease.Destination, expiresIn)
+			}
+			w.Flush()
+		}
+
+		if len(otherLeases) > 0 {
+			fmt.Println("-------------------------------------------------------")
+			fmt.Printf("%d more active leases. Use --all to show all leases.\n", len(otherLeases))
+		}
+
+		return nil
 	},
 }
 
