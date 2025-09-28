@@ -18,20 +18,20 @@ func writeLease(l config.Lease, secretVal string, override bool) (bool, error) {
 
 	switch l.LeaseType {
 	case "env":
-		return writeEnvFile(l.Destination, l.Variable, secretVal, override, l.FileMode)
+		return writeEnvFile(l.Destination, l.Variable, secretVal, l.Format, override, l.FileMode)
 	default:
 		return false, fmt.Errorf("unknown lease type: %s", l.LeaseType)
 	}
 }
 
-func writeEnvFile(path, key, value string, override bool, fileModeStr string) (bool, error) {
+func writeEnvFile(path, key, value, format string, override bool, fileModeStr string) (bool, error) {
 	fileMode, err := parseFileMode(fileModeStr, 0600)
 	if err != nil {
 		return false, err
 	}
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		content := fmt.Sprintf("export %s=%s\n", key, value)
+		content := fmt.Sprintf(format+"\n", key, value)
 		_, err := fileutil.AtomicWriteFile(path, []byte(content), fileMode)
 		return true, err
 	}
@@ -43,11 +43,15 @@ func writeEnvFile(path, key, value string, override bool, fileModeStr string) (b
 
 	lines := strings.Split(string(content), "\n")
 	keyExists := false
+	// To check for the key, we need to know what the line starts with.
+	// The format string tells us. e.g., "export %s=%q" means the line starts with "export KEY=".
+	// We can find this by cutting the format string at the first '%'.
+	prefix := strings.Split(format, "%")[0] + key + "="
 	for i, line := range lines {
-		if strings.HasPrefix(line, "export "+key+"=") {
+		if strings.HasPrefix(line, prefix) {
 			keyExists = true
 			if override {
-				lines[i] = fmt.Sprintf("export %s=%s", key, value)
+				lines[i] = fmt.Sprintf(format, key, value)
 			}
 			break
 		}
@@ -57,7 +61,7 @@ func writeEnvFile(path, key, value string, override bool, fileModeStr string) (b
 		if len(lines) > 0 && lines[len(lines)-1] != "" {
 			lines = append(lines, "")
 		}
-		lines = append(lines, fmt.Sprintf("export %s=%s", key, value))
+		lines = append(lines, fmt.Sprintf(format, key, value))
 	}
 
 	output := strings.Join(lines, "\n")
