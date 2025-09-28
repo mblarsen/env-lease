@@ -31,6 +31,7 @@ type Lease struct {
 	LeaseType   string `json:"lease_type"`
 	Variable    string `json:"variable"`
 	Value       string `json:"value"`
+	ConfigFile  string `json:"config_file"`
 }
 
 // NewState creates a new, empty state.

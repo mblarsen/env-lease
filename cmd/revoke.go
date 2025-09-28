@@ -19,15 +19,15 @@ var revokeCmd = &cobra.Command{
 		}
 		client := ipc.NewClient(getSocketPath(), secret)
 
-		// First, get the list of active leases from the daemon
-		var leasesResp ipc.StatusResponse
-		statusReq := ipc.StatusRequest{Command: "status"}
-		if err := client.Send(statusReq, &leasesResp); err != nil {
-			return fmt.Errorf("failed to get active leases: %w", err)
+		configFile, err := filepath.Abs("env-lease.toml")
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
 		}
 
-		// Then, send the revoke request
-		req := ipc.RevokeRequest{Command: "revoke"}
+		req := ipc.RevokeRequest{
+			Command:    "revoke",
+			ConfigFile: configFile,
+		}
 		var revokeResp ipc.RevokeResponse
 		if err := client.Send(req, &revokeResp); err != nil {
 			return fmt.Errorf("failed to send revoke request: %w", err)
@@ -37,11 +37,18 @@ var revokeCmd = &cobra.Command{
 			fmt.Println(msg)
 		}
 
-		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
-		for _, l := range leasesResp.Leases {
-			if filepath.Base(l.Destination) == ".envrc" {
-				HandleDirenv(noDirenv, os.Stdout)
-				break
+		// If all leases were revoked, check for .envrc and handle direnv
+		var leasesResp ipc.StatusResponse
+		statusReq := ipc.StatusRequest{Command: "status"}
+		if err := client.Send(statusReq, &leasesResp); err != nil {
+			// If we can't get the status, we can't check for .envrc, so we'll just print the message and return.
+		} else {
+			noDirenv, _ := cmd.Flags().GetBool("no-direnv")
+			for _, l := range leasesResp.Leases {
+				if filepath.Base(l.Destination) == ".envrc" {
+					HandleDirenv(noDirenv, os.Stdout)
+					break
+				}
 			}
 		}
 

@@ -16,9 +16,10 @@ type Request struct {
 
 // GrantRequest is the payload for a grant request.
 type GrantRequest struct {
-	Command  string
-	Leases   []Lease
-	Override bool
+	Command    string
+	Leases     []Lease
+	Override   bool
+	ConfigFile string
 }
 
 // GrantResponse is the payload for a grant response.
@@ -38,7 +39,8 @@ type StatusResponse struct {
 
 // RevokeRequest is the payload for a revoke request.
 type RevokeRequest struct {
-	Command string
+	Command    string
+	ConfigFile string
 }
 
 // RevokeResponse is the payload for a revoke response.

@@ -66,11 +66,17 @@ var grantCmd = &cobra.Command{
 			}
 		}
 
+		configFile, err := filepath.Abs("env-lease.toml")
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
+		}
+
 		override, _ := cmd.Flags().GetBool("override")
 		req := ipc.GrantRequest{
-			Command:  "grant",
-			Leases:   leases,
-			Override: override,
+			Command:    "grant",
+			Leases:     leases,
+			Override:   override,
+			ConfigFile: configFile,
 		}
 
 		ipcSecret, err := getSecret()

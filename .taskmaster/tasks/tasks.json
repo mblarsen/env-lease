@@ -1106,7 +1106,7 @@
         "description": "Update the `revoke` command to only revoke leases for the current project by default, based on the `env-lease.toml` configuration. Introduce an `--all` flag to preserve the original global revocation behavior.",
         "details": "The current `revoke` command is too broad, clearing all active leases regardless of their origin. This task refactors it to be project-aware. The default behavior will be to revoke only the leases associated with the current project's `env-lease.toml` file. This includes leases that are currently active for the project but may have been removed from the configuration file since they were last granted. To support the original functionality, a new `--all` flag will be added to perform a global revocation of all active leases. This will require modifying the CLI command to parse the configuration and updating the IPC message and daemon logic to handle both scoped and global revocation requests.",
         "testStrategy": "Testing will be performed through a series of integration tests. \n1. **Default Scoped Revoke:** Create two separate project directories with distinct `env-lease.toml` files. Grant leases for both projects. `cd` into one project directory and run `env-lease revoke`. Use `env-lease status` to verify that only the leases for that specific project have been revoked, while the other project's leases remain active. \n2. **`--all` Flag Revoke:** Set up the same multi-project scenario as above. Run `env-lease revoke --all` from one of the project directories. Use `env-lease status` to verify that all leases from *both* projects have been revoked. \n3. **Stale Lease Revocation:** Grant leases for a project. Then, edit the `env-lease.toml` to remove one of the lease definitions. Run `env-lease revoke` in that project. Verify that all original leases for that project, including the one no longer in the config file, are successfully revoked.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           12,
           11,
@@ -1319,7 +1319,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-27T14:49:48.403Z",
+      "updated": "2025-09-28T08:52:37.730Z",
       "description": "Tasks for master context"
     }
   }
