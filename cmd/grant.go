@@ -6,7 +6,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/spf13/cobra"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,16 +38,16 @@ var grantCmd = &cobra.Command{
 				return fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 			}
 			if duration > 12*time.Hour {
-				fmt.Fprintf(os.Stderr, "Warning: Leases longer than 12 hours are discouraged for security reasons.\n")
+				slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
 			}
 
-			log.Printf("Fetching secret for %s", l.Source)
+			slog.Info("Fetching secret", "source", l.Source)
 			secretVal, err := p.Fetch(l.Source)
 			if err != nil {
 				// TODO: Handle --continue-on-error
 				return fmt.Errorf("failed to fetch secret for %s: %w", l.Source, err)
 			}
-			log.Printf("Fetched secret for %s", l.Source)
+			slog.Info("Fetched secret", "source", l.Source)
 
 			absDest, err := filepath.Abs(l.Destination)
 			if err != nil {

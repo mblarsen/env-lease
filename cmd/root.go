@@ -6,6 +6,9 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 	"os"
+	"log/slog"
+	"github.com/lmittmann/tint"
+	"time"
 )
 
 var rootCmd = &cobra.Command{
@@ -15,6 +18,14 @@ var rootCmd = &cobra.Command{
 development files. It fetches secrets, injects them into files, and revokes
 them after a specified lease duration.`,
 	SilenceUsage: true,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		slog.SetDefault(slog.New(
+			tint.NewHandler(os.Stderr, &tint.Options{
+				Level:      slog.LevelDebug,
+				TimeFormat: time.Kitchen,
+			}),
+		))
+	},
 }
 
 func Execute() {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -175,12 +175,12 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	}
 
 	if err := d.state.SaveState(d.statePath); err != nil {
-		log.Printf("Failed to save state after grant: %v", err)
+		slog.Error("Failed to save state after grant", "err", err)
 		// Do not return error to client, as the grant itself succeeded
 	}
 
 	resp := ipc.GrantResponse{Messages: messages}
-	log.Printf("Granted %d leases", len(req.Leases))
+	slog.Info("Granted leases", "count", len(req.Leases))
 	return json.Marshal(resp)
 }
 
@@ -194,7 +194,7 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	for id, lease := range d.state.Leases {
 		if lease.ConfigFile == req.ConfigFile {
 			if err := d.revoker.Revoke(lease); err != nil {
-				log.Printf("Failed to revoke lease %s: %v", id, err)
+				slog.Error("Failed to revoke lease", "id", id, "err", err)
 				// Continue trying to revoke other leases
 			}
 			delete(d.state.Leases, id)
@@ -203,10 +203,10 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	}
 
 	if err := d.state.SaveState(d.statePath); err != nil {
-		log.Printf("Failed to save state after revoke: %v", err)
+		slog.Error("Failed to save state after revoke", "err", err)
 	}
 
-	log.Printf("Revoked %d leases for project %s", count, req.ConfigFile)
+	slog.Info("Revoked leases for project", "count", count, "project", req.ConfigFile)
 	resp := ipc.RevokeResponse{Messages: []string{fmt.Sprintf("Revoked %d leases.", count)}}
 	return json.Marshal(resp)
 }

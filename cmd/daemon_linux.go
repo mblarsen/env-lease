@@ -6,16 +6,18 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"github.com/lmittmann/tint"
 	"github.com/mblarsen/env-lease/internal/daemon"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
+	"log/slog"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"log"
+	"time"
 )
 
 var daemonCmd = &cobra.Command{
@@ -65,7 +67,14 @@ var runCmd = &cobra.Command{
 	Short: "Run the env-lease daemon.",
 	Long:  `Run the env-lease daemon.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log.Println("Starting daemon...")
+		// set up logger
+		slog.SetDefault(slog.New(
+			tint.NewHandler(os.Stderr, &tint.Options{
+				Level:      slog.LevelDebug,
+				TimeFormat: time.Kitchen,
+			}),
+		))
+		slog.Info("Starting daemon...")
 
 		// Configuration paths
 		configDir := filepath.Join(os.Getenv("HOME"), ".config", "env-lease")
@@ -85,9 +94,9 @@ var runCmd = &cobra.Command{
 		// Load state
 		state, err := daemon.LoadState(statePath)
 		if err != nil {
-			log.Printf("No state file found, initializing new state.")
+			slog.Warn("No state file found, initializing new state.")
 		} else {
-			log.Printf("Loaded state with %d active leases.", len(state.Leases))
+			slog.Info("Loaded state", "leases", len(state.Leases))
 		}
 
 		// Set up dependencies
@@ -100,7 +109,7 @@ var runCmd = &cobra.Command{
 
 		// Create and run daemon
 		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker)
-		log.Printf("Daemon startup successful. Ready to manage leases.")
+		slog.Info("Daemon startup successful.", "socket", ipcServer.SocketPath())
 
 
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -108,7 +117,7 @@ var runCmd = &cobra.Command{
 
 		go func() {
 			<-ctx.Done()
-			fmt.Println("Daemon shutting down...")
+			slog.Info("Daemon shutting down...")
 			state.SaveState(statePath)
 		}()
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
-	"log"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -52,7 +52,6 @@ func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Serve
 // Run starts the daemon's main loop.
 func (d *Daemon) Run(ctx context.Context) error {
 	go d.ipcServer.Listen(d.handleIPC)
-	log.Printf("IPC server listening at %s", d.ipcServer.SocketPath())
 
 	d.revokeExpiredLeases()
 	d.processRetryQueue()
@@ -105,7 +104,7 @@ func (d *Daemon) revokeExpiredLeases() {
 		if now.After(lease.ExpiresAt) {
 			err := d.revoker.Revoke(lease)
 			if err != nil {
-				log.Printf("Failed to revoke lease %s, adding to retry queue", id)
+				slog.Error("Failed to revoke lease, adding to retry queue", "id", id, "err", err)
 				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
 					Lease:         lease,
 					Attempts:      1,
@@ -113,11 +112,11 @@ func (d *Daemon) revokeExpiredLeases() {
 					InitialFailure: now,
 				})
 			} else {
-				log.Printf("Lease %s expired and was revoked", id)
+				slog.Info("Lease expired and was revoked", "id", id)
 			}
 			delete(d.state.Leases, id)
 			if err := d.state.SaveState(d.statePath); err != nil {
-				log.Printf("Failed to save state after lease expiration: %v", err)
+				slog.Error("Failed to save state after lease expiration", "err", err)
 			}
 		}
 	}
