@@ -30,9 +30,9 @@ send you notifications when your leases expire.`,
 		if err != nil {
 			return fmt.Errorf("failed to create temporary script file: %w", err)
 		}
-		defer os.Remove(tmpfile.Name()) // Ensure cleanup.
 
 		if _, err := tmpfile.WriteString(appleScriptContent); err != nil {
+			tmpfile.Close() // best effort
 			return fmt.Errorf("failed to write to temporary script file: %w", err)
 		}
 		if err := tmpfile.Close(); err != nil {
