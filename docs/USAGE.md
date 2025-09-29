@@ -123,22 +123,27 @@ duration = "8h"
 When granted, this will create a `gcp-key.json` file in your project directory. When the lease expires, the file will be deleted.
 
 ---
+## Limitations
+
+### Inline Comments
+
+`env-lease` does not support inline comments in environment files (e.g., `.env` or `.envrc`). Any inline comments on a line managed by `env-lease` will be removed when the lease is granted or revoked.
+
+For example, this:
+
+```
+export API_KEY="some_value" # This is a comment
+```
+
+Will become this after a lease is granted and then revoked:
+
+```
+export API_KEY=""
+```
+
+
+---
 
 ## Security Model
 
-`env-lease` is designed with a simple and secure IPC model for local development.
-
-### Client-Daemon Architecture
-
-The `env-lease` CLI communicates with a background `env-leased` daemon via a Unix Domain Socket. This socket is created in a user-specific directory with restrictive file permissions, meaning other users on the system cannot access it.
-
-### HMAC Token Authentication
-
-To protect against other processes running *as your user* from interfering with the daemon, `env-lease` uses a shared secret token and HMAC-SHA256 signatures for all communication.
-
-*   **Mechanism:** On its first run, the daemon generates a cryptographically random token and stores it in `~/.config/env-lease/auth.token` with `0600` permissions. Every command sent from the CLI to the daemon is signed with this token. The daemon verifies the signature on every message it receives.
-*   **Protection:** This ensures that the daemon only acts on legitimate, untampered commands from the official `env-lease` CLI, and prevents other processes from sending unauthorized or malicious commands.
-
-### Limitations
-
-The security model is designed to raise the bar for attack and prevent accidental interference. It does **not** protect against a sophisticated attacker who has already fully compromised your user account, as such an attacker could read the auth token itself.
+For a detailed explanation of the security model, its trade-offs, and limitations, please see the [Security Model & Trade-Offs](../README.md#security-model--trade-offs) section in the main `README.md` file.
