@@ -152,6 +152,32 @@ var cleanupCmd = &cobra.Command{
 	},
 }
 
+var reloadCmd = &cobra.Command{
+	Use:   "reload",
+	Short: "Reload the env-lease daemon.",
+	Long:  `Reload the env-lease daemon.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-lease.plist")
+
+		// If the service file doesn't exist, do nothing.
+		if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+			fmt.Println("Daemon service not installed, nothing to do.")
+			return nil
+		}
+
+		// Unload the service, ignoring errors in case it's not loaded.
+		_ = exec.Command("launchctl", "unload", plistPath).Run()
+
+		// Load the service.
+		if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
+			return err
+		}
+
+		fmt.Println("Successfully reloaded env-lease daemon service.")
+		return nil
+	},
+}
+
 const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -181,6 +207,7 @@ func init() {
 	installCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
 	daemonCmd.AddCommand(installCmd)
 	daemonCmd.AddCommand(uninstallCmd)
+	daemonCmd.AddCommand(reloadCmd)
 	daemonCmd.AddCommand(runCmd)
 	daemonCmd.AddCommand(cleanupCmd)
 	rootCmd.AddCommand(daemonCmd)

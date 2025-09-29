@@ -152,6 +152,28 @@ var cleanupCmd = &cobra.Command{
 	},
 }
 
+var reloadCmd = &cobra.Command{
+	Use:   "reload",
+	Short: "Reload the env-lease daemon.",
+	Long:  `Reload the env-lease daemon.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		servicePath := filepath.Join(os.Getenv("HOME"), ".config", "systemd", "user", "env-lease.service")
+
+		// If the service file doesn't exist, do nothing.
+		if _, err := os.Stat(servicePath); os.IsNotExist(err) {
+			fmt.Println("Daemon service not installed, nothing to do.")
+			return nil
+		}
+
+		if err := exec.Command("systemctl", "--user", "restart", "env-lease.service").Run(); err != nil {
+			return err
+		}
+
+		fmt.Println("Successfully reloaded env-lease daemon service.")
+		return nil
+	},
+}
+
 const serviceTemplate = `[Unit]
 Description=env-lease daemon
 
@@ -168,6 +190,7 @@ func init() {
 	installCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
 	daemonCmd.AddCommand(installCmd)
 	daemonCmd.AddCommand(uninstallCmd)
+	daemonCmd.AddCommand(reloadCmd)
 	daemonCmd.AddCommand(runCmd)
 	daemonCmd.AddCommand(cleanupCmd)
 	rootCmd.AddCommand(daemonCmd)

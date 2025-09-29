@@ -1439,11 +1439,22 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 59,
+        "title": "Implement `daemon reload` Command",
+        "description": "Create a new `env-lease daemon reload` command to safely restart the service after upgrades. The command must exit with a success code (0) if the service is not installed or running. For macOS, it will use `launchctl unload` (ignoring errors) and `launchctl load`. For Linux, it will use `systemctl --user restart` after checking if the service file exists. Finally, update the `.goreleaser.yml` to add a `post_install` hook that runs `env-lease daemon reload`, ensuring it works with the existing quarantine hook.",
+        "details": "",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T07:18:13.616Z",
+      "updated": "2025-09-29T07:25:29.400Z",
       "description": "Tasks for master context"
     }
   }

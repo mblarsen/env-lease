@@ -20,6 +20,11 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
+changelog:
+  filters:
+    exclude:
+      - '^chore: update tasks'
+
 homebrew_casks:
   - name: env-lease
     repository:
@@ -39,3 +44,4 @@ homebrew_casks:
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/env-lease"]
           end
+          system_command "#{staged_path}/env-lease", args: ["daemon", "reload"]
