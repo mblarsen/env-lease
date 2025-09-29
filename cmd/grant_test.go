@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -109,6 +110,50 @@ duration = "1m"
 		expectedErr := "lease for '" + destFile + "' has no format specified"
 		if err.Error() != expectedErr {
 			t.Fatalf("expected error %q, got %q", expectedErr, err.Error())
+		}
+	})
+
+	t.Run("override behavior", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, ".env.override")
+		// Create a file with an existing value
+		initialContent := `API_KEY_OVERRIDE="existing-value"`
+		err := os.WriteFile(destFile, []byte(initialContent), 0644)
+		if err != nil {
+			t.Fatalf("failed to write initial file: %v", err)
+		}
+
+		configContent := `
+[[lease]]
+source = "mock"
+destination = "` + destFile + `"
+variable = "API_KEY_OVERRIDE"
+duration = "1m"
+format = "%s=%q"
+`
+		configFile := writeConfig(configContent)
+
+		// 1. Test without override - should fail
+		cmd := exec.Command("go", "run", "./env-lease", "grant", "--config", configFile)
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			t.Fatalf("expected an error when overriding without the flag, but got none. Output: %s", string(output))
+		}
+		expectedErr := "variable 'API_KEY_OVERRIDE' already has a value; use --override to replace it"
+		if !strings.Contains(string(output), expectedErr) {
+			t.Fatalf("expected error %q, got %q", expectedErr, string(output))
+		}
+
+		// 2. Test with override - should succeed
+		cmd = exec.Command("go", "run", "./env-lease", "grant", "--config", configFile, "--override")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("grant command failed with override flag: %v\nOutput: %s", err, string(output))
+		}
+
+		content, _ := os.ReadFile(destFile)
+		expected := `API_KEY_OVERRIDE="secret-for-mock"`
+		if !strings.Contains(string(content), expected) {
+			t.Fatalf("expected content %q, got %q", expected, string(content))
 		}
 	})
 }

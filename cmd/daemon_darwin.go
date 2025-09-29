@@ -155,7 +155,7 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 	<true/>
 	<key>EnvironmentVariables</key>
 	<dict>
-		<key>ENVLEASE_LOG_LEVEL</key>
+		<key>ENV_LEASE_LOG_LEVEL</key>
 		<string>info</string>
 	</dict>
 </dict>

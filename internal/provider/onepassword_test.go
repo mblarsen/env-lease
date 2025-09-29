@@ -26,12 +26,13 @@ func TestOnePasswordCLI_Fetch(t *testing.T) {
 		}
 
 		provider := &OnePasswordCLI{}
-		secret, err := provider.Fetch("op://vault/item/secret")
+		secret, err := provider.Fetch("op://vault/item/field")
 		if err != nil {
-			t.Fatalf("expected no error, got %v", err)
+			t.Fatalf("unexpected error: %v", err)
 		}
-		if secret != "my-secret\n" {
-			t.Errorf("expected secret 'my-secret\\n', got '%s'", secret)
+
+		if secret != "my-secret" {
+			t.Fatalf("expected secret 'my-secret', got '%s'", secret)
 		}
 	})
 

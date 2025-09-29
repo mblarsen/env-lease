@@ -21,7 +21,7 @@ them after a specified lease duration.`,
 	SilenceUsage: true,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		logLevel := slog.LevelWarn
-		switch strings.ToLower(os.Getenv("ENVLEASE_LOG_LEVEL")) {
+		switch strings.ToLower(os.Getenv("ENV_LEASE_LOG_LEVEL")) {
 		case "debug":
 			logLevel = slog.LevelDebug
 		case "info":

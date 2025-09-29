@@ -143,7 +143,7 @@ Description=env-lease daemon
 [Service]
 ExecStart=%s daemon run
 Restart=always
-Environment="ENVLEASE_LOG_LEVEL=info"
+Environment="ENV_LEASE_LOG_LEVEL=info"
 
 [Install]
 WantedBy=default.target
