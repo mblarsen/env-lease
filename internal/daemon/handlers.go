@@ -37,6 +37,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal grant request: %w", err)
 	}
+	slog.Debug("Received grant request", "leases", len(req.Leases))
 
 	// Revoke any leases that are in the state but not in the request
 	activeLeases := d.state.LeasesForConfigFile(req.ConfigFile)
@@ -65,7 +66,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		}
 
 		key := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
-		d.state.Leases[key] = &config.Lease{
+		lease := &config.Lease{
 			Source:        l.Source,
 			Destination:   l.Destination,
 			Duration:      l.Duration,
@@ -79,6 +80,8 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 			OrphanedSince: nil,
 			ConfigFile:    req.ConfigFile,
 		}
+		d.state.Leases[key] = lease
+		slog.Debug("Adding lease to state", "source", lease.Source, "expires_at", lease.ExpiresAt)
 	}
 
 	if err := d.state.SaveState(d.statePath); err != nil {
@@ -96,10 +99,12 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal revoke request: %w", err)
 	}
+	slog.Debug("Received revoke request", "config_file", req.ConfigFile)
 
 	var count int
 	for id, lease := range d.state.Leases {
 		if lease.ConfigFile == req.ConfigFile {
+			slog.Debug("Revoking lease", "source", lease.Source)
 			if err := d.revoker.Revoke(lease); err != nil {
 				slog.Error("Failed to revoke lease", "id", id, "err", err)
 				// Continue trying to revoke other leases

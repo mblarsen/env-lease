@@ -1450,11 +1450,22 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 60,
+        "title": "Add Debug Logging to Grant and Revoke Processes",
+        "description": "Add debug-level logging to the grant and revoke processes to improve traceability. This includes adding `slog.Debug` messages to the daemon handlers (`handlers.go`) for incoming requests and `slog.Debug` messages to the revoker (`revoker.go`) for file deletions and environment variable clearing. Crucially, add a `slog.Info` message in the revoker to explicitly log when a lease is revoked for a file that was already missing, confirming the event was handled gracefully.",
+        "details": "",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T07:29:18.478Z",
+      "updated": "2025-09-29T07:36:59.265Z",
       "description": "Tasks for master context"
     }
   }
