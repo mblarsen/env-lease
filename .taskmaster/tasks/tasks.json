@@ -1481,7 +1481,7 @@
         "description": "Relocate the daemon's IPC socket and persisted state file to the XDG Data Home directory (`$XDG_DATA_HOME`). This moves runtime data out of the configuration directory and aligns the application with platform standards.",
         "details": "The current implementation hardcodes paths within `~/.config/env-lease`, which is intended for user configuration, not runtime data. This task will refactor the path management to adhere to the XDG Base Directory Specification.\n1. **Integrate an XDG Library:** Add a dependency like `github.com/adrg/xdg` to handle path resolution reliably across different operating systems.\n2. **Update Path Generation:** All logic that generates paths for the IPC socket and the state persistence file must be updated. The new base directory should be resolved using `xdg.DataHome`. The application should create a subdirectory within it, e.g., `$XDG_DATA_HOME/env-lease/`.\n3. **New Paths:** The socket path will become `$XDG_DATA_HOME/env-lease/env-lease.sock` and the state file will be `$XDG_DATA_HOME/env-lease/state.json`.\n4. **Update Daemon and Client:** The daemon must be updated to create and listen on the socket in the new location and write its state file there. All client commands (`grant`, `revoke`, `status`, etc.) must be updated to look for the socket in the new location. This change will likely involve modifying a shared IPC client or configuration module.",
         "testStrategy": "Testing must cover both the new path logic and the end-to-end functionality of the client-daemon communication.\n1. **Unit Tests:** Create unit tests for the path resolution logic. Mock the `XDG_DATA_HOME` environment variable to verify that the correct path is returned when it is set and when it is unset (testing the fallback to the OS default).\n2. **Integration Tests:** Modify the existing integration test suite. The test setup should ensure the mock daemon starts and creates its socket and state file in the expected XDG data directory. All tests for `grant`, `revoke`, and `status` must be run to confirm they can successfully communicate with the daemon at its new location.\n3. **Persistence Test:** Re-run the test scenario from Task 26. Start the daemon, grant a lease, terminate the daemon with `kill -9`, and verify the state file exists with the correct content in the new `$XDG_DATA_HOME/env-lease/` directory. Restart the daemon and confirm it correctly loads the state from the new location.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           11,
           12,
@@ -1570,7 +1570,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T10:04:12.610Z",
+      "updated": "2025-09-29T10:15:26.979Z",
       "description": "Tasks for master context"
     }
   }

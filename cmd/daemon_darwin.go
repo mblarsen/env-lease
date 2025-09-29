@@ -10,6 +10,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/daemon"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/xdgpath"
 	"github.com/spf13/cobra"
 	"log/slog"
 	"os"
@@ -92,13 +93,18 @@ var runCmd = &cobra.Command{
 		slog.Info("Starting daemon...")
 
 		// Configuration paths
-		configDir := filepath.Join(os.Getenv("HOME"), ".config", "env-lease")
-		if err := os.MkdirAll(configDir, 0700); err != nil {
-			return err
+		socketPath, err := xdgpath.RuntimePath("daemon.sock")
+		if err != nil {
+			return fmt.Errorf("failed to get runtime path: %w", err)
 		}
-		socketPath := filepath.Join(configDir, "daemon.sock")
-		statePath := filepath.Join(configDir, "state.json")
-		secretPath := filepath.Join(configDir, "auth.token")
+		statePath, err := xdgpath.StatePath("state.json")
+		if err != nil {
+			return fmt.Errorf("failed to get state path: %w", err)
+		}
+		secretPath, err := xdgpath.StatePath("auth.token")
+		if err != nil {
+			return fmt.Errorf("failed to get secret path: %w", err)
+		}
 
 		// Get or create secret
 		secret, err := ipc.GetOrCreateSecret(secretPath)

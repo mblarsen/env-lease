@@ -1,18 +1,23 @@
 package cmd
 
 import (
+	"fmt"
 	"github.com/mblarsen/env-lease/internal/ipc"
-	"path/filepath"
-	"os"
+	"github.com/mblarsen/env-lease/internal/xdgpath"
 )
 
 func getSocketPath() string {
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "env-lease")
-	return filepath.Join(configDir, "daemon.sock")
+	socketPath, err := xdgpath.RuntimePath("daemon.sock")
+	if err != nil {
+		panic(fmt.Sprintf("could not determine runtime directory: %v", err))
+	}
+	return socketPath
 }
 
 func getSecret() ([]byte, error) {
-	configDir := filepath.Join(os.Getenv("HOME"), ".config", "env-lease")
-	secretPath := filepath.Join(configDir, "auth.token")
+	secretPath, err := xdgpath.StatePath("auth.token")
+	if err != nil {
+		panic(fmt.Sprintf("could not determine state directory: %v", err))
+	}
 	return ipc.GetOrCreateSecret(secretPath)
 }
