@@ -1091,7 +1091,7 @@
         "description": "Modify the `grant` command to support a `--continue-on-error` flag. When enabled, the command will attempt to fetch all requested secrets, aggregate any errors encountered, and report them at the end, rather than exiting on the first failure.",
         "details": "This task involves modifying both the CLI and the daemon. On the CLI side, a new `--continue-on-error` boolean flag will be added to the `grant` command. The IPC `GrantRequest` struct must be updated to include a corresponding boolean field to transmit the flag's state to the daemon. On the daemon side, the `handleGrant` function will be updated. If the `ContinueOnError` field is true, the secret fetching loop should not exit on the first error. Instead, it should collect each error encountered into a slice. After iterating through all requested leases, if the error slice is not empty, the daemon should return a single, aggregated error message to the client detailing all the failures. Successfully fetched secrets should still be written to the environment file.",
         "testStrategy": "Testing will be multi-layered. First, create unit tests for the daemon's `handleGrant` function using a mock secret provider. Configure the mock to successfully return some secrets but fail on others. Test two scenarios: 1) With `ContinueOnError` set to false, assert that the handler returns immediately on the first failure. 2) With `ContinueOnError` set to true, assert that the handler processes all secrets, writes the successful ones, and returns a single aggregated error containing details for all failures. Second, add an end-to-end integration test. Configure a project with multiple secrets, run `env-lease grant --continue-on-error`, and verify that the command exits with a non-zero status, reports the specific failures to stderr, and that the successfully fetched secrets are present in the output file.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           9,
           10,
@@ -1432,7 +1432,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T06:49:08.940Z",
+      "updated": "2025-09-29T06:52:29.639Z",
       "description": "Tasks for master context"
     }
   }

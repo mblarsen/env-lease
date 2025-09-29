@@ -156,4 +156,53 @@ format = "%s=%q"
 			t.Fatalf("expected content %q, got %q", expected, string(content))
 		}
 	})
+
+	t.Run("continue on error behavior", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, ".env.continue")
+		configContent := `
+[[lease]]
+source = "mock-fail"
+destination = "` + destFile + `"
+variable = "FAIL_KEY"
+duration = "1m"
+format = "%s=%q"
+
+[[lease]]
+source = "mock"
+destination = "` + destFile + `"
+variable = "SUCCESS_KEY"
+duration = "1m"
+format = "%s=%q"
+`
+		configFile := writeConfig(configContent)
+
+		// 1. Test without flag - should fail fast
+		grantCmd.Flags().Set("config", configFile)
+		grantCmd.Flags().Set("continue-on-error", "false")
+		err := grantCmd.RunE(grantCmd, []string{})
+		if err == nil {
+			t.Fatal("expected an error, but got none")
+		}
+		expectedErr := "failed to fetch secret for mock-fail"
+		if !strings.Contains(err.Error(), expectedErr) {
+			t.Fatalf("expected error %q, got %q", expectedErr, err.Error())
+		}
+
+		// 2. Test with flag - should continue and aggregate errors
+		grantCmd.Flags().Set("continue-on-error", "true")
+		err = grantCmd.RunE(grantCmd, []string{})
+		if err == nil {
+			t.Fatal("expected an error, but got none")
+		}
+		if !strings.Contains(err.Error(), expectedErr) {
+			t.Fatalf("expected aggregated error to contain %q, got %q", expectedErr, err.Error())
+		}
+
+		// Check that the successful lease was still written
+		content, _ := os.ReadFile(destFile)
+		expectedContent := `SUCCESS_KEY="secret-for-mock"`
+		if !strings.Contains(string(content), expectedContent) {
+			t.Fatalf("expected content %q, got %q", expectedContent, string(content))
+		}
+	})
 }

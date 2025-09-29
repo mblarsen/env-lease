@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -29,6 +30,9 @@ var grantCmd = &cobra.Command{
 			return fmt.Errorf("failed to get absolute path for %s: %w", configFile, err)
 		}
 
+		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
+		var errs []error
+
 		var p provider.SecretProvider
 		leases := make([]ipc.Lease, len(cfg.Lease))
 		for i, l := range cfg.Lease {
@@ -41,6 +45,10 @@ var grantCmd = &cobra.Command{
 			}
 			duration, err := time.ParseDuration(l.Duration)
 			if err != nil {
+				if continueOnError {
+					errs = append(errs, fmt.Errorf("invalid duration '%s': %w", l.Duration, err))
+					continue
+				}
 				return fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 			}
 			if duration > 12*time.Hour {
@@ -56,7 +64,12 @@ var grantCmd = &cobra.Command{
 					l.Format = "%s=%q"
 				default:
 					if l.LeaseType == "env" {
-						return fmt.Errorf("lease for '%s' has no format specified", l.Destination)
+						err := fmt.Errorf("lease for '%s' has no format specified", l.Destination)
+						if continueOnError {
+							errs = append(errs, err)
+							continue
+						}
+						return err
 					}
 				}
 			}
@@ -64,8 +77,12 @@ var grantCmd = &cobra.Command{
 			slog.Info("Fetching secret", "source", l.Source)
 			secretVal, err := p.Fetch(l.Source)
 			if err != nil {
-				// TODO: Handle --continue-on-error
-				return fmt.Errorf("failed to fetch secret for %s: %w", l.Source, err)
+				err := fmt.Errorf("failed to fetch secret for %s: %w", l.Source, err)
+				if continueOnError {
+					errs = append(errs, err)
+					continue
+				}
+				return err
 			}
 			slog.Info("Fetched secret", "source", l.Source)
 
@@ -77,7 +94,12 @@ var grantCmd = &cobra.Command{
 			override, _ := cmd.Flags().GetBool("override")
 			created, err := writeLease(l, secretVal, override)
 			if err != nil {
-				return fmt.Errorf("failed to write lease for %s: %w", l.Source, err)
+				err := fmt.Errorf("failed to write lease for %s: %w", l.Source, err)
+				if continueOnError {
+					errs = append(errs, err)
+					continue
+				}
+				return err
 			}
 			clearString(secretVal)
 			if created {
@@ -86,7 +108,12 @@ var grantCmd = &cobra.Command{
 
 			absDest, err := filepath.Abs(l.Destination)
 			if err != nil {
-				return fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
+				err := fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
+				if continueOnError {
+					errs = append(errs, err)
+					continue
+				}
+				return err
 			}
 
 			leases[i] = ipc.Lease{
@@ -99,6 +126,14 @@ var grantCmd = &cobra.Command{
 				Encoding:    l.Encoding,
 				FileMode:    l.FileMode,
 			}
+		}
+
+		if len(errs) > 0 {
+			var errStrings []string
+			for _, err := range errs {
+				errStrings = append(errStrings, err.Error())
+			}
+			return fmt.Errorf("encountered errors:\n- %s", strings.Join(errStrings, "\n- "))
 		}
 
 		override, _ := cmd.Flags().GetBool("override")
