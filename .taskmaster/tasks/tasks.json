@@ -1353,7 +1353,7 @@
         "description": "Perform a security-focused refactoring to ensure the daemon process never handles raw secret values. The daemon will be responsible only for managing lease metadata, while the client will handle fetching and writing the secrets.",
         "details": "To enhance security, the daemon's role must be limited to orchestration and lifecycle management. The `env-lease grant` client command will be updated to perform the secret fetching and writing. The new workflow will be: 1. The client (`env-lease grant`) fetches the secret from the provider. 2. The client writes the secret directly to the target `.env` file. 3. The client communicates with the daemon via IPC, sending only the lease metadata (e.g., variable name, file path, expiration timestamp). 4. The daemon will update its state file (`state.json` from Task 7) to track this new lease using only the metadata. The state file must be scrubbed of any secret values. 5. The daemon's core loop (Task 8) will continue to monitor for expirations. Upon expiration, it will use the stored file path and variable name to remove the correct line from the `.env` file, performing revocation without ever needing to know the secret's value.",
         "testStrategy": "1. **State Verification:** After running `env-lease grant`, inspect the `~/.config/env-lease/state.json` file. Confirm that it contains entries with the correct variable name, file path, and expiration, but strictly no secret values. 2. **End-to-End Grant:** Execute a `grant` command. Verify the secret is correctly appended to the target `.env` file and that the daemon logs the registration of the new lease metadata. 3. **End-to-End Expiration:** Allow a granted lease to expire. Verify the daemon's core loop identifies the expired lease and successfully removes the corresponding line from the `.env` file. 4. **Process Inspection:** In a test environment, inspect the daemon's logs and standard output during a grant operation to ensure no secret values are ever printed. 5. **Unit Tests:** Update unit tests for the daemon's state management and IPC handling to assert that secret payloads are neither expected nor processed.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           7,
           8,
@@ -1380,7 +1380,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T03:43:34.546Z",
+      "updated": "2025-09-29T03:50:08.236Z",
       "description": "Tasks for master context"
     }
   }
