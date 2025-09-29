@@ -1,0 +1,21 @@
+default_install_hook_types:
+  - commit-msg
+  - pre-commit
+
+repos:
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v1.17.0
+    hooks:
+      - id: commitizen
+        stages:
+          - commit-msg
+
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.88.29
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data with TruffleHog.
+        entry: trufflehog git file://. --since-commit HEAD --results=verified --fail
+        language: golang
+        pass_filenames: false
