@@ -2,9 +2,10 @@ package daemon
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 	"os"
-	"path/filepath"
 	"time"
 )
 
@@ -53,15 +54,20 @@ func LoadState(path string) (*State, error) {
 
 // SaveState saves the daemon state to a file.
 func (s *State) SaveState(path string) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return err
-	}
-
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal state: %w", err)
 	}
+	_, err = fileutil.AtomicWriteFile(path, data, 0600)
+	return err
+}
 
-	return os.WriteFile(path, data, 0600)
+func (s *State) LeasesForConfigFile(configFile string) map[string]*config.Lease {
+	leases := make(map[string]*config.Lease)
+	for key, lease := range s.Leases {
+		if lease.ConfigFile == configFile {
+			leases[key] = lease
+		}
+	}
+	return leases
 }

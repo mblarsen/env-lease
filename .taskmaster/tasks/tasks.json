@@ -1322,7 +1322,7 @@
         "description": "Enhance the daemon to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file, ensuring the system state stays synchronized with the declared configuration.",
         "details": "The daemon's main processing loop, which currently checks for expired leases, needs to be extended. On each cycle, for every project it manages, the daemon should re-read and parse the corresponding `env-lease.toml` file. It will then compare its list of active leases for that project against the leases currently defined in the configuration. If an active lease from the daemon's state does not have a corresponding definition in the configuration file, it should be treated as orphaned and immediately revoked. The revocation process must use the same logic established in Task 45, which involves clearing the environment variable's value in the target `.envrc` file rather than deleting the line. A log message should be generated to indicate that a lease was revoked due to its removal from the configuration.",
         "testStrategy": "1. Set up a project with an `env-lease.toml` file containing two distinct lease definitions (e.g., for `API_KEY_A` and `API_KEY_B`). 2. Run `env-lease grant` to acquire both leases. 3. Verify using `env-lease status` that both leases are active and check the `.envrc` file to confirm both variables are set. 4. Manually edit the `env-lease.toml` file to remove the configuration block for `API_KEY_B`. 5. Wait for the daemon's next periodic check to occur. 6. Run `env-lease status` again and assert that only the lease for `API_KEY_A` is active. 7. Inspect the `.envrc` file and confirm that the line for `API_KEY_B` has been modified to have an empty value (e.g., `export API_KEY_B=`). 8. Check the daemon's logs for a message confirming the revocation of the lease for `API_KEY_B` due to a configuration change.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           8,
           37,
@@ -1376,11 +1376,22 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 53,
+        "title": "Daemon: Periodically Revoke Leases Removed from Configuration",
+        "description": "Enhance the daemon's periodic check to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file. On each cycle, the daemon should re-read the configuration file for each project it manages, compare the active leases against the configuration, and revoke any that are no longer present.",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T03:50:08.236Z",
+      "updated": "2025-09-29T03:58:34.273Z",
       "description": "Tasks for master context"
     }
   }

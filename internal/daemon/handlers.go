@@ -38,6 +38,26 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to unmarshal grant request: %w", err)
 	}
 
+	// Revoke any leases that are in the state but not in the request
+	activeLeases := d.state.LeasesForConfigFile(req.ConfigFile)
+	for key, activeLease := range activeLeases {
+		found := false
+		for _, reqLease := range req.Leases {
+			if activeLease.Source == reqLease.Source && activeLease.Destination == reqLease.Destination && activeLease.Variable == reqLease.Variable {
+				found = true
+				break
+			}
+		}
+		if !found {
+			slog.Info("Revoking lease removed from config", "key", key)
+			if err := d.revoker.Revoke(activeLease); err != nil {
+				slog.Error("Failed to revoke lease removed from config", "key", key, "err", err)
+				// Continue trying to revoke other leases
+			}
+			delete(d.state.Leases, key)
+		}
+	}
+
 	for _, l := range req.Leases {
 		duration, err := time.ParseDuration(l.Duration)
 		if err != nil {
