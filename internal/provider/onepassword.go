@@ -44,6 +44,14 @@ func (p *OnePasswordCLI) resolveFileURI(sourceURI string) (string, error) {
 	cmd := cmdExecer.Command("op", args...)
 	output, err := cmd.Output()
 	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return "", &OpError{
+				Command:  "item get",
+				ExitCode: exitErr.ExitCode(),
+				Stderr:   string(exitErr.Stderr),
+				Err:      err,
+			}
+		}
 		return "", fmt.Errorf("failed to execute 'op item get': %w", err)
 	}
 
@@ -69,43 +77,14 @@ func (p *OnePasswordCLI) Fetch(sourceURI string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return p.fetchDocument(canonicalURI)
+		sourceURI = canonicalURI
 	}
 
-	if strings.Contains(sourceURI, "document") {
-		return p.fetchDocument(sourceURI)
-	}
-	return p.fetchSecret(sourceURI)
+	return p.fetchWithRead(sourceURI)
 }
 
-// fetchDocument retrieves a document from 1Password using the `op document get` command.
-func (p *OnePasswordCLI) fetchDocument(sourceURI string) (string, error) {
-	args := []string{"document", "get", sourceURI}
-	if p.Account != "" {
-		args = append(args, "--account", p.Account)
-	}
-	cmd := cmdExecer.Command("op", args...)
-	output, err := cmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", &OpError{
-				ExitCode: exitErr.ExitCode(),
-				Stderr:   string(exitErr.Stderr),
-				Err:      err,
-			}
-		}
-		return "", fmt.Errorf("failed to execute 'op document get': %w", err)
-	}
-
-	if len(output) == 0 {
-		return "", fmt.Errorf("op document get returned empty output for %s", sourceURI)
-	}
-
-	return string(output), nil
-}
-
-// fetchSecret retrieves a secret from 1Password using the `op read` command.
-func (p *OnePasswordCLI) fetchSecret(sourceURI string) (string, error) {
+// fetchWithRead retrieves a secret from 1Password using the `op read` command.
+func (p *OnePasswordCLI) fetchWithRead(sourceURI string) (string, error) {
 	args := []string{"read", sourceURI}
 	if p.Account != "" {
 		args = append(args, "--account", p.Account)
@@ -115,6 +94,7 @@ func (p *OnePasswordCLI) fetchSecret(sourceURI string) (string, error) {
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			return "", &OpError{
+				Command:  "read",
 				ExitCode: exitErr.ExitCode(),
 				Stderr:   string(exitErr.Stderr),
 				Err:      err,
@@ -127,18 +107,19 @@ func (p *OnePasswordCLI) fetchSecret(sourceURI string) (string, error) {
 		return "", fmt.Errorf("op read returned empty output for %s", sourceURI)
 	}
 
-	return string(output), nil
+	return strings.TrimSpace(string(output)), nil
 }
 
 // OpError is a custom error for 1Password CLI errors.
 type OpError struct {
+	Command  string
 	ExitCode int
 	Stderr   string
 	Err      error
 }
 
 func (e *OpError) Error() string {
-	return fmt.Sprintf("op read failed with exit code %d: %s", e.ExitCode, e.Stderr)
+	return fmt.Sprintf("op %s failed with exit code %d: %s", e.Command, e.ExitCode, e.Stderr)
 }
 
 func (e *OpError) Unwrap() error {

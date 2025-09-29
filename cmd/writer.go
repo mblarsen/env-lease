@@ -20,10 +20,29 @@ func writeLease(l config.Lease, secretVal string, override bool) (bool, error) {
 	switch l.LeaseType {
 	case "env":
 		return writeEnvFile(l.Destination, l.Variable, secretVal, l.Format, override, l.FileMode)
+	case "file":
+		return writeFile(l.Destination, secretVal, l.FileMode)
 	default:
 		return false, fmt.Errorf("unknown lease type: %s", l.LeaseType)
 	}
 }
+
+func writeFile(path, value string, fileModeStr string) (bool, error) {
+	fileMode, err := parseFileMode(fileModeStr, 0600)
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		_, err := fileutil.AtomicWriteFile(path, []byte(value), fileMode)
+		return true, err
+	}
+
+	// If the file exists, we just overwrite it.
+	_, err = fileutil.AtomicWriteFile(path, []byte(value), fileMode)
+	return false, err
+}
+
 
 func writeEnvFile(path, key, value, format string, override bool, fileModeStr string) (bool, error) {
 	fileMode, err := parseFileMode(fileModeStr, 0600)
@@ -44,53 +63,40 @@ func writeEnvFile(path, key, value, format string, override bool, fileModeStr st
 
 	lines := strings.Split(string(content), "\n")
 	keyExists := false
-	// To check for the key, we need to know what the line starts with.
-	// The format string tells us. e.g., "export %s=%q" means the line starts with "export KEY=".
-	// We can find this by cutting the format string at the first '%'.
 	prefix := strings.Split(format, "%")[0] + key + "="
 	for i, line := range lines {
 		if strings.HasPrefix(line, prefix) {
 			keyExists = true
-			// Check the existing value.
-			parts := strings.SplitN(line, "=", 2)
-			existingValue := ""
-			if len(parts) > 1 {
-				existingValue = strings.Trim(parts[1], `"`)
-			}
-
-			// If the existing value is the same, we're done.
-			if existingValue == value {
+			newLine := fmt.Sprintf(format, key, value)
+			if line == newLine {
 				return false, nil
 			}
 
-			// If the existing value is empty, we can set it.
-			if existingValue == "" {
-				lines[i] = fmt.Sprintf(format, key, value)
-				break
-			}
+			// Check if the line has a value.
+			parts := strings.SplitN(line, "=", 2)
+			hasValue := len(parts) > 1 && strings.Trim(parts[1], `""`) != ""
 
-			// If the existing value is different and override is not set, error.
-			if !override {
+			if hasValue && !override {
 				return false, fmt.Errorf("variable '%s' already has a value; use --override to replace it", key)
 			}
 
-			// Otherwise, override it.
-			lines[i] = fmt.Sprintf(format, key, value)
+			lines[i] = newLine
 			break
 		}
 	}
 
 	if !keyExists {
-		if len(lines) > 0 && lines[len(lines)-1] != "" {
-			lines = append(lines, "")
-		}
 		lines = append(lines, fmt.Sprintf(format, key, value))
 	}
 
-	output := strings.Join(lines, "\n")
-	if !strings.HasSuffix(output, "\n") {
-		output += "\n"
+	var nonEmptyLines []string
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			nonEmptyLines = append(nonEmptyLines, line)
+		}
 	}
+
+	output := strings.Join(nonEmptyLines, "\n") + "\n"
 	_, err = fileutil.AtomicWriteFile(path, []byte(output), fileMode)
 	return false, err
 }
