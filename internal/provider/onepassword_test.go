@@ -21,7 +21,7 @@ func TestOnePasswordCLI_Fetch(t *testing.T) {
 	t.Run("successful fetch", func(t *testing.T) {
 		cmdExecer = &mockExecer{
 			CommandFunc: func(name string, arg ...string) *exec.Cmd {
-				return exec.Command("echo", "my-secret")
+				return exec.Command("echo", "-n", "my-secret")
 			},
 		}
 
