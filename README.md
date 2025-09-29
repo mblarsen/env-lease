@@ -1,9 +1,37 @@
 # env-lease
 
-> [!WARNING]
-> Disclaimer: This is a toy project and is not intended for use. Please do not use this software.
+> [!IMPORTANT]
+> ⚠️ **This is a toy project and is not intended for real-world use.** ⚠️
+>
+> This software is provided "as is" without warranty of any kind. Please do not use it to handle sensitive credentials. **Use at your own risk.**
 
-A command-line tool for managing temporary, leased secrets in local development environment files. It fetches secrets from a backend (like 1Password), writes them to a file, and automatically clears them after a specified "lease" duration expires.
+`env-lease` is a command-line tool designed to improve the developer experience of managing secrets in local environments. It fetches secrets from a provider (like 1Password), injects them into a local file (e.g., `.envrc`), and automatically revokes them after a configurable "lease" period. This provides rapid access to secrets while minimizing the risk of leaving them scattered across your system.
+
+### Core Features
+
+*   **Automatic Cleanup:** Leased secrets are automatically revoked and removed after a specified duration, reducing secret sprawl.
+*   **Granular Control:** Set a unique lease duration for each secret, giving you fine-grained control over its lifecycle.
+*   **Flexible:** Manages both environment variables and temporary files (e.g., for service account keys).
+*   **Simple & Declarative:** Configure all your secret leases in a single, easy-to-read `env-lease.toml` file.
+*   **Developer-Friendly:** Get optional desktop notifications on macOS when a lease expires.
+
+### Why?
+
+While tools like `op read` combined with `direnv` offer a highly secure method for handling secrets by injecting them directly into the environment, this approach can introduce latency, as secrets are fetched with each new shell session. `env-lease` offers a different balance of priorities:
+
+*   **Improved Developer Experience (DX):** By caching secrets in a local file, `env-lease` makes access nearly instantaneous, speeding up your workflow.
+*   **Time-Based Leases:** To mitigate the security trade-off of writing secrets to disk, `env-lease` ensures they are automatically removed after their lease expires. You can configure different durations for each secret, giving you fine-grained control.
+*   **Reduced Secret Sprawl:** By centralizing secret management in `env-lease.toml`, you can avoid leaving credentials in shell history, separate config files, or other insecure locations.
+
+### A Note on Security
+
+`env-lease` is designed to be a significant improvement over scattering plaintext secrets in shell history or leaving them in long-lived `.env` files. It achieves this by enforcing time-based leases that automatically clean up credentials.
+
+However, it's important to understand the trade-offs:
+
+*   **Filesystem vs. Memory:** `env-lease` prioritizes performance and developer experience by writing secrets to the filesystem. This is a deliberate design choice for speed. For environments requiring the highest level of security, solutions that inject secrets directly into process memory (like `op read` with `direnv`) remain the gold standard.
+*   **Intended Environment:** This tool is built for trusted local development setups. It is not intended as a hardened security solution for production or other sensitive environments.
+
 
 ## Installation
 
