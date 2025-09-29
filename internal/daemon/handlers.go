@@ -73,7 +73,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 			LeaseType:     l.LeaseType,
 			Variable:      l.Variable,
 			Format:        l.Format,
-			Encoding:      l.Encoding,
+			Transform:     l.Transform,
 			FileMode:      l.FileMode,
 			OpAccount:     l.OpAccount,
 			ExpiresAt:     d.clock.Now().Add(duration),

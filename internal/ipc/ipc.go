@@ -57,7 +57,7 @@ type Lease struct {
 	LeaseType   string
 	Variable    string
 	Format      string
-	Encoding    string
+	Transform   []string
 	FileMode    string
 	ExpiresAt   time.Time
 	ConfigFile  string

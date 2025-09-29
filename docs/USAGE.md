@@ -71,8 +71,70 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 | `lease_type`  | No       | The type of lease. Can be `"env"` (default) or `"file"`.                                                | `"file"`                              |
 | `variable`    | Yes      | The name of the environment variable to set (for `lease_type="env"`).                                   | `"API_KEY"`                           |
 | `format`      | No       | A Go `sprintf`-style format string for `env` leases. Defaults are applied for `.env` and `.envrc`.    | `"export %s=%q"`                      |
-| `encoding`    | No       | If set to `"base64"`, the secret value is base64-encoded (for `lease_type="env"`).                        | `"base64"`                            |
+| `transform`   | No       | An array of transformations to apply to the secret before writing it. See the "Transformations" section below. | `["base64-decode", "json", "select 'key'"]` |
 | `op_account`  | No       | The 1Password account to use. Overrides the `OP_ACCOUNT` environment variable.                      | `"my-account"`                        |
+
+---
+
+## Secret Transformations
+
+The `transform` option provides a powerful pipeline to process secrets after they are fetched but before they are written to a file. This is ideal for handling secrets that are not plain text, such as base64-encoded values or structured data like JSON or YAML.
+
+The `transform` key accepts an array of strings, where each string represents a single step in the pipeline. The secret is passed through each step in order.
+
+### The Pipeline Flow
+
+The transformation pipeline is type-aware. It starts with a `string` (the raw secret from the provider), but its internal data type can change from one step to the next.
+
+1.  **Initial State:** The pipeline starts with a `string`.
+2.  **Parsing (Optional):** Transformers like `json`, `toml`, or `yaml` parse the input string into an internal, structured data format.
+3.  **Querying (Optional):** The `select` transformer operates on this structured data to extract a specific value. Its output is always a `string`.
+4.  **Final State:** The final step in the pipeline **must** produce a `string`, as this is the value that will be written to the destination file.
+
+For example, you cannot have `json` as the last step, because its output is structured data, not a string. It must be followed by a `select` step.
+
+### Transformer Reference
+
+| Transformer | Description | Input Type | Output Type |
+| :--- | :--- | :--- | :--- |
+| `base64-encode` | Encodes the input string to standard base64. | `string` | `string` |
+| `base64-decode` | Decodes a base64-encoded input string. | `string` | `string` |
+| `json` | Parses a valid JSON string into structured data. | `string` | `structured_data` |
+| `toml` | Parses a valid TOML string into structured data. | `string` | `structured_data` |
+| `yaml` | Parses a valid YAML string into structured data. | `string` | `structured_data` |
+| `select '<path>'` | Extracts a value from structured data using dot-notation. The path must be quoted. | `structured_data` | `string` or `structured_data` |
+| `to_json` | Converts structured data to a JSON string. | `structured_data` | `string` |
+| `to_yaml` | Converts structured data to a YAML string. | `structured_data` | `string` |
+| `to_toml` | Converts structured data to a TOML string. | `structured_data` | `string` |
+
+### Example: Extracting a Nested Value from JSON
+
+This is a common use case where a single 1Password item stores multiple related values.
+
+**Secret stored in 1Password:**
+```json
+{
+  "database": {
+    "user": "admin",
+    "pass": "p@ssw0rd-123"
+  },
+  "api_key": "abc-123"
+}
+```
+
+**`env-lease.toml` configuration:**
+To extract just the database password, you would define the following pipeline:
+
+```toml
+[[lease]]
+source = "op://vault/item/my-json-secret"
+destination = ".envrc"
+variable = "DB_PASSWORD"
+duration = "8h"
+# 1. Parse the incoming secret as JSON.
+# 2. Select the value at the path 'database.pass'.
+transform = ["json", "select 'database.pass'"]
+```
 
 ---
 

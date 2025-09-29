@@ -18,9 +18,9 @@ type Lease struct {
 	Duration      string `toml:"duration"`
 	LeaseType     string `toml:"lease_type"`
 	Variable      string `toml:"variable"`
-	Format        string `toml:"format"`
-	Encoding      string `toml:"encoding"`
-	FileMode      string `toml:"file_mode"`
+	Format        string   `toml:"format"`
+	Transform     []string `toml:"transform"`
+	FileMode      string   `toml:"file_mode"`
 	OpAccount     string `toml:"op_account"`
 	ExpiresAt     time.Time
 	OrphanedSince *time.Time
@@ -29,12 +29,46 @@ type Lease struct {
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.
 func Load(path string) (*Config, error) {
-	var config Config
-	if _, err := toml.DecodeFile(path, &config); err != nil {
+	var rawConfig struct {
+		Lease []struct {
+			Source      string   `toml:"source"`
+			Destination string   `toml:"destination"`
+			Duration    string   `toml:"duration"`
+			LeaseType   string   `toml:"lease_type"`
+			Variable    string   `toml:"variable"`
+			Format      string   `toml:"format"`
+			Transform   []string `toml:"transform"`
+			Encoding    string   `toml:"encoding"` // Keep for backward compatibility
+			FileMode    string   `toml:"file_mode"`
+			OpAccount   string   `toml:"op_account"`
+		} `toml:"lease"`
+	}
+
+	if _, err := toml.DecodeFile(path, &rawConfig); err != nil {
 		return nil, err
 	}
 
-	for i := range config.Lease {
+	var config Config
+	config.Lease = make([]Lease, len(rawConfig.Lease))
+
+	for i, rawLease := range rawConfig.Lease {
+		config.Lease[i] = Lease{
+			Source:      rawLease.Source,
+			Destination: rawLease.Destination,
+			Duration:    rawLease.Duration,
+			LeaseType:   rawLease.LeaseType,
+			Variable:    rawLease.Variable,
+			Format:      rawLease.Format,
+			Transform:   rawLease.Transform,
+			FileMode:    rawLease.FileMode,
+			OpAccount:   rawLease.OpAccount,
+		}
+
+		// Backward compatibility for encoding
+		if len(config.Lease[i].Transform) == 0 && rawLease.Encoding == "base64" {
+			config.Lease[i].Transform = []string{"base64-encode"}
+		}
+
 		// Set default lease type
 		if config.Lease[i].LeaseType == "" {
 			config.Lease[i].LeaseType = "env"

@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"encoding/base64"
 	"fmt"
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/provider"
+	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
 	"log/slog"
 	"os"
@@ -112,8 +112,23 @@ var grantCmd = &cobra.Command{
 			}
 			slog.Info("Fetched secret", "source", l.Source)
 
-			if l.Encoding == "base64" {
-				secretVal = base64.StdEncoding.EncodeToString([]byte(secretVal))
+			if len(l.Transform) > 0 {
+				pipeline, err := transform.NewPipeline(l.Transform)
+				if err != nil {
+					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to create transform pipeline: %w", err)})
+					if !continueOnError {
+						break
+					}
+					continue
+				}
+				secretVal, err = pipeline.Run(secretVal)
+				if err != nil {
+					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to transform secret: %w", err)})
+					if !continueOnError {
+						break
+					}
+					continue
+				}
 			}
 
 			// Write the secret to the destination file.
@@ -147,7 +162,7 @@ var grantCmd = &cobra.Command{
 				LeaseType:   l.LeaseType,
 				Variable:    l.Variable,
 				Format:      l.Format,
-				Encoding:    l.Encoding,
+				Transform:   l.Transform,
 				FileMode:    l.FileMode,
 			}
 		}
