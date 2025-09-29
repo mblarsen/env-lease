@@ -1387,11 +1387,22 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 55,
+        "title": "Implement op+file:// scheme and preserve newlines for 1Password provider",
+        "description": "Implement a new `op+file://<item-name>/<file-name>` URI scheme for 1Password documents. This scheme should perform an `op item get` lookup under the hood to find the canonical `op://<vault-id>/<item-id>/<file-id>` URI. The provider should handle potential ambiguities if item names are not unique. Ensure the `lease_type` ('file' or 'env') is decoupled from the `source` URI scheme. For `lease_type = 'env'`, the provider must return the raw, unmodified secret content, including newlines. The `TrimSpace` function should be removed from the secret fetching logic to ensure multi-line environment variables are handled correctly when no encoding is specified. If `encoding` (e.g., 'base64') is used, the standard encoding process applies.",
+        "details": "",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T03:58:34.273Z",
+      "updated": "2025-09-29T06:02:31.709Z",
       "description": "Tasks for master context"
     }
   }
