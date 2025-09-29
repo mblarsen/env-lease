@@ -48,7 +48,12 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		return exec.Command("systemctl", "--user", "enable", "--now", "env-lease.service").Run()
+		if err := exec.Command("systemctl", "--user", "enable", "--now", "env-lease.service").Run(); err != nil {
+			return err
+		}
+
+		fmt.Printf("Successfully installed env-lease daemon service. Configuration file created at: %s\n", servicePath)
+		return nil
 	},
 }
 
@@ -63,7 +68,12 @@ var uninstallCmd = &cobra.Command{
 			// Ignore errors, as the service may not be running
 		}
 
-		return os.Remove(servicePath)
+		if err := os.Remove(servicePath); err != nil {
+			return err
+		}
+
+		fmt.Println("Successfully uninstalled env-lease daemon service.")
+		return nil
 	},
 }
 

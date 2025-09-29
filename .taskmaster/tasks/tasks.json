@@ -1405,7 +1405,7 @@
         "description": "Enhance the `daemon install` and `daemon uninstall` commands to provide clear, informative messages upon successful completion, including the path to the created service file on installation.",
         "details": "Modify the `env-lease daemon install` and `env-lease daemon uninstall` Cobra commands to improve user experience by providing explicit confirmation messages.\n\n1.  **`daemon install` Command:**\n    *   After the platform-specific service manager file (e.g., systemd `.service` or launchd `.plist`) is successfully created and the service is enabled, the command should print a confirmation message to standard output.\n    *   This message must include the full path to the service file that was just created. For example: `Successfully installed env-lease daemon service. Configuration file created at: /etc/systemd/system/env-leased.service`.\n    *   This new messaging logic must NOT execute when the `--print` flag (from Task 40) is used, preserving the existing behavior of only printing the file content to stdout.\n\n2.  **`daemon uninstall` Command:**\n    *   After the service has been successfully stopped, disabled, and its corresponding service file has been removed, the command should print a simple confirmation message to standard output.\n    *   For example: `Successfully uninstalled env-lease daemon service.`",
         "testStrategy": "Testing will be performed by executing the CLI commands on each supported OS and asserting the content of standard output.\n\n1.  **Install Test (Linux):**\n    *   Run `sudo env-lease daemon install`.\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the message `Successfully installed env-lease daemon service. Configuration file created at: [path]`, where `[path]` is the correct systemd service file path.\n    *   Verify the service file exists at the reported path.\n\n2.  **Install Test (macOS):**\n    *   Run `env-lease daemon install`.\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the message `Successfully installed env-lease daemon service. Configuration file created at: [path]`, where `[path]` is the correct launchd plist path in the user's home directory.\n    *   Verify the plist file exists at the reported path.\n\n3.  **Uninstall Test:**\n    *   On a system with the daemon installed, run `env-lease daemon uninstall` (with `sudo` if required).\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the exact message: `Successfully uninstalled env-lease daemon service.`\n    *   Verify the service file has been deleted.\n\n4.  **`--print` Flag Compatibility Test:**\n    *   Run `env-lease daemon install --print`.\n    *   Assert that stdout contains only the service file content and does NOT contain the new \"Successfully installed...\" message.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           32,
           40
@@ -1443,7 +1443,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T07:13:41.714Z",
+      "updated": "2025-09-29T07:18:13.616Z",
       "description": "Tasks for master context"
     }
   }

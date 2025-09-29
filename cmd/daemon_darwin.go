@@ -48,7 +48,12 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		return exec.Command("launchctl", "load", plistPath).Run()
+		if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
+			return err
+		}
+
+		fmt.Printf("Successfully installed env-lease daemon service. Configuration file created at: %s\n", plistPath)
+		return nil
 	},
 }
 
@@ -63,7 +68,12 @@ var uninstallCmd = &cobra.Command{
 			// Ignore errors, as the service may not be loaded
 		}
 
-		return os.Remove(plistPath)
+		if err := os.Remove(plistPath); err != nil {
+			return err
+		}
+
+		fmt.Println("Successfully uninstalled env-lease daemon service.")
+		return nil
 	},
 }
 
