@@ -17,12 +17,17 @@ var revokeCmd = &cobra.Command{
 
 		configFile, err := filepath.Abs("env-lease.toml")
 		if err != nil {
-			return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
+			// If --all is passed, we don't care about the config file.
+			if all, _ := cmd.Flags().GetBool("all"); !all {
+				return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
+			}
 		}
 
+		all, _ := cmd.Flags().GetBool("all")
 		req := ipc.RevokeRequest{
 			Command:    "revoke",
 			ConfigFile: configFile,
+			All:        all,
 		}
 		var revokeResp ipc.RevokeResponse
 		if err := client.Send(req, &revokeResp); err != nil {
@@ -56,5 +61,6 @@ var revokeCmd = &cobra.Command{
 
 func init() {
 	revokeCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
+	revokeCmd.Flags().Bool("all", false, "Revoke all active leases, across all projects.")
 	rootCmd.AddCommand(revokeCmd)
 }

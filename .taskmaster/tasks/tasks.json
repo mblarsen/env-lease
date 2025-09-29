@@ -1536,7 +1536,7 @@
         "description": "Add a section to the `USAGE.md` documentation file warning users to revoke all active secrets before upgrading to a new version, particularly while the software is in an unstable, pre-release state.",
         "details": "Locate the `USAGE.md` file in the project root. Add a new section, possibly titled 'Upgrading Between Versions' or as a prominent note. This section should clearly state that due to the unstable nature of the software during active development, breaking changes to the daemon's state management or IPC protocol may occur between versions. Instruct users to run `env-lease revoke --all` to clear all active leases *before* stopping the daemon and replacing the application binary. Explain that this step is crucial to prevent orphaned leases or unexpected behavior after an upgrade.",
         "testStrategy": "Review the changes in a Markdown previewer. 1. Confirm that a new section regarding upgrades has been added to `USAGE.md`. 2. Verify the text clearly explains the reason for revoking secrets (potential breaking changes in an unstable application). 3. Ensure the recommended command is exactly `env-lease revoke --all` and is formatted correctly as a code block. 4. Check for any grammatical errors, typos, or formatting issues.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           37
         ],
@@ -1570,7 +1570,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T09:44:05.685Z",
+      "updated": "2025-09-29T09:47:26.253Z",
       "description": "Tasks for master context"
     }
   }

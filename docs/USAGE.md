@@ -205,6 +205,19 @@ duration = "1h"
 This provides a more readable and maintainable way to reference file attachments. The content of the file can be leased to a destination file (`lease_type = "file"`) or an environment variable (`lease_type = "env"`).
 
 ---
+## Upgrading
+
+**Important:** Before upgrading to a new version of `env-lease`, especially during this pre-release stage of development, it is crucial to revoke all active leases.
+
+Due to the unstable nature of the software, breaking changes to the daemon's state or communication protocol may occur between versions. To prevent orphaned leases or other issues, run the following command **before** you stop the daemon or replace the application binary:
+
+```sh
+env-lease revoke --all
+```
+
+This will ensure a clean state before you upgrade.
+
+---
 ## Limitations
 
 ### Inline Comments

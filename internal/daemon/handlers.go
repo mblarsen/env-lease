@@ -99,11 +99,11 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal revoke request: %w", err)
 	}
-	slog.Debug("Received revoke request", "config_file", req.ConfigFile)
+	slog.Debug("Received revoke request", "config_file", req.ConfigFile, "all", req.All)
 
 	var count int
 	for id, lease := range d.state.Leases {
-		if lease.ConfigFile == req.ConfigFile {
+		if req.All || lease.ConfigFile == req.ConfigFile {
 			slog.Debug("Revoking lease", "source", lease.Source)
 			if err := d.revoker.Revoke(lease); err != nil {
 				slog.Error("Failed to revoke lease", "id", id, "err", err)
@@ -118,7 +118,7 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 		slog.Error("Failed to save state after revoke", "err", err)
 	}
 
-	slog.Info("Revoked leases for project", "count", count, "project", req.ConfigFile)
+	slog.Info("Revoked leases", "count", count, "all", req.All, "project", req.ConfigFile)
 	resp := ipc.RevokeResponse{Messages: []string{fmt.Sprintf("Revoked %d leases.", count)}}
 	return json.Marshal(resp)
 }

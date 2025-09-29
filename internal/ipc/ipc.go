@@ -42,6 +42,7 @@ type StatusResponse struct {
 type RevokeRequest struct {
 	Command    string
 	ConfigFile string
+	All        bool
 }
 
 // RevokeResponse is the payload for a revoke response.
