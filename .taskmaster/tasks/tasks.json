@@ -1398,11 +1398,41 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 56,
+        "title": "Improve User Feedback for Daemon Install and Uninstall Commands",
+        "description": "Enhance the `daemon install` and `daemon uninstall` commands to provide clear, informative messages upon successful completion, including the path to the created service file on installation.",
+        "details": "Modify the `env-lease daemon install` and `env-lease daemon uninstall` Cobra commands to improve user experience by providing explicit confirmation messages.\n\n1.  **`daemon install` Command:**\n    *   After the platform-specific service manager file (e.g., systemd `.service` or launchd `.plist`) is successfully created and the service is enabled, the command should print a confirmation message to standard output.\n    *   This message must include the full path to the service file that was just created. For example: `Successfully installed env-lease daemon service. Configuration file created at: /etc/systemd/system/env-leased.service`.\n    *   This new messaging logic must NOT execute when the `--print` flag (from Task 40) is used, preserving the existing behavior of only printing the file content to stdout.\n\n2.  **`daemon uninstall` Command:**\n    *   After the service has been successfully stopped, disabled, and its corresponding service file has been removed, the command should print a simple confirmation message to standard output.\n    *   For example: `Successfully uninstalled env-lease daemon service.`",
+        "testStrategy": "Testing will be performed by executing the CLI commands on each supported OS and asserting the content of standard output.\n\n1.  **Install Test (Linux):**\n    *   Run `sudo env-lease daemon install`.\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the message `Successfully installed env-lease daemon service. Configuration file created at: [path]`, where `[path]` is the correct systemd service file path.\n    *   Verify the service file exists at the reported path.\n\n2.  **Install Test (macOS):**\n    *   Run `env-lease daemon install`.\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the message `Successfully installed env-lease daemon service. Configuration file created at: [path]`, where `[path]` is the correct launchd plist path in the user's home directory.\n    *   Verify the plist file exists at the reported path.\n\n3.  **Uninstall Test:**\n    *   On a system with the daemon installed, run `env-lease daemon uninstall` (with `sudo` if required).\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the exact message: `Successfully uninstalled env-lease daemon service.`\n    *   Verify the service file has been deleted.\n\n4.  **`--print` Flag Compatibility Test:**\n    *   Run `env-lease daemon install --print`.\n    *   Assert that stdout contains only the service file content and does NOT contain the new \"Successfully installed...\" message.",
+        "status": "pending",
+        "dependencies": [
+          32,
+          40
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 57,
+        "title": "Make Lease Revocation Resilient to Missing Files",
+        "description": "Modify the lease revocation logic to gracefully handle cases where a leased file has already been deleted by the user. Instead of failing, the revocation process will log the event and successfully remove the lease from the daemon's state.",
+        "details": "The core lease revocation function, likely within the daemon, needs to be updated. This function is triggered by both the `env-lease revoke` command and the periodic cleanup of stale leases (Task 53). When revoking a file-based lease, the logic must first check for the existence of the target file before attempting deletion.\n1. In the revocation handler, before calling `os.Remove()`, use `os.Stat()` to check if the file path exists.\n2. If the check returns an error satisfying `os.IsNotExist(err)`, the function should not propagate this as a failure. Instead, it should log an informational message using `slog` (e.g., `slog.Info(\"Lease target file not found, proceeding with revocation\", \"path\", filePath)`).\n3. If the file exists, attempt deletion as usual. Any errors from `os.Remove()` (e.g., permission denied) should still be treated as fatal errors for that specific lease revocation.\n4. In either case (file deleted successfully or file was already missing), the process should continue to remove the lease's metadata from the daemon's state file, ensuring the revocation is completed from a logical standpoint.",
+        "testStrategy": "An integration test will be created to validate the new behavior.\n1. **Setup:** Grant a new file-based lease using `env-lease grant`, which creates a file (e.g., `test-secret.txt`).\n2. **Verification 1:** Confirm the file `test-secret.txt` exists and the lease is listed in `env-lease status`.\n3. **Action:** Manually delete the file using `rm test-secret.txt`.\n4. **Test Execution:** Run `env-lease revoke` for the project.\n5. **Verification 2:** Assert that the `revoke` command exits with code 0.\n6. **Verification 3:** Run `env-lease status` again and assert that the lease is no longer listed.\n7. **Verification 4:** Inspect the daemon's logs and confirm the presence of an `info` level log message indicating the file was not found, and the absence of any `error` level logs for this revocation.\n8. **Regression Test:** Repeat the entire process, but skip step 3 (do not manually delete the file), and verify that `revoke` still works correctly by deleting the file itself.",
+        "status": "pending",
+        "dependencies": [
+          12,
+          37,
+          53,
+          55
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T06:02:31.709Z",
+      "updated": "2025-09-29T06:49:08.940Z",
       "description": "Tasks for master context"
     }
   }
