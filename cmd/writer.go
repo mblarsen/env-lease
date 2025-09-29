@@ -3,12 +3,13 @@ package cmd
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
 	"os"
 	"strconv"
 	"strings"
 	"unsafe"
+
+	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 )
 
 func writeLease(l config.Lease, secretVal string, override bool) (bool, error) {
@@ -50,9 +51,31 @@ func writeEnvFile(path, key, value, format string, override bool, fileModeStr st
 	for i, line := range lines {
 		if strings.HasPrefix(line, prefix) {
 			keyExists = true
-			if override {
-				lines[i] = fmt.Sprintf(format, key, value)
+			// Check the existing value.
+			parts := strings.SplitN(line, "=", 2)
+			existingValue := ""
+			if len(parts) > 1 {
+				existingValue = strings.Trim(parts[1], `"`)
 			}
+
+			// If the existing value is the same, we're done.
+			if existingValue == value {
+				return false, nil
+			}
+
+			// If the existing value is empty, we can set it.
+			if existingValue == "" {
+				lines[i] = fmt.Sprintf(format, key, value)
+				break
+			}
+
+			// If the existing value is different and override is not set, error.
+			if !override {
+				return false, fmt.Errorf("variable '%s' already has a value; use --override to replace it", key)
+			}
+
+			// Otherwise, override it.
+			lines[i] = fmt.Sprintf(format, key, value)
 			break
 		}
 	}

@@ -3,6 +3,7 @@ package provider
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 // OnePasswordCLI is a SecretProvider that fetches secrets using the 1Password CLI.
@@ -34,7 +35,7 @@ func (p *OnePasswordCLI) Fetch(sourceURI string) (string, error) {
 		return "", fmt.Errorf("op read returned empty output for %s", sourceURI)
 	}
 
-	return string(output), nil
+	return strings.TrimSpace(string(output)), nil
 }
 
 // OpError is a custom error for 1Password CLI errors.
