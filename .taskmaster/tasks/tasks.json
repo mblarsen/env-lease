@@ -1428,11 +1428,22 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 58,
+        "title": "Improve Error Reporting for `grant --continue-on-error`",
+        "description": "Refactor the error reporting for the `grant` command when the `--continue-on-error` flag is used. The current format is cluttered and redundant. The new format should be more structured and readable, like this:\n\n    Failed to grant 2 leases:\n\n    Lease: <lease-source-uri>\n    └─ Error: <error-message>\n\n    Lease: <another-lease-source-uri>\n    └─ Error: <another-error-message>\n\n    This involves creating a custom error structure to associate each error with its lease source, modifying the error aggregation logic in `cmd/grant.go`, and updating the final error message formatting. The tests in `cmd/grant_test.go` should also be updated to reflect the new error format.",
+        "details": "",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T06:52:29.639Z",
+      "updated": "2025-09-29T07:13:41.714Z",
       "description": "Tasks for master context"
     }
   }

@@ -14,6 +14,34 @@ import (
 	"time"
 )
 
+
+type grantError struct {
+	Source string
+	Err    error
+}
+
+type GrantErrors struct {
+	errs []grantError
+}
+
+func (e *GrantErrors) Error() string {
+	var sb strings.Builder
+	if len(e.errs) > 1 {
+		sb.WriteString(fmt.Sprintf("Failed to grant %d leases:\n\n", len(e.errs)))
+	} else {
+		sb.WriteString("Failed to grant lease:\n\n")
+	}
+	for _, ge := range e.errs {
+		sb.WriteString(fmt.Sprintf("Lease: %s\n", ge.Source))
+		sb.WriteString(fmt.Sprintf("└─ Error: %s\n\n", ge.Err))
+	}
+
+	if len(e.errs) > 1 {
+		sb.WriteString("Note: Other leases may have been granted successfully.\n")
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}
+
 var grantCmd = &cobra.Command{
 	Use:   "grant",
 	Short: "Grant all leases defined in env-lease.toml.",
@@ -31,7 +59,7 @@ var grantCmd = &cobra.Command{
 		}
 
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
-		var errs []error
+		var errs []grantError
 
 		var p provider.SecretProvider
 		leases := make([]ipc.Lease, len(cfg.Lease))
@@ -45,11 +73,11 @@ var grantCmd = &cobra.Command{
 			}
 			duration, err := time.ParseDuration(l.Duration)
 			if err != nil {
-				if continueOnError {
-					errs = append(errs, fmt.Errorf("invalid duration '%s': %w", l.Duration, err))
-					continue
+				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("invalid duration '%s': %w", l.Duration, err)})
+				if !continueOnError {
+					break
 				}
-				return fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
+				continue
 			}
 			if duration > 12*time.Hour {
 				slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
@@ -64,12 +92,11 @@ var grantCmd = &cobra.Command{
 					l.Format = "%s=%q"
 				default:
 					if l.LeaseType == "env" {
-						err := fmt.Errorf("lease for '%s' has no format specified", l.Destination)
-						if continueOnError {
-							errs = append(errs, err)
-							continue
+						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("lease for '%s' has no format specified", l.Destination)})
+						if !continueOnError {
+							break
 						}
-						return err
+						continue
 					}
 				}
 			}
@@ -77,12 +104,11 @@ var grantCmd = &cobra.Command{
 			slog.Info("Fetching secret", "source", l.Source)
 			secretVal, err := p.Fetch(l.Source)
 			if err != nil {
-				err := fmt.Errorf("failed to fetch secret for %s: %w", l.Source, err)
-				if continueOnError {
-					errs = append(errs, err)
-					continue
+				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to fetch secret: %w", err)})
+				if !continueOnError {
+					break
 				}
-				return err
+				continue
 			}
 			slog.Info("Fetched secret", "source", l.Source)
 
@@ -94,12 +120,11 @@ var grantCmd = &cobra.Command{
 			override, _ := cmd.Flags().GetBool("override")
 			created, err := writeLease(l, secretVal, override)
 			if err != nil {
-				err := fmt.Errorf("failed to write lease for %s: %w", l.Source, err)
-				if continueOnError {
-					errs = append(errs, err)
-					continue
+				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to write lease: %w", err)})
+				if !continueOnError {
+					break
 				}
-				return err
+				continue
 			}
 			clearString(secretVal)
 			if created {
@@ -108,12 +133,11 @@ var grantCmd = &cobra.Command{
 
 			absDest, err := filepath.Abs(l.Destination)
 			if err != nil {
-				err := fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
-				if continueOnError {
-					errs = append(errs, err)
-					continue
+				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)})
+				if !continueOnError {
+					break
 				}
-				return err
+				continue
 			}
 
 			leases[i] = ipc.Lease{
@@ -129,11 +153,7 @@ var grantCmd = &cobra.Command{
 		}
 
 		if len(errs) > 0 {
-			var errStrings []string
-			for _, err := range errs {
-				errStrings = append(errStrings, err.Error())
-			}
-			return fmt.Errorf("encountered errors:\n- %s", strings.Join(errStrings, "\n- "))
+			return &GrantErrors{errs: errs}
 		}
 
 		override, _ := cmd.Flags().GetBool("override")

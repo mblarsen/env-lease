@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -107,9 +106,17 @@ duration = "1m"
 		if err == nil {
 			t.Fatal("expected an error for missing format, but got none")
 		}
-		expectedErr := "lease for '" + destFile + "' has no format specified"
-		if err.Error() != expectedErr {
-			t.Fatalf("expected error %q, got %q", expectedErr, err.Error())
+		expectedErr := "Failed to grant lease:"
+		if !strings.Contains(err.Error(), expectedErr) {
+			t.Fatalf("expected error to contain %q, got %q", expectedErr, err.Error())
+		}
+		expectedLease := "Lease: mock"
+		if !strings.Contains(err.Error(), expectedLease) {
+			t.Fatalf("expected error to contain %q, got %q", expectedLease, err.Error())
+		}
+		expectedLeaseError := "└─ Error: lease for '" + destFile + "' has no format specified"
+		if !strings.Contains(err.Error(), expectedLeaseError) {
+			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
 	})
 
@@ -133,21 +140,26 @@ format = "%s=%q"
 		configFile := writeConfig(configContent)
 
 		// 1. Test without override - should fail
-		cmd := exec.Command("go", "run", "./env-lease", "grant", "--config", configFile)
-		output, err := cmd.CombinedOutput()
+		grantCmd.Flags().Set("config", configFile)
+		grantCmd.Flags().Set("override", "false")
+		err = grantCmd.RunE(grantCmd, []string{})
 		if err == nil {
-			t.Fatalf("expected an error when overriding without the flag, but got none. Output: %s", string(output))
+			t.Fatal("expected an error, but got none")
 		}
-		expectedErr := "variable 'API_KEY_OVERRIDE' already has a value; use --override to replace it"
-		if !strings.Contains(string(output), expectedErr) {
-			t.Fatalf("expected error %q, got %q", expectedErr, string(output))
+		expectedErr := "Failed to grant lease:"
+		if !strings.Contains(err.Error(), expectedErr) {
+			t.Fatalf("expected error to contain %q, got %q", expectedErr, err.Error())
+		}
+		expectedLeaseError := "└─ Error: failed to write lease: variable 'API_KEY_OVERRIDE' already has a value; use --override to replace it"
+		if !strings.Contains(err.Error(), expectedLeaseError) {
+			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
 
 		// 2. Test with override - should succeed
-		cmd = exec.Command("go", "run", "./env-lease", "grant", "--config", configFile, "--override")
-		output, err = cmd.CombinedOutput()
+		grantCmd.Flags().Set("override", "true")
+		err = grantCmd.RunE(grantCmd, []string{})
 		if err != nil {
-			t.Fatalf("grant command failed with override flag: %v\nOutput: %s", err, string(output))
+			t.Fatalf("grant command failed with override flag: %v", err)
 		}
 
 		content, _ := os.ReadFile(destFile)
@@ -176,16 +188,24 @@ format = "%s=%q"
 `
 		configFile := writeConfig(configContent)
 
-		// 1. Test without flag - should fail fast
+		// 1. Test without flag - should fail fast, but with new format
 		grantCmd.Flags().Set("config", configFile)
 		grantCmd.Flags().Set("continue-on-error", "false")
 		err := grantCmd.RunE(grantCmd, []string{})
 		if err == nil {
 			t.Fatal("expected an error, but got none")
 		}
-		expectedErr := "failed to fetch secret for mock-fail"
+		expectedErr := "Failed to grant lease:"
 		if !strings.Contains(err.Error(), expectedErr) {
-			t.Fatalf("expected error %q, got %q", expectedErr, err.Error())
+			t.Fatalf("expected error to contain %q, got %q", expectedErr, err.Error())
+		}
+		expectedLease := "Lease: mock-fail"
+		if !strings.Contains(err.Error(), expectedLease) {
+			t.Fatalf("expected error to contain %q, got %q", expectedLease, err.Error())
+		}
+		expectedLeaseError := "└─ Error: failed to fetch secret: failed to fetch mock secret"
+		if !strings.Contains(err.Error(), expectedLeaseError) {
+			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
 
 		// 2. Test with flag - should continue and aggregate errors
@@ -194,8 +214,15 @@ format = "%s=%q"
 		if err == nil {
 			t.Fatal("expected an error, but got none")
 		}
+		expectedErr = "Failed to grant lease:"
 		if !strings.Contains(err.Error(), expectedErr) {
 			t.Fatalf("expected aggregated error to contain %q, got %q", expectedErr, err.Error())
+		}
+		if !strings.Contains(err.Error(), expectedLease) {
+			t.Fatalf("expected aggregated error to contain %q, got %q", expectedLease, err.Error())
+		}
+		if !strings.Contains(err.Error(), expectedLeaseError) {
+			t.Fatalf("expected aggregated error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
 
 		// Check that the successful lease was still written
