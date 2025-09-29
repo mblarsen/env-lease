@@ -66,6 +66,10 @@ env-lease enable-notifications
 
 This command will open Apple's Script Editor with a simple script. Click the "Run" button and then "Allow" the notification permission prompt. This one-time setup is all that's needed.
 
+### Limitations
+
+`env-lease` does not support inline comments in environment files (e.g., `.env` or `.envrc`). Any inline comments on a line managed by `env-lease` will be removed when the lease is granted or revoked.
+
 ## Security
 
 `env-lease` uses a secure IPC model with HMAC-SHA256 token authentication to protect against unauthorized local processes interacting with its daemon.

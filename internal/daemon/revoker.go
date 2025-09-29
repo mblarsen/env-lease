@@ -56,12 +56,7 @@ func (r *FileRevoker) clearEnvVar(path, keyToRevoke string) error {
 
 		if keyPart == keyToRevoke {
 			originalKeyPart := parts[0]
-			comment := ""
-			if commentIndex := strings.Index(line, "#"); commentIndex > strings.Index(line, "=") {
-				comment = " " + strings.TrimSpace(line[commentIndex:])
-			}
-			out.WriteString(originalKeyPart + "=" + comment + "\n")
-		} else {
+								out.WriteString(originalKeyPart + "=\n")		} else {
 			out.WriteString(line + "\n")
 		}
 	}
