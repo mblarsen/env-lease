@@ -86,6 +86,7 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 | `env-lease enable-notifications` | (macOS only) Guides the user to grant notification permissions.                                           |
 | `env-lease daemon install`| Installs and starts the daemon as a user service.                                                         |
 | `env-lease daemon uninstall`| Stops and uninstalls the daemon.                                                                          |
+| `env-lease daemon reload`| Reloads the daemon service.                                                                               |
 | `env-lease daemon cleanup`| Manually purges all orphaned leases from the daemon's state.                                              |
 
 ---
