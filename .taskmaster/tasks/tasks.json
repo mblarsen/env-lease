@@ -1490,11 +1490,37 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 63,
+        "title": "Add Infisical Secret Provider",
+        "description": "Implement a new secret provider for Infisical. The implementation will follow the established pattern of other providers, using the Infisical CLI ('infisical') to fetch secrets.",
+        "details": "Create a new provider in the `/internal/provider` package that implements the `SecretProvider` interface for Infisical. The provider should be named `InfisicalCLI`. The `Fetch` method will use the `os/exec` package to call `infisical secrets get <SECRET_NAME> --env=<ENVIRONMENT> --project-id=<PROJECT_ID> --raw`. The source URI should be parsed to extract these parameters. A suggested URI format is `infisical://<project-id>/<environment>/<secret-name>`. The implementation must include robust error handling for scenarios such as the `infisical` command not being in the PATH, the user not being logged in, the specified secret not being found, or network issues. Custom error types should be created for Infisical-specific failures to provide clear feedback to the user.",
+        "testStrategy": "Unit tests must be created for the Infisical provider. These tests should use a mocked `os/exec` interface to simulate the Infisical CLI's behavior without requiring an actual installation. Test cases should cover: 1. Successful retrieval of a secret. 2. The `infisical` executable not being found in the system's PATH. 3. The CLI returning a non-zero exit code for a non-existent secret. 4. The CLI returning an error due to authentication failure. An optional integration test can be added that runs only when the `infisical` CLI is properly configured in the test environment.",
+        "status": "pending",
+        "dependencies": [
+          3
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 64,
+        "title": "Add Bitwarden Secret Provider",
+        "description": "Implement a new secret provider for Bitwarden. The implementation will follow the established pattern of other providers, using the Bitwarden CLI ('bw') to fetch secrets.",
+        "details": "Create a new provider in the `/internal/provider` package that implements the `SecretProvider` interface for Bitwarden. The provider struct should be named `BitwardenCLI`. The `Fetch` method will use the `os/exec` package to call `bw get password <ITEM_ID>`. The source URI should be parsed to extract the item ID. A suggested URI format is `bitwarden://<item_id>`. The implementation must include robust error handling for scenarios such as the `bw` executable not being found in the PATH, the user's vault being locked, the specified item ID not being found, or other CLI errors. Custom error types should be created for Bitwarden-specific failures to provide clear feedback to the user.",
+        "testStrategy": "Unit tests must be created for the Bitwarden provider. These tests should use a mocked `os/exec` interface to simulate the Bitwarden CLI's behavior without requiring an actual installation or logged-in session. Test cases should cover: 1. Successful retrieval of a secret. 2. The `bw` executable not being found in the PATH. 3. The `bw` CLI returning an error for a locked vault. 4. The `bw` CLI returning an error for an invalid item ID. 5. A malformed `bitwarden://` source URI.",
+        "status": "pending",
+        "dependencies": [
+          3
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T07:59:36.799Z",
+      "updated": "2025-09-29T08:13:21.531Z",
       "description": "Tasks for master context"
     }
   }
