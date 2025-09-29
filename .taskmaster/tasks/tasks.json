@@ -1468,7 +1468,7 @@
         "description": "The `--no-direnv` flag for the `grant` and `revoke` commands is not being respected, causing `direnv allow` to be executed unconditionally. This task will correct the command logic to ensure the flag properly disables the automatic `direnv` execution.",
         "details": "The client-side logic for the `grant` and `revoke` commands needs to be updated. Currently, the check for the `--no-direnv` flag is either missing or incorrect, leading to the `direnv allow` command being called even when the user explicitly opts out. The fix involves modifying the conditional logic that triggers the `direnv` integration. The execution flow should be: 1. After a successful grant or revoke operation modifying an `.envrc` file. 2. Before checking for the `direnv` executable, first evaluate the `--no-direnv` flag. 3. If the flag is present and set to `true`, the program must skip all `direnv`-related actions and instead print the suggestion message to the console. 4. If the flag is `false` (the default), the existing logic of checking for the `direnv` executable and running `direnv allow` should proceed.",
         "testStrategy": "The existing integration test suite for `direnv` integration must be updated to cover this bugfix. 1. **Test `--no-direnv` Behavior:** Create a new test case for both `grant` and `revoke`. Configure the test with a mock `direnv` executable in the `PATH` and target an `.envrc` file. Execute the command with the `--no-direnv` flag. Assert that the mock `direnv` executable was **not** called. Assert that the command's standard output contains the expected suggestion message (e.g., 'Run `direnv allow` to load the new environment.'). 2. **Regression Test Default Behavior:** Verify that the existing test case for the default behavior (without the flag) still passes. This test should run `grant`/`revoke` without the flag and assert that the mock `direnv allow` command **is** executed.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           42
         ],
@@ -1570,7 +1570,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T09:47:26.253Z",
+      "updated": "2025-09-29T10:04:12.610Z",
       "description": "Tasks for master context"
     }
   }

@@ -3,12 +3,14 @@ package cmd
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 )
 
 func HandleDirenv(noDirenv bool, out io.Writer) {
 	if noDirenv {
+		slog.Debug("`--no-direnv` flag is set, skipping direnv execution.")
 		fmt.Fprintln(out, ".envrc modified. Run 'direnv allow' to apply changes.")
 		return
 	}
