@@ -65,7 +65,7 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 
 | Key           | Required | Description                                                                                             | Example                               |
 |---------------|----------|---------------------------------------------------------------------------------------------------------|---------------------------------------|
-| `source`      | Yes      | The URI of the secret. For 1Password, this is the `op://` reference.                                   | `"op://vault/item/secret"`            |
+| `source`      | Yes      | The URI of the secret. For 1Password, this can be the canonical `op://` reference or the user-friendly `op+file://<item-name>/<file-name>` for document attachments. | `"op://vault/item/secret"` or `"op+file://My Item/file.json"` |
 | `destination` | Yes      | The relative path to the target file.                                                                   | `".envrc"`                            |
 | `duration`    | Yes      | The lease duration (e.g., "10m", "1h", "8h").                                                           | `"8h"`                                |
 | `lease_type`  | No       | The type of lease. Can be `"env"` (default) or `"file"`.                                                | `"file"`                              |
@@ -107,9 +107,9 @@ duration = "1h"
 format = "export %s=%q"
 ```
 
-### Example 2: Lease to a File
+### Example 2: Lease a Document Field to a File
 
-This is useful for secrets that are files themselves, like a `.pem` key or a `google-service.json` file.
+This is useful for secrets that are files themselves, like a `.pem` key or a `google-service.json` file, and are stored in a standard `document` field in 1Password.
 
 ```toml
 # env-lease.toml
@@ -121,6 +121,25 @@ duration = "8h"
 ```
 
 When granted, this will create a `gcp-key.json` file in your project directory. When the lease expires, the file will be deleted.
+
+### Example 3: Lease a Document Attachment with a User-Friendly URI
+
+For items in 1Password that are of the "Document" category and have a file attachment, you can use the `op+file://` scheme to avoid having to look up the document's internal ID.
+
+This scheme uses the item's name and the attached file's name.
+
+```toml
+# env-lease.toml
+[[lease]]
+lease_type = "file"
+# Looks for an item named "app-iac container env"
+# and a file attachment named "container_env.json"
+source = "op+file://app-iac container env/container_env.json"
+destination = "container_env.json"
+duration = "1h"
+```
+
+This provides a more readable and maintainable way to reference file attachments. The content of the file can be leased to a destination file (`lease_type = "file"`) or an environment variable (`lease_type = "env"`).
 
 ---
 ## Limitations
