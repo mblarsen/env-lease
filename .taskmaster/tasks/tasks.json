@@ -1516,11 +1516,50 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 65,
+        "title": "Refactor `encoding` to a Flexible `transform` Pipeline",
+        "description": "Replace the simple `encoding` field in the configuration with a more powerful `transform` array, enabling a multi-step pipeline for processing secrets, such as parsing JSON and selecting a specific key.",
+        "details": "This task involves a significant refactoring of the secret processing logic. The existing `encoding` string field in `env-lease.toml` will be deprecated in favor of a new `transform` array of strings.\n\n**Implementation Steps:**\n\n1.  **Update Configuration Structs:** Modify the Go structs responsible for parsing `env-lease.toml` (from Task 2). Replace the `Encoding string` field with `Transform []string`.\n\n2.  **Ensure Backward Compatibility:** In the configuration loading logic, after unmarshalling the TOML, check if the `Transform` slice is empty and the legacy `Encoding` field is set to `\"base64\"`. If so, programmatically set `Transform` to `[\"base64-encode\"]` to maintain old behavior.\n\n3.  **Create Transformation Engine:** Implement a new package, e.g., `pkg/transform`, to manage the pipeline. This engine will take an initial value (the raw secret string) and the `[]string` of transformations. It must manage the intermediate state of the data, which can be either a string or a structured data type (e.g., `map[string]interface{}`).\n\n4.  **Implement Transformers:**\n    *   `base64-encode`: Implements `base64.StdEncoding.EncodeToString`.\n    *   `base64-decode`: Implements `base64.StdEncoding.DecodeString`.\n    *   `json`, `toml`, `yaml`: These transformers will parse an input string into a generic structured data format. They should return an error if the input is not valid for the given format.\n    *   `select '<path>'`: This transformer is stateful; it requires the previous step to have produced structured data. It will parse its argument to extract the path (e.g., `credentials.api_key`). It will then traverse the structured data to find the value at that path. The result should be coerced to a string. A library like `github.com/tidwall/gjson` could be suitable for JSON, or a custom dot-notation walker for a generic `map[string]interface{}`.\n\n5.  **Integrate into `grant` Command:** The `env-lease grant` command's logic (client-side, as per Task 51) must be updated. After fetching a secret from a provider, it should pass the secret and its corresponding `transform` array to the new transformation engine. The final string output from the engine is what gets written to the destination file or environment.\n\n6.  **Error Handling:** Each transformer must handle and return errors gracefully (e.g., invalid input format, path not found in `select`). The pipeline engine must stop processing and propagate the error, which the `grant` command should then report to the user.",
+        "testStrategy": "Testing should be multi-layered to cover configuration parsing, individual transformers, and the end-to-end workflow.\n\n1.  **Unit Tests (Configuration):**\n    *   Verify that a `env-lease.toml` with `transform = [\"json\", \"select 'key'\"]` is parsed correctly.\n    *   Verify that a legacy config with `encoding = \"base64\"` is correctly interpreted as `transform = [\"base64-encode\"]`.\n    *   Test that if both `encoding` and `transform` are present, `transform` takes precedence.\n\n2.  **Unit Tests (Transformers):**\n    *   For each transformer (`base64-encode`, `base64-decode`, `json`, `toml`, `yaml`), provide valid input and assert the correct output.\n    *   Provide invalid input to each transformer (e.g., non-base64 string to `base64-decode`, malformed JSON to `json`) and assert that an appropriate error is returned.\n    *   For the `select` transformer, test with valid nested paths, non-existent paths, and on non-structured data to ensure it returns correct values and errors.\n\n3.  **Integration Tests (Pipeline Engine):**\n    *   Test a complete, valid pipeline, e.g., `[\"base64-decode\", \"json\", \"select 'credentials.api_key'\"]`. Provide a base64-encoded JSON string as input and verify the final extracted string value.\n    *   Test a pipeline that should fail mid-way (e.g., a `select` step following a `base64-encode` step without a parser in between) and verify a descriptive error is returned.\n\n4.  **End-to-End Tests:**\n    *   Modify the `grant` command's integration tests. Use a mock secret provider to return various secret formats (plain text, base64, JSON, TOML).\n    *   Run `env-lease grant` with corresponding `transform` configurations and verify that the final, correctly transformed value is written to the target `.env` file.",
+        "status": "in-progress",
+        "dependencies": [
+          2
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 66,
+        "title": "Update USAGE.md with Pre-Upgrade Revocation Warning",
+        "description": "Add a section to the `USAGE.md` documentation file warning users to revoke all active secrets before upgrading to a new version, particularly while the software is in an unstable, pre-release state.",
+        "details": "Locate the `USAGE.md` file in the project root. Add a new section, possibly titled 'Upgrading Between Versions' or as a prominent note. This section should clearly state that due to the unstable nature of the software during active development, breaking changes to the daemon's state management or IPC protocol may occur between versions. Instruct users to run `env-lease revoke --all` to clear all active leases *before* stopping the daemon and replacing the application binary. Explain that this step is crucial to prevent orphaned leases or unexpected behavior after an upgrade.",
+        "testStrategy": "Review the changes in a Markdown previewer. 1. Confirm that a new section regarding upgrades has been added to `USAGE.md`. 2. Verify the text clearly explains the reason for revoking secrets (potential breaking changes in an unstable application). 3. Ensure the recommended command is exactly `env-lease revoke --all` and is formatted correctly as a code block. 4. Check for any grammatical errors, typos, or formatting issues.",
+        "status": "pending",
+        "dependencies": [
+          37
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 67,
+        "title": "Implement 'explode' Transform for Multi-Secret Expansion",
+        "description": "Create a new 'explode' transform that processes a structured secret (like JSON or TOML) and expands its top-level key-value pairs into multiple individual secrets managed by the daemon.",
+        "details": "This task introduces an 'explode' transform to be used within the transform pipeline. It is designed to operate on the output of a parser transform like 'json'. When applied, it will take a map-like structure and create a separate secret for each key-value pair. The names of the new secrets will be generated by combining the original secret alias with the key from the data, separated by an underscore (e.g., original alias 'API_CREDS' with key 'key' becomes 'API_CREDS_KEY'). This will require modifying the core secret processing logic to handle a single grant request that results in multiple secrets being stored and managed by the daemon. The transform should convert all values to strings. Initially, this transform will only operate on flat, single-level objects; nested objects are out of scope for this task.",
+        "testStrategy": "1. Unit test the 'explode' transformer in isolation, providing it with a `map[string]interface{}` input and verifying it produces the correct map of new secret names and string values. Test cases should include non-string values (booleans, numbers) to ensure they are correctly converted to strings. 2. Create an integration test using a mock provider that returns a JSON string (e.g., `{\"username\": \"admin\", \"password\": \"secret123\"}`). Configure a secret in `env-lease.toml` with `transform = [\"json\", \"explode\"]`. 3. Run `env-lease grant` for the configured secret and verify that two distinct environment variables are created (e.g., `SECRET_NAME_USERNAME` and `SECRET_NAME_PASSWORD`). 4. Check the daemon's state to confirm that both derived secrets are being tracked under the original lease. 5. Run `env-lease revoke` on the original secret alias and confirm that all derived secrets are revoked and their environment variables are unset.",
+        "status": "pending",
+        "dependencies": [
+          65
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T08:13:21.531Z",
+      "updated": "2025-09-29T08:46:37.402Z",
       "description": "Tasks for master context"
     }
   }
