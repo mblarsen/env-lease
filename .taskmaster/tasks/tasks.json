@@ -1143,7 +1143,7 @@
         "description": "Implement a `--print` flag for the `daemon install` command. This flag will output the generated service configuration file to stdout and prevent the actual installation, facilitating debugging and manual setup.",
         "details": "Modify the `daemon install` Cobra command, which was established as part of the unified binary in Task 32. Add a new persistent boolean flag named `--print`. The command's execution logic should be updated to check if this flag is present. If `--print` is true, the command must generate the appropriate service configuration content (a `.plist` file for macOS, a `.service` file for Linux) as a string. This string should be printed directly to standard output. Concurrently, a warning message, such as 'WARNING: Service configuration printed but not installed.', should be printed to standard error. The command should then exit without attempting to write any files to system directories or execute service management commands (`launchctl`, `systemctl`). If the `--print` flag is not provided, the command should execute its original installation logic without change.",
         "testStrategy": "Testing will involve running the command on both supported platforms and verifying the output streams and system state. 1. On Linux, run `env-lease daemon install --print`. Capture stdout and assert that its content is a valid systemd `.service` file. Capture stderr and assert it contains the warning message. Verify that no file was created in `~/.config/systemd/user/` and `systemctl` was not invoked. 2. On macOS, run `env-lease daemon install --print`. Capture stdout and assert its content is a valid XML `.plist` file. Capture stderr and assert it contains the warning message. Verify no file was created in `~/Library/LaunchAgents/` and `launchctl` was not invoked. 3. On both platforms, run `env-lease daemon install` without the flag to confirm that the original installation behavior is preserved and that nothing is printed to stdout.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           32
         ],
@@ -1380,7 +1380,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-28T11:57:45.345Z",
+      "updated": "2025-09-29T03:43:34.546Z",
       "description": "Tasks for master context"
     }
   }

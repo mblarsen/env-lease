@@ -37,6 +37,11 @@ var installCmd = &cobra.Command{
 		}
 
 		plist := fmt.Sprintf(plistTemplate, executable)
+		if print, _ := cmd.Flags().GetBool("print"); print {
+			fmt.Fprint(os.Stdout, plist)
+			fmt.Fprintln(os.Stderr, "WARNING: Service configuration printed but not installed.")
+			return nil
+		}
 		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-lease.plist")
 
 		if _, err := fileutil.AtomicWriteFile(plistPath, []byte(plist), 0644); err != nil {
@@ -163,6 +168,7 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 `
 
 func init() {
+	installCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
 	daemonCmd.AddCommand(installCmd)
 	daemonCmd.AddCommand(uninstallCmd)
 	daemonCmd.AddCommand(runCmd)

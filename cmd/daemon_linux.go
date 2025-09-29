@@ -37,6 +37,11 @@ var installCmd = &cobra.Command{
 		}
 
 		service := fmt.Sprintf(serviceTemplate, executable)
+		if print, _ := cmd.Flags().GetBool("print"); print {
+			fmt.Fprint(os.Stdout, service)
+			fmt.Fprintln(os.Stderr, "WARNING: Service configuration printed but not installed.")
+			return nil
+		}
 		servicePath := filepath.Join(os.Getenv("HOME"), ".config", "systemd", "user", "env-lease.service")
 
 		if _, err := fileutil.AtomicWriteFile(servicePath, []byte(service), 0644); err != nil {
@@ -150,6 +155,7 @@ WantedBy=default.target
 `
 
 func init() {
+	installCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
 	daemonCmd.AddCommand(installCmd)
 	daemonCmd.AddCommand(uninstallCmd)
 	daemonCmd.AddCommand(runCmd)
