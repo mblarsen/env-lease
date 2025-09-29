@@ -22,6 +22,9 @@ type FileRevoker struct{}
 func (r *FileRevoker) Revoke(lease *config.Lease) error {
 	switch lease.LeaseType {
 	case "file":
+		if _, err := os.Stat(lease.Destination); os.IsNotExist(err) {
+			return nil // File is already gone, consider it revoked.
+		}
 		return os.Remove(lease.Destination)
 	case "env":
 		return r.clearEnvVar(lease.Destination, lease.Variable)

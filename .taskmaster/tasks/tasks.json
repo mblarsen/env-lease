@@ -1419,7 +1419,7 @@
         "description": "Modify the lease revocation logic to gracefully handle cases where a leased file has already been deleted by the user. Instead of failing, the revocation process will log the event and successfully remove the lease from the daemon's state.",
         "details": "The core lease revocation function, likely within the daemon, needs to be updated. This function is triggered by both the `env-lease revoke` command and the periodic cleanup of stale leases (Task 53). When revoking a file-based lease, the logic must first check for the existence of the target file before attempting deletion.\n1. In the revocation handler, before calling `os.Remove()`, use `os.Stat()` to check if the file path exists.\n2. If the check returns an error satisfying `os.IsNotExist(err)`, the function should not propagate this as a failure. Instead, it should log an informational message using `slog` (e.g., `slog.Info(\"Lease target file not found, proceeding with revocation\", \"path\", filePath)`).\n3. If the file exists, attempt deletion as usual. Any errors from `os.Remove()` (e.g., permission denied) should still be treated as fatal errors for that specific lease revocation.\n4. In either case (file deleted successfully or file was already missing), the process should continue to remove the lease's metadata from the daemon's state file, ensuring the revocation is completed from a logical standpoint.",
         "testStrategy": "An integration test will be created to validate the new behavior.\n1. **Setup:** Grant a new file-based lease using `env-lease grant`, which creates a file (e.g., `test-secret.txt`).\n2. **Verification 1:** Confirm the file `test-secret.txt` exists and the lease is listed in `env-lease status`.\n3. **Action:** Manually delete the file using `rm test-secret.txt`.\n4. **Test Execution:** Run `env-lease revoke` for the project.\n5. **Verification 2:** Assert that the `revoke` command exits with code 0.\n6. **Verification 3:** Run `env-lease status` again and assert that the lease is no longer listed.\n7. **Verification 4:** Inspect the daemon's logs and confirm the presence of an `info` level log message indicating the file was not found, and the absence of any `error` level logs for this revocation.\n8. **Regression Test:** Repeat the entire process, but skip step 3 (do not manually delete the file), and verify that `revoke` still works correctly by deleting the file itself.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           12,
           37,
@@ -1454,7 +1454,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T07:25:29.400Z",
+      "updated": "2025-09-29T07:29:18.478Z",
       "description": "Tasks for master context"
     }
   }
