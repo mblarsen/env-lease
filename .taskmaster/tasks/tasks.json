@@ -1383,7 +1383,7 @@
         "description": "Enhance the daemon's periodic check to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file. On each cycle, the daemon should re-read the configuration file for each project it manages, compare the active leases against the configuration, and revoke any that are no longer present.",
         "details": "",
         "testStrategy": "",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
@@ -1607,7 +1607,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-30T07:18:51.079Z",
+      "updated": "2025-09-30T07:25:21.310Z",
       "description": "Tasks for master context"
     }
   }

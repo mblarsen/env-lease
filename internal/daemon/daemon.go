@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"log/slog"
@@ -77,6 +78,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		case <-ticker.C:
 			d.revokeExpiredLeases()
 			d.processRetryQueue()
+			d.revokeOrphanedLeases()
 		case <-cleanupTicker.C:
 			d.cleanupOrphanedLeases()
 		case sig := <-sigs:
@@ -87,6 +89,69 @@ func (d *Daemon) Run(ctx context.Context) error {
 			return d.Shutdown()
 		}
 	}
+}
+
+func (d *Daemon) revokeOrphanedLeases() {
+	slog.Debug("Checking for orphaned leases from config changes...")
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// Gather unique config files from the state
+	configFiles := make(map[string]struct{})
+	for _, lease := range d.state.Leases {
+		if lease.ConfigFile != "" {
+			configFiles[lease.ConfigFile] = struct{}{}
+		}
+	}
+
+	stateChanged := false
+	for configFile := range configFiles {
+		// Load the current configuration from disk
+		cfg, err := config.Load(configFile)
+		if err != nil {
+			// If config can't be loaded (e.g., deleted), revoke all leases associated with it.
+			slog.Warn("Config file not found or failed to load; revoking associated leases", "config", configFile, "err", err)
+			for key, lease := range d.state.LeasesForConfigFile(configFile) {
+				if err := d.revoker.Revoke(lease); err != nil {
+					slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
+				} else {
+					slog.Info("Revoked orphaned lease", "key", key)
+					delete(d.state.Leases, key)
+					stateChanged = true
+				}
+			}
+			continue
+		}
+
+		// Create a map of leases defined in the config for efficient lookup
+		configLeases := make(map[string]struct{})
+		for _, l := range cfg.Lease {
+			// The key in the state is a composite of source, destination, and variable.
+			// We only need to check the source for existence.
+			configLeases[l.Source] = struct{}{}
+		}
+
+		// Check active leases against the config
+		for key, activeLease := range d.state.LeasesForConfigFile(configFile) {
+			if _, exists := configLeases[activeLease.Source]; !exists {
+				slog.Info("Lease removed from config, revoking", "key", key)
+				if err := d.revoker.Revoke(activeLease); err != nil {
+					slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
+					// Optionally, add to a retry queue here as well
+				} else {
+					delete(d.state.Leases, key)
+					stateChanged = true
+				}
+			}
+		}
+	}
+
+	if stateChanged {
+		if err := d.state.SaveState(d.statePath); err != nil {
+			slog.Error("Failed to save state after revoking orphaned leases", "err", err)
+		}
+	}
+	slog.Debug("Finished checking for orphaned leases.")
 }
 
 func (d *Daemon) Shutdown() error {

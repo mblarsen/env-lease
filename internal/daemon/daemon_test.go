@@ -6,6 +6,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"os"
 	"testing"
 	"time"
 )
@@ -75,6 +76,79 @@ func TestDaemon_revokeExpiredLeases(t *testing.T) {
 	assert.Equal(t, 1, revoker.RevokeCount)
 	assert.Equal(t, 1, notifier.NotifyCount)
 	assert.Equal(t, "Lease Expired", notifier.LastTitle)
-	assert.Equal(t, "Lease for onepassword://vault/item/field has expired and was revoked.", notifier.LastMessage)
-	assert.Empty(t, state.Leases)
+		assert.Equal(t, "Lease for onepassword://vault/item/field has expired and was revoked.", notifier.LastMessage)
+		assert.Empty(t, state.Leases)
+		}
+	
+func TestDaemon_revokeOrphanedLeases(t *testing.T) {
+	// Arrange
+	state := NewState()
+	socketPath := "/tmp/env-lease-test.sock"
+	clock := &mockClock{now: time.Now()}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+	server, err := ipc.NewServer(socketPath, []byte("secret"))
+	require.NoError(t, err)
+
+	stateFile, err := os.CreateTemp("", "env-lease-state-*.json")
+	require.NoError(t, err)
+	defer os.Remove(stateFile.Name())
+
+	daemon := NewDaemon(state, stateFile.Name(), clock, server, revoker, notifier)
+
+	// Create a temporary config file
+	configFile, err := os.CreateTemp("", "env-lease-*.toml")
+	require.NoError(t, err)
+	defer os.Remove(configFile.Name())
+
+	_, err = configFile.WriteString(`
+[[lease]]
+source = "onepassword://vault/item/field1"
+destination = "/tmp/file1"
+duration = "1h"
+lease_type = "env"
+variable = "VAR1"
+
+[[lease]]
+source = "onepassword://vault/item/field2"
+destination = "/tmp/file2"
+duration = "1h"
+lease_type = "env"
+variable = "VAR2"
+`)
+	require.NoError(t, err)
+	configFile.Close()
+
+	// Add leases to the state, pretending they were granted from the config
+	state.Leases["lease1"] = &config.Lease{
+		Source:     "onepassword://vault/item/field1",
+		ConfigFile: configFile.Name(),
+	}
+	state.Leases["lease2"] = &config.Lease{
+		Source:     "onepassword://vault/item/field2", // This one will be removed from config
+		ConfigFile: configFile.Name(),
+	}
+	state.Leases["lease3"] = &config.Lease{
+		Source:     "onepassword://vault/item/field3", // This one will be removed from config
+		ConfigFile: configFile.Name(),
+	}
+
+	// Act: Modify the config file to "remove" lease2 and lease3
+	err = os.WriteFile(configFile.Name(), []byte(`
+[[lease]]
+source = "onepassword://vault/item/field1"
+destination = "/tmp/file1"
+duration = "1h"
+lease_type = "env"
+variable = "VAR1"
+`),
+		0644)
+	require.NoError(t, err)
+
+	daemon.revokeOrphanedLeases()
+
+	// Assert
+	assert.Equal(t, 2, revoker.RevokeCount, "Revoke should be called for the two removed leases")
+	assert.Len(t, state.Leases, 1, "Only one lease should remain in the state")
+	assert.NotNil(t, state.Leases["lease1"], "Lease1 should still be in the state")
 }
