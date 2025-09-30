@@ -104,7 +104,11 @@ func (d *Daemon) revokeExpiredLeases() {
 	now := d.clock.Now()
 	for id, lease := range d.state.Leases {
 		if now.After(lease.ExpiresAt) {
-			err := d.revoker.Revoke(lease)
+			var err error
+			if lease.LeaseType != "shell" {
+				err = d.revoker.Revoke(lease)
+			}
+
 			if err != nil {
 				slog.Error("Failed to revoke lease, adding to retry queue", "id", id, "err", err)
 				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
@@ -136,7 +140,11 @@ func (d *Daemon) processRetryQueue() {
 	for i := len(d.state.RetryQueue) - 1; i >= 0; i-- {
 		item := d.state.RetryQueue[i]
 		if now.After(item.NextRetryTime) {
-			err := d.revoker.Revoke(item.Lease)
+			var err error
+			if item.Lease.LeaseType != "shell" {
+				err = d.revoker.Revoke(item.Lease)
+			}
+
 			if err != nil {
 				item.Attempts++
 				item.NextRetryTime = now.Add(time.Duration(item.Attempts*2) * time.Second) // Exponential backoff
