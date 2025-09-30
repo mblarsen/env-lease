@@ -228,6 +228,7 @@ var grantCmd = &cobra.Command{
 		}
 
 		if shellMode {
+			fmt.Println("# When using shell lease types run this command like `eval $(env-lease grant)`")
 			for _, cmd := range shellCommands {
 				fmt.Println(cmd)
 			}

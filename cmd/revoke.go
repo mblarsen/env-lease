@@ -45,6 +45,7 @@ var revokeCmd = &cobra.Command{
 		}
 
 		if isShellMode {
+			fmt.Println("# When using shell lease types run this command like `eval $(env-lease revoke)`")
 			for _, shellCmd := range revokeResp.ShellCommands {
 				fmt.Println(shellCmd)
 			}
