@@ -15,9 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -133,17 +131,7 @@ var runCmd = &cobra.Command{
 		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker, notifier)
 		slog.Info("Daemon startup successful.", "socket", ipcServer.SocketPath())
 
-
-		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
-
-		go func() {
-			<-ctx.Done()
-			slog.Info("Daemon shutting down...")
-			state.SaveState(statePath)
-		}()
-
-		return d.Run(ctx)
+		return d.Run(context.Background())
 	},
 }
 

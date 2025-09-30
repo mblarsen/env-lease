@@ -7,7 +7,9 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"log/slog"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -35,7 +37,7 @@ type Daemon struct {
 	clock     Clock
 	ipcServer *ipc.Server
 	revoker   Revoker
-	notifier Notifier
+	notifier  Notifier
 	mu        sync.Mutex
 }
 
@@ -47,12 +49,16 @@ func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Serve
 		clock:     clock,
 		ipcServer: ipcServer,
 		revoker:   revoker,
-		notifier: notifier,
+		notifier:  notifier,
 	}
 }
 
 // Run starts the daemon's main loop.
 func (d *Daemon) Run(ctx context.Context) error {
+	// Set up a channel to listen for OS signals
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+
 	go d.ipcServer.Listen(d.handleIPC)
 
 	d.revokeExpiredLeases()
@@ -66,19 +72,38 @@ func (d *Daemon) Run(ctx context.Context) error {
 	defer cleanupTicker.Stop()
 
 	for {
+		slog.Debug("Daemon run loop tick")
 		select {
 		case <-ticker.C:
 			d.revokeExpiredLeases()
 			d.processRetryQueue()
 		case <-cleanupTicker.C:
 			d.cleanupOrphanedLeases()
+		case sig := <-sigs:
+			slog.Debug("Received signal, initiating shutdown...", "signal", sig)
+			return d.Shutdown()
 		case <-ctx.Done():
-			return d.ipcServer.Close()
+			slog.Debug("Parent context cancelled, initiating shutdown...")
+			return d.Shutdown()
 		}
 	}
 }
 
+func (d *Daemon) Shutdown() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	slog.Info("Daemon shutting down...")
+	if err := d.state.SaveState(d.statePath); err != nil {
+		slog.Error("Failed to save state during shutdown", "err", err)
+	}
+	return d.ipcServer.Close()
+}
+
 func (d *Daemon) cleanupOrphanedLeases() {
+	slog.Debug("Cleaning up orphaned leases...")
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	now := d.clock.Now()
 	for id, lease := range d.state.Leases {
 		// This is a simplified check. A real implementation would need
@@ -98,9 +123,14 @@ func (d *Daemon) cleanupOrphanedLeases() {
 			}
 		}
 	}
+	slog.Debug("Finished cleaning up orphaned leases.")
 }
 
 func (d *Daemon) revokeExpiredLeases() {
+	slog.Debug("Checking for expired leases...")
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	now := d.clock.Now()
 	for id, lease := range d.state.Leases {
 		if now.After(lease.ExpiresAt) {
@@ -133,9 +163,14 @@ func (d *Daemon) revokeExpiredLeases() {
 			}
 		}
 	}
+	slog.Debug("Finished checking for expired leases.")
 }
 
 func (d *Daemon) processRetryQueue() {
+	slog.Debug("Processing retry queue...")
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	now := d.clock.Now()
 	for i := len(d.state.RetryQueue) - 1; i >= 0; i-- {
 		item := d.state.RetryQueue[i]
@@ -162,4 +197,5 @@ func (d *Daemon) processRetryQueue() {
 			}
 		}
 	}
+	slog.Debug("Finished processing retry queue.")
 }
