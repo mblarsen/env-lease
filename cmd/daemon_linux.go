@@ -82,9 +82,16 @@ var runCmd = &cobra.Command{
 	Long:  `Run the env-lease daemon.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// set up logger
+		logLevel := slog.LevelInfo
+		if levelStr := os.Getenv("ENV_LEASE_LOG_LEVEL"); levelStr != "" {
+			var l slog.Level
+			if err := l.UnmarshalText([]byte(levelStr)); err == nil {
+				logLevel = l
+			}
+		}
 		slog.SetDefault(slog.New(
 			tint.NewHandler(os.Stderr, &tint.Options{
-				Level:      slog.LevelDebug,
+				Level:      logLevel,
 				TimeFormat: time.Kitchen,
 			}),
 		))

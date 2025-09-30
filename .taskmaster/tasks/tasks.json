@@ -1579,11 +1579,22 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 70,
+        "title": "Create `convert` Command to Generate `env-lease.toml` from `.env` File",
+        "description": "Implement a new `env-lease convert` command that parses a `.env` or `.envrc` file to scaffold a corresponding `env-lease.toml` configuration, printing the result to standard output.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "details": "The new command, `env-lease convert [file]`, will be added using the cobra library. It will read an environment file (defaulting to `.envrc` or `.env` in the current directory if no file argument is provided). The command will parse each line, looking for variable assignments where the value is a 1Password secret URI (e.g., `export API_KEY=\"op://...\"`). For each valid secret definition found, it will generate a `[[secret]]` block in the TOML output. Other lines, such as comments or non-assignment commands, will be ignored. The output will be a complete, valid `env-lease.toml` file printed to stdout, including a default `duration` value (e.g., `\"1h\"`). This allows users to easily bootstrap their configuration using `env-lease convert > env-lease.toml`.",
+        "testStrategy": "Unit tests will be created to validate the parsing logic against various `.env` file formats, including lines with and without `export`, single/double/no quotes, comments, and empty lines. An end-to-end CLI test will be implemented: 1. Create a temporary directory with a sample `.envrc` file. 2. Execute the compiled `env-lease convert` command. 3. Capture stdout and assert that it matches the expected TOML output. 4. Test argument handling by providing an explicit file path. 5. Test error handling for cases where the input file does not exist.",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-30T03:10:57.057Z",
+      "updated": "2025-09-30T03:21:22.537Z",
       "description": "Tasks for master context"
     }
   }

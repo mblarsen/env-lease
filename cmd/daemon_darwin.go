@@ -35,7 +35,8 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		plist := fmt.Sprintf(plistTemplate, executable)
+		homeDir := os.Getenv("HOME")
+		plist := fmt.Sprintf(plistTemplate, executable, homeDir, homeDir)
 		if print, _ := cmd.Flags().GetBool("print"); print {
 			fmt.Fprint(os.Stdout, plist)
 			fmt.Fprintln(os.Stderr, "WARNING: Service configuration printed but not installed.")
@@ -82,9 +83,16 @@ var runCmd = &cobra.Command{
 	Long:  `Run the env-lease daemon.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// set up logger
+		logLevel := slog.LevelInfo
+		if levelStr := os.Getenv("ENV_LEASE_LOG_LEVEL"); levelStr != "" {
+			var l slog.Level
+			if err := l.UnmarshalText([]byte(levelStr)); err == nil {
+				logLevel = l
+			}
+		}
 		slog.SetDefault(slog.New(
 			tint.NewHandler(os.Stderr, &tint.Options{
-				Level:      slog.LevelDebug,
+				Level:      logLevel,
 				TimeFormat: time.Kitchen,
 			}),
 		))
@@ -193,6 +201,10 @@ const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 		<key>ENV_LEASE_LOG_LEVEL</key>
 		<string>info</string>
 	</dict>
+	<key>StandardOutPath</key>
+	<string>%s/Library/Logs/env-lease.log</string>
+	<key>StandardErrorPath</key>
+	<string>%s/Library/Logs/env-lease.error.log</string>
 </dict>
 </plist>
 `
