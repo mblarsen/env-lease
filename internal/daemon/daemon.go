@@ -112,6 +112,12 @@ func (d *Daemon) revokeOrphanedLeases() {
 			// If config can't be loaded (e.g., deleted), revoke all leases associated with it.
 			slog.Warn("Config file not found or failed to load; revoking associated leases", "config", configFile, "err", err)
 			for key, lease := range d.state.LeasesForConfigFile(configFile) {
+				if lease.LeaseType == "shell" {
+					slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
+					delete(d.state.Leases, key)
+					stateChanged = true
+					continue
+				}
 				if err := d.revoker.Revoke(lease); err != nil {
 					slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
 				} else {
@@ -135,6 +141,12 @@ func (d *Daemon) revokeOrphanedLeases() {
 		for key, activeLease := range d.state.LeasesForConfigFile(configFile) {
 			if _, exists := configLeases[activeLease.Source]; !exists {
 				slog.Info("Lease removed from config, revoking", "key", key)
+				if activeLease.LeaseType == "shell" {
+					slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
+					delete(d.state.Leases, key)
+					stateChanged = true
+					continue
+				}
 				if err := d.revoker.Revoke(activeLease); err != nil {
 					slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
 					// Optionally, add to a retry queue here as well
