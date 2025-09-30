@@ -62,7 +62,7 @@ func runInstallIdle(cmd *cobra.Command, args []string) error {
 
 	// Write the systemd service file
 	servicePath := filepath.Join(homeDir, systemdDir, idleServiceName)
-	serviceContent := fmt.Sprintf(serviceTemplate, scriptPath, timeoutSeconds, executable)
+	serviceContent := fmt.Sprintf(idleServiceTemplate, scriptPath, timeoutSeconds, executable)
 	if _, err := fileutil.AtomicWriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func runStatusIdle(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-const serviceTemplate = `[Unit]
+const idleServiceTemplate = `[Unit]
 Description=env-lease idle lease revoker
 
 [Service]

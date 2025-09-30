@@ -35,7 +35,7 @@ var installCmd = &cobra.Command{
 			return err
 		}
 
-		service := fmt.Sprintf(serviceTemplate, executable)
+		service := fmt.Sprintf(daemonServiceTemplate, executable)
 		if print, _ := cmd.Flags().GetBool("print"); print {
 			fmt.Fprint(os.Stdout, service)
 			fmt.Fprintln(os.Stderr, "WARNING: Service configuration printed but not installed.")
@@ -175,7 +175,7 @@ var reloadCmd = &cobra.Command{
 	},
 }
 
-const serviceTemplate = `[Unit]
+const daemonServiceTemplate = `[Unit]
 Description=env-lease daemon
 
 [Service]
