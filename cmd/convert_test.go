@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -30,23 +31,6 @@ INVALID_LINE
 	err = ioutil.WriteFile(envrcPath, []byte(envrcContent), 0644)
 	require.NoError(t, err)
 
-	// Expected TOML output
-	expectedToml := `duration = "1h"
-
-[[secret]]
-variable = "API_KEY"
-source = "op://vault/item/field"
-
-[[secret]]
-variable = "SECRET_TOKEN"
-source = "op://vault/item2/field2"
-
-[[secret]]
-variable = "EXTRA_VAR"
-source = "op://vault/item3/field3"
-
-`
-
 	// Test case 1: Read from .envrc in current directory
 	t.Run("reads from .envrc", func(t *testing.T) {
 		// Change to the temporary directory
@@ -56,6 +40,25 @@ source = "op://vault/item3/field3"
 		require.NoError(t, err)
 		defer os.Chdir(originalWd)
 
+		expectedToml := `[[lease]]
+variable = "API_KEY"
+source = "op://vault/item/field"
+destination = ".envrc"
+duration = "1h"
+
+[[lease]]
+variable = "SECRET_TOKEN"
+source = "op://vault/item2/field2"
+destination = ".envrc"
+duration = "1h"
+
+[[lease]]
+variable = "EXTRA_VAR"
+source = "op://vault/item3/field3"
+destination = ".envrc"
+duration = "1h"
+
+`
 		// Execute the command
 		output, err := executeCommand(rootCmd, "convert")
 		require.NoError(t, err)
@@ -64,6 +67,25 @@ source = "op://vault/item3/field3"
 
 	// Test case 2: Read from a specific file
 	t.Run("reads from specified file", func(t *testing.T) {
+		expectedToml := fmt.Sprintf(`[[lease]]
+variable = "API_KEY"
+source = "op://vault/item/field"
+destination = "%s"
+duration = "1h"
+
+[[lease]]
+variable = "SECRET_TOKEN"
+source = "op://vault/item2/field2"
+destination = "%s"
+duration = "1h"
+
+[[lease]]
+variable = "EXTRA_VAR"
+source = "op://vault/item3/field3"
+destination = "%s"
+duration = "1h"
+
+`, envrcPath, envrcPath, envrcPath)
 		// Execute the command with the file path
 		output, err := executeCommand(rootCmd, "convert", envrcPath)
 		require.NoError(t, err)
@@ -109,11 +131,11 @@ func TestConvertToToml(t *testing.T) {
 		{
 			name: "simple case",
 			input: `export API_KEY="op://vault/item/field"`,
-			expected: `duration = "1h"
-
-[[secret]]
+			expected: `[[lease]]
 variable = "API_KEY"
 source = "op://vault/item/field"
+destination = ".envrc"
+duration = "1h"
 
 `,
 		},
@@ -123,15 +145,17 @@ source = "op://vault/item/field"
 export API_KEY="op://vault/item/field"
 export ANOTHER_KEY="op://vault/item2/field2"
 `,
-			expected: `duration = "1h"
-
-[[secret]]
+			expected: `[[lease]]
 variable = "API_KEY"
 source = "op://vault/item/field"
+destination = ".envrc"
+duration = "1h"
 
-[[secret]]
+[[lease]]
 variable = "ANOTHER_KEY"
 source = "op://vault/item2/field2"
+destination = ".envrc"
+duration = "1h"
 
 `,
 		},
@@ -143,42 +167,42 @@ export API_KEY="op://vault/item/field"
 echo "hello"
 ANOTHER_KEY='op://vault/item2/field2'
 `,
-			expected: `duration = "1h"
-
-[[secret]]
+			expected: `[[lease]]
 variable = "API_KEY"
 source = "op://vault/item/field"
+destination = ".envrc"
+duration = "1h"
 
-[[secret]]
+[[lease]]
 variable = "ANOTHER_KEY"
 source = "op://vault/item2/field2"
+destination = ".envrc"
+duration = "1h"
 
 `,
 		},
 		{
 			name: "no quotes",
 			input: `DB_PASSWORD=op://vault/db/password`,
-			expected: `duration = "1h"
-
-[[secret]]
+			expected: `[[lease]]
 variable = "DB_PASSWORD"
 source = "op://vault/db/password"
+destination = ".envrc"
+duration = "1h"
 
 `,
 		},
 		{
-			name: "empty input",
+			name:  "empty input",
 			input: ``,
 
-			expected: `duration = "1h"
-
-`,
+			expected: "",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			output := convertToToml(tc.input)
+			output := convertToToml(tc.input, ".envrc")
 			assert.Equal(t, tc.expected, output)
 		})
 	}
