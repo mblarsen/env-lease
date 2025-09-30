@@ -1566,11 +1566,24 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 69,
+        "title": "Investigate Automatic Lease Revocation on macOS via Idle Timer",
+        "description": "Research and prototype a mechanism on macOS to automatically trigger `env-lease revoke --all` after a user has been idle for a specified duration, such as one hour.",
+        "details": "This task is to explore a security enhancement for macOS users by automatically revoking all active leases when the system is left unattended. The primary goal is to produce a proof-of-concept script and documentation on the recommended setup.\n\n**Implementation Steps:**\n\n1.  **Research Idle Time Detection:** Investigate the most reliable method to query user idle time on macOS. The primary candidate is the `ioreg` command-line tool. A common approach is `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'`. This method's consistency across different macOS versions should be verified.\n\n2.  **Explore Execution Schedulers:** Compare different methods for periodically running a check script:\n    *   **`launchd` Agent:** This is the preferred macOS native approach. Research how to create a user-level `launchd` agent (`.plist` file in `~/Library/LaunchAgents`) that runs a script at a regular interval (e.g., every 5 minutes) using the `StartInterval` key.\n    *   **AppleScript:** Evaluate if an AppleScript application or script offers any advantages over `launchd`, such as easier interaction with system events, though it's likely more complex for this use case.\n    *   **Cron/Shell Loop:** A simple cron job or a backgrounded shell script with a `sleep` loop can be used for prototyping but is generally less robust and efficient than `launchd`.\n\n3.  **Develop Proof-of-Concept (PoC) Script:** Create a shell script that performs the core logic:\n    *   It must be executable and should find the `env-lease` binary (either by assuming it's in the PATH or by accepting a path as an argument).\n    *   It will call `ioreg` to get the idle time in seconds.\n    *   It will compare the idle time against a configurable threshold (e.g., 3600 seconds).\n    *   If the idle time exceeds the threshold, it will execute `env-lease revoke --all`.\n    *   The script should include basic logging (e.g., to `stdout` or a log file) to aid in debugging.\n\n4.  **Create `launchd` Configuration:** Based on the research, create a sample `.plist` file that is configured to run the PoC script. This file should be well-commented to explain the different keys and their purposes.\n\n5.  **Document Findings:** The final deliverable is a Markdown document outlining the findings. It should include the recommended approach (`launchd`), the complete PoC shell script, the sample `.plist` configuration, and clear, step-by-step instructions for a user to set it up on their machine.",
+        "testStrategy": "Verification will focus on the PoC script and its integration with the system scheduler.\n\n1.  **Manual Script Test:** Execute the PoC script directly from the terminal. Manually verify that it correctly reads the idle time and does *not* trigger a revoke when the idle time is below the threshold. Then, wait for the idle time to exceed the threshold (or temporarily set the threshold to a very low value like 5 seconds) and confirm that `env-lease revoke --all` is executed. Check the daemon's state or logs to confirm revocation.\n\n2.  **`launchd` Integration Test:**\n    *   Place the `.plist` file in `~/Library/LaunchAgents` and load it using `launchctl load <path_to_plist>`.\n    *   Let the machine remain idle for longer than the configured threshold.\n    *   After becoming active again, use `env-lease status` to verify that all leases have been revoked.\n    *   Check the script's log output to confirm it was run by `launchd`.\n\n3.  **Activity Reset Test:** Ensure that user activity (e.g., moving the mouse) correctly resets the system's idle timer, preventing the script from revoking leases while the user is active.\n\n4.  **Documentation Review:** The final documentation must be reviewed for clarity, accuracy, and completeness. Another team member should be able to follow the instructions to successfully set up the auto-revocation mechanism.",
+        "status": "pending",
+        "dependencies": [
+          37
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-29T10:15:26.979Z",
+      "updated": "2025-09-30T03:10:57.057Z",
       "description": "Tasks for master context"
     }
   }
