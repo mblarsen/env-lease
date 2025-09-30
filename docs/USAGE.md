@@ -160,6 +160,42 @@ This will produce an `env-lease.toml` file with leases for `DATABASE_URL` and `A
 
 ---
 
+## Automatic Revocation on Idle
+
+For enhanced security, `env-lease` can be configured to automatically revoke all active leases after a period of user inactivity. This is managed by a background service that periodically checks for system idle time.
+
+This feature is supported on both macOS (via `launchd`) and Linux (via `systemd`).
+
+### Enabling the Idle Revocation Service
+
+To install and start the service, use the `idle install` command. You can customize the idle timeout and how frequently the check runs.
+
+```sh
+# Install with a 30-minute idle timeout and a 5-minute check interval (default)
+env-lease idle install --timeout 30m
+
+# Install with a 1-hour timeout and a check every 2 minutes
+env-lease idle install --timeout 1h --check-interval 2m
+```
+
+### Checking the Service Status
+
+You can verify that the service is installed and running with the `idle status` command:
+
+```sh
+env-lease idle status
+```
+
+### Disabling the Service
+
+To stop the service and remove all its components, use the `idle uninstall` command:
+
+```sh
+env-lease idle uninstall
+```
+
+---
+
 ## Command Reference
 
 | Command                  | Description                                                                                               |
@@ -173,6 +209,9 @@ This will produce an `env-lease.toml` file with leases for `DATABASE_URL` and `A
 | `env-lease daemon uninstall`| Stops and uninstalls the daemon.                                                                          |
 | `env-lease daemon reload`| Reloads the daemon service.                                                                               |
 | `env-lease daemon cleanup`| Manually purges all orphaned leases from the daemon's state.                                              |
+| `env-lease idle install` | Installs and starts the idle revocation service. Flags: `--timeout`, `--check-interval`.                  |
+| `env-lease idle uninstall`| Stops and uninstalls the idle revocation service.                                                         |
+| `env-lease idle status`  | Checks the status of the idle revocation service.                                                         |
 
 ---
 

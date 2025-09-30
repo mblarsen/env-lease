@@ -124,6 +124,14 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 		slog.Error("Failed to save state after revoke", "err", err)
 	}
 
+	if req.All && count > 0 {
+		title := "Leases Revoked"
+		message := fmt.Sprintf("Revoked %d leases due to system idle.", count)
+		if err := d.notifier.Notify(title, message); err != nil {
+			slog.Error("Failed to send notification", "err", err)
+		}
+	}
+
 	slog.Info("Revoked leases", "count", count, "all", req.All, "project", req.ConfigFile)
 	resp := ipc.RevokeResponse{
 		Messages:      []string{fmt.Sprintf("Revoked %d leases.", count)},
