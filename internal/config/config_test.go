@@ -13,6 +13,7 @@ func TestLoad(t *testing.T) {
 source = "op://vault/item/secret"
 destination = ".envrc"
 duration = "1h"
+variable = "API_KEY"
 `
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
