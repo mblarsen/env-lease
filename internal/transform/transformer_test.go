@@ -1,6 +1,8 @@
 package transform
 
 import (
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -120,6 +122,88 @@ key = "value"`,
 			if output != tt.expected {
 				t.Errorf("Run() = %v, want %v", output, tt.expected)
 			}
+		})
+	}
+}
+
+func TestExplodeTransformerWithArgs(t *testing.T) {
+	tests := []struct {
+		name          string
+		transformation string
+		input         string
+		expected      ExplodedData
+		expectErr     bool
+		errContains   string
+	}{
+		{
+			name:           "no args",
+			transformation: "explode",
+			input:          `{"KEY1": "v1", "KEY2": "v2"}`,
+			expected:       ExplodedData{"KEY1": "v1", "KEY2": "v2"},
+		},
+		{
+			name:           "filter only",
+			transformation: "explode(filter=ORY_)",
+			input:          `{"ORY_KEY": "v1", "OTHER_KEY": "v2"}`,
+			expected:       ExplodedData{"ORY_KEY": "v1"},
+		},
+		{
+			name:           "prefix only",
+			transformation: "explode(prefix=REACT_)",
+			input:          `{"KEY1": "v1", "KEY2": "v2"}`,
+			expected:       ExplodedData{"REACT_KEY1": "v1", "REACT_KEY2": "v2"},
+		},
+		{
+			name:           "filter and prefix",
+			transformation: "explode(filter=ORY_, prefix=REACT_)",
+			input:          `{"ORY_KEY": "v1", "OTHER_KEY": "v2"}`,
+			expected:       ExplodedData{"REACT_ORY_KEY": "v1"},
+		},
+		{
+			name:           "prefix and filter (reversed order)",
+			transformation: "explode(prefix=REACT_, filter=ORY_)",
+			input:          `{"ORY_KEY": "v1", "OTHER_KEY": "v2"}`,
+			expected:       ExplodedData{"REACT_ORY_KEY": "v1"},
+		},
+		{
+			name:           "filter is case-insensitive",
+			transformation: "explode(filter=ory_)",
+			input:          `{"ORY_KEY": "v1", "OTHER_KEY": "v2"}`,
+			expected:       ExplodedData{"ORY_KEY": "v1"},
+		},
+		{
+			name:           "invalid argument",
+			transformation: "explode(foo=bar)",
+			input:          `{}`,
+			expectErr:      true,
+			errContains:    "unknown argument",
+		},
+		{
+			name:           "malformed argument",
+			transformation: "explode(filter=)",
+			input:          `{}`,
+			expectErr:      true,
+			errContains:    "empty value for argument",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pipeline, err := NewPipeline([]string{"json", tt.transformation})
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					require.Contains(t, err.Error(), tt.errContains)
+				}
+				return
+			}
+			require.NoError(t, err)
+
+			output, err := pipeline.Run(tt.input)
+			require.NoError(t, err)
+			exploded, ok := output.(ExplodedData)
+			require.True(t, ok)
+			assert.Equal(t, tt.expected, exploded)
 		})
 	}
 }

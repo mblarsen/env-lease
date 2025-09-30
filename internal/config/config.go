@@ -25,6 +25,7 @@ type Lease struct {
 	ExpiresAt     time.Time
 	OrphanedSince *time.Time
 	ConfigFile    string
+	ParentSource  string
 }
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.

@@ -88,10 +88,10 @@ The transformation pipeline is type-aware. It starts with a `string` (the raw se
 
 1.  **Initial State:** The pipeline starts with a `string`.
 2.  **Parsing (Optional):** Transformers like `json`, `toml`, or `yaml` parse the input string into an internal, structured data format.
-3.  **Querying (Optional):** The `select` transformer operates on this structured data to extract a specific value. Its output is always a `string`.
-4.  **Final State:** The final step in the pipeline **must** produce a `string`, as this is the value that will be written to the destination file.
+3.  **Querying (Optional):** The `select` transformer operates on this structured data to extract a specific value. Its output can be a `string` or another `structured_data` object.
+4.  **Final State:** The final step in the pipeline **must** produce a `string` (for a single lease) or `exploded_data` (for multiple leases via the `explode` transformer).
 
-For example, you cannot have `json` as the last step, because its output is structured data, not a string. It must be followed by a `select` step.
+For example, you cannot have `json` as the last step, because its output is structured data. It must be followed by a `select` or `explode` step.
 
 ### Transformer Reference
 
@@ -103,6 +103,7 @@ For example, you cannot have `json` as the last step, because its output is stru
 | `toml` | Parses a valid TOML string into structured data. | `string` | `structured_data` |
 | `yaml` | Parses a valid YAML string into structured data. | `string` | `structured_data` |
 | `select '<path>'` | Extracts a value from structured data using dot-notation. The path must be quoted. | `structured_data` | `string` or `structured_data` |
+| `explode(...)` | **Terminating transform.** Expands structured data into multiple variables. Accepts optional `filter` and `prefix` arguments. Must be the last transform. | `structured_data` | `exploded_data` |
 | `to_json` | Converts structured data to a JSON string. | `structured_data` | `string` |
 | `to_yaml` | Converts structured data to a YAML string. | `structured_data` | `string` |
 | `to_toml` | Converts structured data to a TOML string. | `structured_data` | `string` |
@@ -135,6 +136,55 @@ duration = "8h"
 # 2. Select the value at the path 'database.pass'.
 transform = ["json", "select 'database.pass'"]
 ```
+
+### Example: Expanding a JSON Object with `explode`
+
+The `explode` transform is a powerful way to turn a single structured secret into multiple environment variables. It accepts two optional, named arguments:
+- `filter=PREFIX_`: Only processes keys that already start with `PREFIX_`.
+- `prefix=PREFIX_`: Adds `PREFIX_` to the beginning of every processed key.
+
+**Secret stored in 1Password:**
+```json
+{
+  "ORY_API_KEY": "key-12345",
+  "ORY_API_SECRET": "secret-abcde",
+  "AWS_REGION": "us-east-1"
+}
+```
+
+**`env-lease.toml` Examples:**
+
+**1. Filter Only:**
+To get only the `ORY_` variables:
+```toml
+transform = ["json", "explode(filter=ORY_)"]
+# Result: ORY_API_KEY, ORY_API_SECRET
+```
+
+**2. Prefix Only:**
+To add `MYAPP_` to all variables:
+```toml
+transform = ["json", "explode(prefix=MYAPP_)"]
+# Result: MYAPP_ORY_API_KEY, MYAPP_ORY_API_SECRET, MYAPP_AWS_REGION
+```
+
+**3. Filter and Prefix:**
+To get only the `ORY_` variables and then add a `REACT_` prefix to them:
+```toml
+transform = ["json", "explode(filter=ORY_, prefix=REACT_)"]
+# Result: REACT_ORY_API_KEY, REACT_ORY_API_SECRET
+```
+
+**4. No Arguments:**
+To get all variables as they are:
+```toml
+transform = ["json", "explode"]
+# Result: ORY_API_KEY, ORY_API_SECRET, AWS_REGION
+```
+
+**Safety Blacklist:** To prevent accidental clobbering of critical system variables, `env-lease` enforces a blacklist on the *final* generated variable name. If a generated variable is blacklisted (e.g., `PATH`), the grant operation will fail.
+
+> **Note:** The `explode` transform can only be used with `lease_type = "env"` or `lease_type = "shell"`. It cannot be used to create multiple files.
 
 ---
 

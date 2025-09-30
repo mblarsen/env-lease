@@ -7,7 +7,6 @@ import (
 	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -16,14 +15,6 @@ import (
 )
 
 var shellMode bool
-
-func printInfo(format string, a ...interface{}) {
-	var writer io.Writer = os.Stdout
-	if shellMode {
-		writer = os.Stderr
-	}
-	fmt.Fprintf(writer, format, a...)
-}
 
 type grantError struct {
 	Source string
@@ -57,8 +48,25 @@ var grantCmd = &cobra.Command{
 	Short: "Grant all leases defined in env-lease.toml.",
 	Long:  `Grant all leases defined in env--lease.toml.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var (
+			cfg           *config.Config
+			err           error
+			absConfigFile string
+		)
+
+		interactive, _ := cmd.Flags().GetBool("interactive")
+
+		// Check if stdout is a terminal
+		stat, _ := os.Stdout.Stat()
+		isPiped := (stat.Mode() & os.ModeCharDevice) == 0
+
+		if isPiped && interactive {
+			return fmt.Errorf("interactive mode is not supported when piping output (e.g., inside 'eval $(...)')\n" +
+				"Please run 'eval $(env-lease grant)' without the interactive flag.")
+		}
+
 		configFile, _ := cmd.Flags().GetString("config")
-		cfg, err := config.Load(configFile)
+		cfg, err = config.Load(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
@@ -70,7 +78,7 @@ var grantCmd = &cobra.Command{
 			}
 		}
 
-		absConfigFile, err := filepath.Abs(configFile)
+		absConfigFile, err = filepath.Abs(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for %s: %w", configFile, err)
 		}
@@ -78,23 +86,20 @@ var grantCmd = &cobra.Command{
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 		var errs []grantError
 		var shellCommands []string
-
 		var p provider.SecretProvider
-		interactive, _ := cmd.Flags().GetBool("interactive")
 		leases := make([]ipc.Lease, 0, len(cfg.Lease))
+		var finalLeases []ipc.Lease
+		var sc []string
+
 		for _, l := range cfg.Lease {
-			if interactive {
-				if !confirm(fmt.Sprintf("Grant lease for '%s'?", l.Source)) {
-					continue
-				}
-			}
+			// Provider setup
 			if os.Getenv("ENV_LEASE_TEST") == "1" {
 				p = &provider.MockProvider{}
 			} else {
-				p = &provider.OnePasswordCLI{
-					Account: l.OpAccount,
-				}
+				p = &provider.OnePasswordCLI{Account: l.OpAccount}
 			}
+
+			// Duration validation
 			duration, err := time.ParseDuration(l.Duration)
 			if err != nil {
 				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("invalid duration '%s': %w", l.Duration, err)})
@@ -107,7 +112,7 @@ var grantCmd = &cobra.Command{
 				slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
 			}
 
-			// Set default format if not provided
+			// Set default format
 			if l.Format == "" {
 				switch filepath.Base(l.Destination) {
 				case ".envrc":
@@ -125,6 +130,7 @@ var grantCmd = &cobra.Command{
 				}
 			}
 
+			// Fetch secret
 			slog.Info("Fetching secret", "source", l.Source)
 			secretVal, err := p.Fetch(l.Source)
 			if err != nil {
@@ -136,6 +142,8 @@ var grantCmd = &cobra.Command{
 			}
 			slog.Info("Fetched secret", "source", l.Source)
 
+			// Run transform pipeline
+			var transformResult interface{} = secretVal
 			if len(l.Transform) > 0 {
 				pipeline, err := transform.NewPipeline(l.Transform)
 				if err != nil {
@@ -145,7 +153,7 @@ var grantCmd = &cobra.Command{
 					}
 					continue
 				}
-				secretVal, err = pipeline.Run(secretVal)
+				transformResult, err = pipeline.Run(secretVal)
 				if err != nil {
 					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to transform secret: %w", err)})
 					if !continueOnError {
@@ -155,45 +163,76 @@ var grantCmd = &cobra.Command{
 				}
 			}
 
-			if l.LeaseType == "shell" {
-				shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
-			} else {
-				override, _ := cmd.Flags().GetBool("override")
-				created, err := writeLease(l, secretVal, override)
-				if err != nil {
-					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to write lease: %w", err)})
+			// Handle result: could be a single string or exploded data
+			var approvedLeases []ipc.Lease
+			var approvedShellCommands []string
+
+			switch result := transformResult.(type) {
+			case string:
+				// SINGLE LEASE CASE
+				prompt := fmt.Sprintf("Grant lease for '%s'?", l.Variable)
+				if l.Variable == "" {
+					prompt = fmt.Sprintf("Grant lease for '%s'?", l.Source)
+				}
+				if !interactive || confirm(prompt) {
+					finalLeases, sc, err = processLease(cmd, l, result, absConfigFile)
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: err})
+						if !continueOnError {
+							break
+						}
+						continue
+					}
+					approvedLeases = append(approvedLeases, finalLeases...)
+					approvedShellCommands = append(approvedShellCommands, sc...)
+				}
+
+			case transform.ExplodedData:
+				// EXPLODED LEASE CASE
+				if l.LeaseType == "file" {
+					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("'explode' transform cannot be used with lease_type 'file'")})
 					if !continueOnError {
 						break
 					}
 					continue
 				}
-				if created {
-					printInfo("Created file: %s\n", l.Destination)
-				}
-			}
-			clearString(secretVal)
 
-			absDest, err := filepath.Abs(l.Destination)
-			if err != nil {
-				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)})
-				if !continueOnError {
-					break
-				}
-				continue
-			}
-
-			leases = append(leases, ipc.Lease{
-				Source:      l.Source,
-				Destination: absDest,
-				Duration:    l.Duration,
-				LeaseType:   l.LeaseType,
-				Variable:    l.Variable,
-				Format:      l.Format,
-				Transform:   l.Transform,
-				FileMode:    l.FileMode,
-			})
+										// Add a parent/container lease for the status command to find
+										parentLeaseConfig := l
+										parentLeaseConfig.Variable = "" // No single variable for the parent
+										parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", absConfigFile)
+										if err != nil {
+											errs = append(errs, grantError{Source: l.Source, Err: err})
+											if !continueOnError {
+												break
+											}
+											continue
+										}
+										approvedLeases = append(approvedLeases, parentLeases...)
+										uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
+				
+										// Process all the child leases
+										for key, value := range result {
+											if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", key)) {
+												explodedLeaseConfig := l
+												explodedLeaseConfig.Variable = key
+												explodedLeaseConfig.ParentSource = uniqueParentID
+				
+												finalLeases, sc, err = processLease(cmd, explodedLeaseConfig, value, absConfigFile)
+												if err != nil {
+													errs = append(errs, grantError{Source: key, Err: err})
+													if !continueOnError {
+														break
+													}
+													continue
+												}
+												approvedLeases = append(approvedLeases, finalLeases...)
+												approvedShellCommands = append(approvedShellCommands, sc...)
+											}
+										}			}
+			leases = append(leases, approvedLeases...)
+			shellCommands = append(shellCommands, approvedShellCommands...)
 		}
-
 		if len(errs) > 0 {
 			return &GrantErrors{errs: errs}
 		}
@@ -205,10 +244,9 @@ var grantCmd = &cobra.Command{
 			Override:   override,
 			ConfigFile: absConfigFile,
 		}
-
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			printInfo("Grant request (test mode) processed successfully.\n")
+			fmt.Fprintln(os.Stderr, "Grant request (test mode) processed successfully.")
 			return nil
 		}
 
@@ -218,41 +256,78 @@ var grantCmd = &cobra.Command{
 			handleClientError(err)
 		}
 		for _, msg := range resp.Messages {
-			printInfo("%s\n", msg)
+			fmt.Fprintln(os.Stderr, msg)
 		}
 
 		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
 		for _, l := range leases {
 			if filepath.Base(l.Destination) == ".envrc" {
-				var writer io.Writer = os.Stdout
-				if shellMode {
-					writer = os.Stderr
-				}
-				HandleDirenv(noDirenv, writer)
+				HandleDirenv(noDirenv, os.Stderr)
 				break
 			}
 		}
 
 		if shellMode {
-			fmt.Println("# When using shell lease types run this command like `eval $(env-lease grant)`")
+			fmt.Fprintln(os.Stderr, "# When using shell lease types run this command like `eval $(env-lease grant)`")
 			for _, cmd := range shellCommands {
 				fmt.Println(cmd)
 			}
 		}
-
-		printInfo("Grant request sent successfully.\n")
+		fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
 		return nil
 	},
 }
-		
-		
-		
-		
-		        func init() {
-		            grantCmd.Flags().Bool("override", false, "Override existing values in destination files.")
-		            grantCmd.Flags().Bool("continue-on-error", false, "Continue granting leases even if one fails.")
-		            grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
-		            grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
-		            grantCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before granting each lease.")
-		            rootCmd.AddCommand(grantCmd)
-		        }
+
+func processLease(cmd *cobra.Command, l config.Lease, secretVal string, configFile string) ([]ipc.Lease, []string, error) {
+	var shellCommands []string
+	var leases []ipc.Lease
+	var absDest string
+	var err error
+
+	if l.LeaseType == "shell" {
+		if l.Variable != "" {
+			shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
+		}
+		absDest = filepath.Join(filepath.Dir(configFile), "<shell>")
+	} else {
+		// For file/env leases, only write if there's a variable.
+		// This prevents writing the parent/container lease of an explode.
+		if l.Variable != "" {
+			override, _ := cmd.Flags().GetBool("override")
+			created, err := writeLease(l, secretVal, override)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to write lease: %w", err)
+			}
+			if created {
+				fmt.Fprintf(os.Stderr, "Created file: %s\n", l.Destination)
+			}
+		}
+		absDest, err = filepath.Abs(l.Destination)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
+		}
+	}
+
+	leases = append(leases, ipc.Lease{
+		Source:       l.Source,
+		Destination:  absDest,
+		Duration:     l.Duration,
+		LeaseType:    l.LeaseType,
+		Variable:     l.Variable,
+		Format:       l.Format,
+		Transform:    l.Transform,
+		FileMode:     l.FileMode,
+		ParentSource: l.ParentSource,
+		ConfigFile:   configFile,
+	})
+	return leases, shellCommands, nil
+}
+
+func init() {
+	grantCmd.Flags().Bool("override", false, "Override existing values in destination files.")
+	grantCmd.Flags().Bool("continue-on-error", false, "Continue granting leases even if one fails.")
+	grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
+	grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
+	grantCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before granting each lease.")
+	rootCmd.AddCommand(grantCmd)
+}

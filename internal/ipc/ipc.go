@@ -55,17 +55,18 @@ type RevokeResponse struct {
 
 // Lease is a simplified lease structure for IPC.
 type Lease struct {
-	Source      string
-	Destination string
-	Duration    string
-	LeaseType   string
-	Variable    string
-	Format      string
-	Transform   []string
-	FileMode    string
-	ExpiresAt   time.Time
-	ConfigFile  string
-	OpAccount   string
+	Source       string
+	Destination  string
+	Duration     string
+	LeaseType    string
+	Variable     string
+	Format       string
+	Transform    []string
+	FileMode     string
+	ExpiresAt    time.Time
+	ConfigFile   string
+	OpAccount    string
+	ParentSource string
 }
 
 // Sign creates a signature for the payload.
