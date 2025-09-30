@@ -138,6 +138,28 @@ transform = ["json", "select 'database.pass'"]
 
 ---
 
+## Scaffolding Configuration from `.env`
+
+For existing projects that already use a `.env` or `.envrc` file with 1Password URIs, you can use the `convert` command to quickly generate a starting `env-lease.toml` configuration.
+
+Given a `.envrc` file like this:
+
+```sh
+# .envrc
+export DATABASE_URL="op://vault/item/db-url"
+export API_KEY="op://vault/item/api-key"
+```
+
+You can generate a configuration by running:
+
+```sh
+env-lease convert > env-lease.toml
+```
+
+This will produce an `env-lease.toml` file with leases for `DATABASE_URL` and `API_KEY`. You will still need to edit the file to set the desired `duration` for each lease.
+
+---
+
 ## Command Reference
 
 | Command                  | Description                                                                                               |
@@ -145,6 +167,7 @@ transform = ["json", "select 'database.pass'"]
 | `env-lease grant`        | Grants all leases defined in `env-lease.toml`. Flags: `--override`, `--continue-on-error`.                 |
 | `env-lease revoke`       | Immediately revokes all secrets defined in the current project's `env-lease.toml`.                          |
 | `env-lease status`       | Lists all currently active leases managed by the daemon.                                                  |
+| `env-lease convert`      | Scaffolds an `env-lease.toml` file from an existing `.env` or `.envrc` file.                               |
 | `env-lease enable-notifications` | (macOS only) Guides the user to grant notification permissions.                                           |
 | `env-lease daemon install`| Installs and starts the daemon as a user service.                                                         |
 | `env-lease daemon uninstall`| Stops and uninstalls the daemon.                                                                          |
