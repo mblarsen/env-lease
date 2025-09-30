@@ -34,11 +34,43 @@ var revokeCmd = &cobra.Command{
 			}
 
 			var leasesToRevoke []ipc.Lease
+			var childrenOfParent = make(map[string][]ipc.Lease)
+			var parents []ipc.Lease
+			var normalLeases []ipc.Lease
+
+			// First, separate leases into parents, children, and normal leases
 			for _, l := range leasesResp.Leases {
+				if l.ParentSource != "" {
+					childrenOfParent[l.ParentSource] = append(childrenOfParent[l.ParentSource], l)
+				} else if _, isParent := childrenOfParent[l.Source+"->"+l.Destination]; isParent {
+					parents = append(parents, l)
+				} else {
+					normalLeases = append(normalLeases, l)
+				}
+			}
+
+			// Process parents and their children
+			for _, p := range parents {
+				if confirm(fmt.Sprintf("Revoke lease for '%s'?", p.Source)) {
+					leasesToRevoke = append(leasesToRevoke, p)
+					leasesToRevoke = append(leasesToRevoke, childrenOfParent[p.Source+"->"+p.Destination]...)
+				} else {
+					// If parent is not revoked, ask for each child
+					for _, child := range childrenOfParent[p.Source+"->"+p.Destination] {
+						if confirm(fmt.Sprintf("Revoke lease for '%s'?", child.Variable)) {
+							leasesToRevoke = append(leasesToRevoke, child)
+						}
+					}
+				}
+			}
+
+			// Process normal leases
+			for _, l := range normalLeases {
 				if confirm(fmt.Sprintf("Revoke lease for '%s'?", l.Source)) {
 					leasesToRevoke = append(leasesToRevoke, l)
 				}
 			}
+
 
 			if len(leasesToRevoke) == 0 {
 				fmt.Println("No leases selected for revocation.")
