@@ -55,6 +55,7 @@ The CLI communicates with a background daemon via a Unix Domain Socket with rest
 However, it's important to understand the design trade-offs and limitations:
 
 *   **Filesystem vs. Memory:** `env-lease` prioritizes performance and developer experience by writing secrets to the filesystem. For environments requiring the highest level of security, solutions that inject secrets directly into process memory (like `op read` with `direnv`) remain the best choice.
+*   **`shell` Lease Type:** The `lease_type = "shell"` offers a safer alternative to file-based leases as it injects secrets directly into the shell's memory without writing them to disk. While its functionality is comparable to using `op read`, it provides a simpler, declarative way to organize secrets within the `env-lease.toml` file. A key benefit is the ability to mix and match `shell`, `env`, and `file` lease types within a single project.
 *   **Intended Environment:** This tool is built for trusted local development setups and is not intended as a hardened security solution for production or other sensitive environments.
 *   **Compromised User Account:** The security model is designed to raise the bar for attack and prevent accidental interference. It does **not** protect against a sophisticated attacker who has already fully compromised your user account, as such an attacker could read the authentication token itself.
 
