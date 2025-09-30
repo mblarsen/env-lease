@@ -39,6 +39,14 @@ type StatusResponse struct {
 	Leases []Lease
 }
 
+type CleanupRequest struct {
+	Command string
+}
+
+type CleanupResponse struct {
+	Messages []string
+}
+
 // RevokeRequest is the payload for a revoke request.
 type RevokeRequest struct {
 	Command    string

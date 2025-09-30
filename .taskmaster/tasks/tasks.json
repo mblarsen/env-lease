@@ -1240,7 +1240,7 @@
         "description": "Implement the complete daemon logic for detecting, marking, and purging orphaned leases. This includes a periodic background check and updating the `env-lease daemon cleanup` command to trigger the process manually.",
         "details": "This task involves two main components. First, enhance the daemon's core loop to include a periodic background job that runs, for example, every 24 hours. This job will iterate through all active leases managed in the state file (from Task 7). For each lease, it will check for the existence of the source `env-lease.toml` file. If the file does not exist, the lease's entry in the state file should be updated with a new field, such as `orphaned_since`, containing the current timestamp. The job should also check for leases already marked as orphaned. If the current time is more than 30 days past the `orphaned_since` timestamp, the daemon must trigger the internal revocation logic for that lease and remove its entry from the state entirely. Second, the `env-lease daemon cleanup` command must be updated. It will use the IPC client (from Task 10) to send a new `CleanupRequest` to the daemon. A corresponding handler must be added to the daemon's IPC server to receive this request and immediately execute the full orphan detection and purging logic on demand.",
         "testStrategy": "A multi-layered testing approach is required. For unit tests, mock the daemon's state manager and the filesystem. Create a test state with several leases. In one test case, 'delete' the config file for one lease and run the cleanup logic; assert that the lease is now marked as orphaned in the state with a correct timestamp. In another case, create a lease already marked as orphaned 29 days ago, advance a mock clock by two days, run the cleanup logic, and assert that the lease has been completely removed from the state. For integration testing, start a live daemon with a temporary state file, grant a lease, then manually delete the associated `env-lease.toml`. Execute the `env-lease daemon cleanup` command and then use `env-lease status` to verify the lease is now correctly identified as orphaned.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           7,
           10,
@@ -1607,7 +1607,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-30T07:59:35.980Z",
+      "updated": "2025-09-30T10:42:10.812Z",
       "description": "Tasks for master context"
     }
   }

@@ -165,27 +165,54 @@ func (d *Daemon) Shutdown() error {
 }
 
 func (d *Daemon) cleanupOrphanedLeases() {
-	slog.Debug("Cleaning up orphaned leases...")
+	slog.Debug("Starting orphaned lease cleanup...")
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	now := d.clock.Now()
+	stateChanged := false
+
 	for id, lease := range d.state.Leases {
-		// This is a simplified check. A real implementation would need
-		// to know the original config path for each lease.
-		configPath := "env-lease.toml" // Placeholder
-		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// If a lease doesn't have a config file path, we can't check it.
+		if lease.ConfigFile == "" {
+			continue
+		}
+
+		// Check if the original config file still exists.
+		if _, err := os.Stat(lease.ConfigFile); os.IsNotExist(err) {
+			// The file is gone, so the lease is an orphan.
 			if lease.OrphanedSince == nil {
+				slog.Info("Marking lease as orphaned", "id", id, "config_file", lease.ConfigFile)
 				lease.OrphanedSince = &now
 				d.state.Leases[id] = lease
-			} else if now.Sub(*lease.OrphanedSince) > 30*24*time.Hour {
-				delete(d.state.Leases, id)
+				stateChanged = true
 			}
 		} else {
+			// The file exists, so if it was marked as orphaned, un-mark it.
 			if lease.OrphanedSince != nil {
+				slog.Info("Un-marking lease as orphaned", "id", id)
 				lease.OrphanedSince = nil
 				d.state.Leases[id] = lease
+				stateChanged = true
 			}
+		}
+
+		// Now, check if the lease has been orphaned for too long.
+		if lease.OrphanedSince != nil && now.Sub(*lease.OrphanedSince) > 30*24*time.Hour {
+			slog.Info("Purging lease orphaned for more than 30 days", "id", id)
+			// We can reuse the revokeOrphanedLeases logic, which already handles revocation.
+			// Here we just delete it from the state.
+			if err := d.revoker.Revoke(lease); err != nil {
+				slog.Error("Failed to revoke purged lease", "id", id, "err", err)
+			}
+			delete(d.state.Leases, id)
+			stateChanged = true
+		}
+	}
+
+	if stateChanged {
+		if err := d.state.SaveState(d.statePath); err != nil {
+			slog.Error("Failed to save state after cleaning up orphaned leases", "err", err)
 		}
 	}
 	slog.Debug("Finished cleaning up orphaned leases.")

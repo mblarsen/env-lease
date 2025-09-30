@@ -10,9 +10,6 @@ import (
 )
 
 func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	var req struct {
 		Command string
 	}
@@ -22,14 +19,34 @@ func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
 
 	switch req.Command {
 	case "grant":
+		d.mu.Lock()
+		defer d.mu.Unlock()
 		return d.handleGrant(payload)
 	case "revoke":
+		d.mu.Lock()
+		defer d.mu.Unlock()
 		return d.handleRevoke(payload)
 	case "status":
+		d.mu.Lock()
+		defer d.mu.Unlock()
 		return d.handleStatus(payload)
+	case "cleanup":
+		return d.handleCleanup(payload)
 	default:
 		return nil, fmt.Errorf("unknown command: %s", req.Command)
 	}
+}
+
+func (d *Daemon) handleCleanup(payload []byte) ([]byte, error) {
+	slog.Debug("Received cleanup request")
+
+	// Run the cleanup logic immediately
+	d.cleanupOrphanedLeases()
+	d.revokeOrphanedLeases()
+
+	resp := ipc.CleanupResponse{Messages: []string{"Orphaned lease cleanup process completed."}}
+	slog.Info("Orphaned lease cleanup process completed.")
+	return json.Marshal(resp)
 }
 
 func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
