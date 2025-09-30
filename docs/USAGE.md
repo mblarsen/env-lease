@@ -66,10 +66,10 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 | Key           | Required | Description                                                                                             | Example                               |
 |---------------|----------|---------------------------------------------------------------------------------------------------------|---------------------------------------|
 | `source`      | Yes      | The URI of the secret. For 1Password, this can be the canonical `op://` reference or the user-friendly `op+file://<item-name>/<file-name>` for document attachments. | `"op://vault/item/secret"` or `"op+file://My Item/file.json"` |
-| `destination` | Yes      | The relative path to the target file.                                                                   | `".envrc"`                            |
+| `destination` | Yes*     | The relative path to the target file. *Required for `env` and `file` types only.*                       | `".envrc"`                            |
 | `duration`    | Yes      | The lease duration (e.g., "10m", "1h", "8h").                                                           | `"8h"`                                |
-| `lease_type`  | No       | The type of lease. Can be `"env"` (default) or `"file"`.                                                | `"file"`                              |
-| `variable`    | Yes      | The name of the environment variable to set (for `lease_type="env"`).                                   | `"API_KEY"`                           |
+| `lease_type`  | No       | The type of lease. Can be `"env"` (default), `"file"`, or `"shell"`.                                    | `"shell"`                             |
+| `variable`    | Yes*     | The name of the environment variable to set. *Required for `env` and `shell` types.*                      | `"API_KEY"`                           |
 | `format`      | No       | A Go `sprintf`-style format string for `env` leases. Defaults are applied for `.env` and `.envrc`.    | `"export %s=%q"`                      |
 | `transform`   | No       | An array of transformations to apply to the secret before writing it. See the "Transformations" section below. | `["base64-decode", "json", "select 'key'"]` |
 | `op_account`  | No       | The 1Password account to use. Overrides the `OP_ACCOUNT` environment variable.                      | `"my-account"`                        |
@@ -203,6 +203,42 @@ duration = "1h"
 ```
 
 This provides a more readable and maintainable way to reference file attachments. The content of the file can be leased to a destination file (`lease_type = "file"`) or an environment variable (`lease_type = "env"`).
+
+### Example 4: Lease a Variable Directly to Your Shell
+
+The `shell` lease type allows you to export a secret directly as an environment variable in your current shell session, without needing a tool like `direnv`.
+
+This is useful for quick, temporary access to credentials.
+
+```toml
+# env-lease.toml
+[[lease]]
+lease_type = "shell"
+source = "op://your_vault/your_item/your_field"
+variable = "QUICK_API_KEY"
+duration = "15m"
+```
+
+**Granting the Lease**
+
+To grant a `shell` lease, you must wrap the command in `eval $()` so your shell can process the `export` command that `env-lease` outputs:
+
+```sh
+eval $(env-lease grant)
+
+# Now you can use the variable
+echo $QUICK_API_KEY
+```
+
+**Revoking the Lease**
+
+Similarly, to `unset` the variable from your shell, you must use `eval $()` with the `revoke` command:
+
+```sh
+eval $(env-lease revoke)
+```
+
+> **Note on Automatic Revocation:** While the lease is tracked by the `env-lease` daemon and expires automatically, the environment variable will **remain in your shell** after expiration. You must manually run `eval $(env-lease revoke)` or close the shell session to remove it. This is a fundamental limitation of how shell environments work.
 
 ---
 ## Upgrading

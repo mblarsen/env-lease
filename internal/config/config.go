@@ -75,11 +75,21 @@ func Load(path string) (*Config, error) {
 		}
 
 		// Validate required fields
-		if config.Lease[i].Source == "" {
+		lease := &config.Lease[i]
+		if lease.Source == "" {
 			return nil, fmt.Errorf("lease %d: source is required", i)
 		}
-		if config.Lease[i].Destination == "" {
-			return nil, fmt.Errorf("lease %d: destination is required", i)
+
+		if lease.LeaseType == "env" || lease.LeaseType == "file" {
+			if lease.Destination == "" {
+				return nil, fmt.Errorf("lease %d: destination is required for lease_type '%s'", i, lease.LeaseType)
+			}
+		}
+
+		if lease.LeaseType == "env" || lease.LeaseType == "shell" {
+			if lease.Variable == "" {
+				return nil, fmt.Errorf("lease %d: variable is required for lease_type '%s'", i, lease.LeaseType)
+			}
 		}
 	}
 

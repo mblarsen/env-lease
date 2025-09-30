@@ -47,7 +47,8 @@ type RevokeRequest struct {
 
 // RevokeResponse is the payload for a revoke response.
 type RevokeResponse struct {
-	Messages []string
+	Messages      []string
+	ShellCommands []string
 }
 
 // Lease is a simplified lease structure for IPC.

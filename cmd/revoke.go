@@ -34,8 +34,20 @@ var revokeCmd = &cobra.Command{
 			handleClientError(err)
 		}
 
+		isShellMode := len(revokeResp.ShellCommands) > 0
+
 		for _, msg := range revokeResp.Messages {
-			fmt.Println(msg)
+			if isShellMode {
+				fmt.Fprintln(os.Stderr, msg)
+			} else {
+				fmt.Println(msg)
+			}
+		}
+
+		if isShellMode {
+			for _, shellCmd := range revokeResp.ShellCommands {
+				fmt.Println(shellCmd)
+			}
 		}
 
 		// If all leases were revoked, check for .envrc and handle direnv
@@ -48,13 +60,23 @@ var revokeCmd = &cobra.Command{
 			noDirenv, _ := cmd.Flags().GetBool("no-direnv")
 			for _, l := range leasesResp.Leases {
 				if filepath.Base(l.Destination) == ".envrc" {
-					HandleDirenv(noDirenv, os.Stdout)
+					writer := os.Stdout
+					if isShellMode {
+						writer = os.Stderr
+					}
+					HandleDirenv(noDirenv, writer)
 					break
 				}
 			}
 		}
 
-		fmt.Println("Revoke request sent.")
+		finalMsg := "Revoke request sent."
+		if isShellMode {
+			fmt.Fprintln(os.Stderr, finalMsg)
+		} else {
+			fmt.Println(finalMsg)
+		}
+
 		return nil
 	},
 }

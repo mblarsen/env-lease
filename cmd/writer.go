@@ -22,6 +22,8 @@ func writeLease(l config.Lease, secretVal string, override bool) (bool, error) {
 		return writeEnvFile(l.Destination, l.Variable, secretVal, l.Format, override, l.FileMode)
 	case "file":
 		return writeFile(l.Destination, secretVal, l.FileMode)
+	case "shell":
+		return false, fmt.Errorf("the 'shell' lease type should not be handled by writeLease")
 	default:
 		return false, fmt.Errorf("unknown lease type: %s", l.LeaseType)
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -14,6 +15,15 @@ import (
 	"time"
 )
 
+var shellMode bool
+
+func printInfo(format string, a ...interface{}) {
+	var writer io.Writer = os.Stdout
+	if shellMode {
+		writer = os.Stderr
+	}
+	fmt.Fprintf(writer, format, a...)
+}
 
 type grantError struct {
 	Source string
@@ -53,6 +63,13 @@ var grantCmd = &cobra.Command{
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 
+		for _, l := range cfg.Lease {
+			if l.LeaseType == "shell" {
+				shellMode = true
+				break
+			}
+		}
+
 		absConfigFile, err := filepath.Abs(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for %s: %w", configFile, err)
@@ -60,6 +77,7 @@ var grantCmd = &cobra.Command{
 
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 		var errs []grantError
+		var shellCommands []string
 
 		var p provider.SecretProvider
 		leases := make([]ipc.Lease, len(cfg.Lease))
@@ -131,20 +149,23 @@ var grantCmd = &cobra.Command{
 				}
 			}
 
-			// Write the secret to the destination file.
-			override, _ := cmd.Flags().GetBool("override")
-			created, err := writeLease(l, secretVal, override)
-			if err != nil {
-				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to write lease: %w", err)})
-				if !continueOnError {
-					break
+			if l.LeaseType == "shell" {
+				shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
+			} else {
+				override, _ := cmd.Flags().GetBool("override")
+				created, err := writeLease(l, secretVal, override)
+				if err != nil {
+					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to write lease: %w", err)})
+					if !continueOnError {
+						break
+					}
+					continue
 				}
-				continue
+				if created {
+					printInfo("Created file: %s\n", l.Destination)
+				}
 			}
 			clearString(secretVal)
-			if created {
-				fmt.Printf("Created file: %s\n", l.Destination)
-			}
 
 			absDest, err := filepath.Abs(l.Destination)
 			if err != nil {
@@ -181,7 +202,7 @@ var grantCmd = &cobra.Command{
 
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			fmt.Println("Grant request (test mode) processed successfully.")
+			printInfo("Grant request (test mode) processed successfully.\n")
 			return nil
 		}
 
@@ -191,18 +212,28 @@ var grantCmd = &cobra.Command{
 			handleClientError(err)
 		}
 		for _, msg := range resp.Messages {
-			fmt.Println(msg)
+			printInfo("%s\n", msg)
 		}
 
 		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
 		for _, l := range leases {
 			if filepath.Base(l.Destination) == ".envrc" {
-				HandleDirenv(noDirenv, os.Stdout)
+				var writer io.Writer = os.Stdout
+				if shellMode {
+					writer = os.Stderr
+				}
+				HandleDirenv(noDirenv, writer)
 				break
 			}
 		}
 
-		fmt.Println("Grant request sent successfully.")
+		if shellMode {
+			for _, cmd := range shellCommands {
+				fmt.Println(cmd)
+			}
+		}
+
+		printInfo("Grant request sent successfully.\n")
 		return nil
 	},
 }

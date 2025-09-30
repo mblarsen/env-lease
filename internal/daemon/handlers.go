@@ -102,12 +102,18 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	slog.Debug("Received revoke request", "config_file", req.ConfigFile, "all", req.All)
 
 	var count int
+	var shellCommands []string
 	for id, lease := range d.state.Leases {
 		if req.All || lease.ConfigFile == req.ConfigFile {
 			slog.Debug("Revoking lease", "source", lease.Source)
-			if err := d.revoker.Revoke(lease); err != nil {
-				slog.Error("Failed to revoke lease", "id", id, "err", err)
-				// Continue trying to revoke other leases
+			if lease.LeaseType == "shell" {
+				shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+				slog.Debug("Ignoring revoker for shell lease type", "id", id)
+			} else {
+				if err := d.revoker.Revoke(lease); err != nil {
+					slog.Error("Failed to revoke lease", "id", id, "err", err)
+					// Continue trying to revoke other leases
+				}
 			}
 			delete(d.state.Leases, id)
 			count++
@@ -119,7 +125,10 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	}
 
 	slog.Info("Revoked leases", "count", count, "all", req.All, "project", req.ConfigFile)
-	resp := ipc.RevokeResponse{Messages: []string{fmt.Sprintf("Revoked %d leases.", count)}}
+	resp := ipc.RevokeResponse{
+		Messages:      []string{fmt.Sprintf("Revoked %d leases.", count)},
+		ShellCommands: shellCommands,
+	}
 	return json.Marshal(resp)
 }
 
