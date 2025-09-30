@@ -146,7 +146,7 @@ var cleanupCmd = &cobra.Command{
 	Use:   "cleanup",
 	Short: "Cleanup orphaned leases.",
 	Long:  `Cleanup orphaned leases.`,
-	RunE: func(cmd *cobra.comman, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newClient()
 		req := ipc.CleanupRequest{Command: "cleanup"}
 		var resp ipc.CleanupResponse
