@@ -80,8 +80,14 @@ var grantCmd = &cobra.Command{
 		var shellCommands []string
 
 		var p provider.SecretProvider
-		leases := make([]ipc.Lease, len(cfg.Lease))
-		for i, l := range cfg.Lease {
+		interactive, _ := cmd.Flags().GetBool("interactive")
+		leases := make([]ipc.Lease, 0, len(cfg.Lease))
+		for _, l := range cfg.Lease {
+			if interactive {
+				if !confirm(fmt.Sprintf("Grant lease for '%s'?", l.Source)) {
+					continue
+				}
+			}
 			if os.Getenv("ENV_LEASE_TEST") == "1" {
 				p = &provider.MockProvider{}
 			} else {
@@ -176,7 +182,7 @@ var grantCmd = &cobra.Command{
 				continue
 			}
 
-			leases[i] = ipc.Lease{
+			leases = append(leases, ipc.Lease{
 				Source:      l.Source,
 				Destination: absDest,
 				Duration:    l.Duration,
@@ -185,7 +191,7 @@ var grantCmd = &cobra.Command{
 				Format:      l.Format,
 				Transform:   l.Transform,
 				FileMode:    l.FileMode,
-			}
+			})
 		}
 
 		if len(errs) > 0 {
@@ -242,10 +248,11 @@ var grantCmd = &cobra.Command{
 		
 		
 		
-		func init() {
-		    grantCmd.Flags().Bool("override", false, "Override existing values in destination files.")
-		    grantCmd.Flags().Bool("continue-on-error", false, "Continue granting leases even if one fails.")
-		    grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
-		    grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
-		    rootCmd.AddCommand(grantCmd)
-		}
+		        func init() {
+		            grantCmd.Flags().Bool("override", false, "Override existing values in destination files.")
+		            grantCmd.Flags().Bool("continue-on-error", false, "Continue granting leases even if one fails.")
+		            grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
+		            grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
+		            grantCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before granting each lease.")
+		            rootCmd.AddCommand(grantCmd)
+		        }

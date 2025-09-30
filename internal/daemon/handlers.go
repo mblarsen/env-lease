@@ -103,20 +103,41 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 
 	var count int
 	var shellCommands []string
-	for id, lease := range d.state.Leases {
-		if req.All || lease.ConfigFile == req.ConfigFile {
-			slog.Debug("Revoking lease", "source", lease.Source)
-			if lease.LeaseType == "shell" {
-				shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
-				slog.Debug("Ignoring revoker for shell lease type", "id", id)
-			} else {
-				if err := d.revoker.Revoke(lease); err != nil {
-					slog.Error("Failed to revoke lease", "id", id, "err", err)
-					// Continue trying to revoke other leases
+
+	if len(req.Leases) > 0 {
+		for _, l := range req.Leases {
+			id := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
+			if lease, ok := d.state.Leases[id]; ok {
+				slog.Debug("Revoking lease", "source", lease.Source)
+				if lease.LeaseType == "shell" {
+					shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+					slog.Debug("Ignoring revoker for shell lease type", "id", id)
+				} else {
+					if err := d.revoker.Revoke(lease); err != nil {
+						slog.Error("Failed to revoke lease", "id", id, "err", err)
+						// Continue trying to revoke other leases
+					}
 				}
+				delete(d.state.Leases, id)
+				count++
 			}
-			delete(d.state.Leases, id)
-			count++
+		}
+	} else {
+		for id, lease := range d.state.Leases {
+			if req.All || lease.ConfigFile == req.ConfigFile {
+				slog.Debug("Revoking lease", "source", lease.Source)
+				if lease.LeaseType == "shell" {
+					shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+					slog.Debug("Ignoring revoker for shell lease type", "id", id)
+				} else {
+					if err := d.revoker.Revoke(lease); err != nil {
+						slog.Error("Failed to revoke lease", "id", id, "err", err)
+						// Continue trying to revoke other leases
+					}
+				}
+				delete(d.state.Leases, id)
+				count++
+			}
 		}
 	}
 
@@ -140,17 +161,24 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	return json.Marshal(resp)
 }
 
-func (d *Daemon) handleStatus(_ []byte) ([]byte, error) {
+func (d *Daemon) handleStatus(payload []byte) ([]byte, error) {
+	var req ipc.StatusRequest
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal status request: %w", err)
+	}
+
 	var leases []ipc.Lease
 	for _, l := range d.state.Leases {
-		leases = append(leases, ipc.Lease{
-			Source:      l.Source,
-			Destination: l.Destination,
-			LeaseType:   l.LeaseType,
-			Variable:    l.Variable,
-			ExpiresAt:   l.ExpiresAt,
-			ConfigFile:  l.ConfigFile,
-		})
+		if req.ConfigFile == "" || l.ConfigFile == req.ConfigFile {
+			leases = append(leases, ipc.Lease{
+				Source:      l.Source,
+				Destination: l.Destination,
+				LeaseType:   l.LeaseType,
+				Variable:    l.Variable,
+				ExpiresAt:   l.ExpiresAt,
+				ConfigFile:  l.ConfigFile,
+			})
+		}
 	}
 	resp := ipc.StatusResponse{Leases: leases}
 	return json.Marshal(resp)

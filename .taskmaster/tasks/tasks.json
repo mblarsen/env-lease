@@ -1597,7 +1597,7 @@
         "description": "Add an `--interactive` / `-i` flag to the `grant` and `revoke` commands to prompt the user for confirmation before processing each individual secret lease.",
         "details": "This feature enhances user control during lease management. The implementation will involve:\n\n1.  **Flag Addition:** Add a new boolean flag `--interactive` with a shorthand `-i` to both the `grant` and `revoke` cobra commands.\n\n2.  **Grant Command Logic:** Modify the `grant` command's execution flow. If the `--interactive` flag is set, iterate through the secrets defined in the configuration. For each secret, print a prompt to `stderr` (e.g., `Grant lease for 'API_KEY'? [y/N] `) and wait for user input from `stdin`.\n\n3.  **Revoke Command Logic:** Similarly, update the `revoke` command. When run with `--interactive`, it should list the currently active leases for the project and prompt for confirmation before revoking each one (e.g., `Revoke lease for 'API_KEY'? [y/N] `).\n\n4.  **Input Handling:** Create a shared utility function to handle the user prompt. This function should read a single line from `stdin`. The action should only proceed if the input is 'y' or 'Y'. Any other input (including an empty line by pressing Enter) should be treated as 'No', and the specific secret should be skipped.\n\n5.  **Default Behavior:** The default behavior of both commands (when the flag is not present) must remain unchanged, processing all applicable secrets without user interaction.",
         "testStrategy": "Testing will be conducted through a combination of unit and integration tests.\n\n1.  **Unit Tests:** Create a unit test for the new user input prompting utility. This test will mock `stdin` and `stderr` to verify:\n    - The prompt is correctly formatted and written to `stderr`.\n    - Input 'y' and 'Y' return `true`.\n    - Input 'n', 'N', an empty string (Enter), and any other text return `false`.\n\n2.  **CLI Integration Tests:** Implement end-to-end tests using a test harness that can control the command's `stdin`.\n    - **Grant Interactive:** Set up a config with three secrets. Run `env-lease grant -i` and pipe the input sequence `y\\nfoo\\nY\\n` to `stdin`. Verify that only the first and third secrets are granted a lease by checking the daemon's state.\n    - **Revoke Interactive:** Grant leases for all three secrets. Run `env-lease revoke -i` and pipe the input sequence `n\\ny\\n\\n` to `stdin`. Verify that only the second secret's lease is revoked.\n    - **Backward Compatibility:** Run both `grant` and `revoke` without the `-i` flag to ensure they still process all secrets by default without any prompting.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           37
         ],
@@ -1607,7 +1607,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-30T06:59:36.466Z",
+      "updated": "2025-09-30T07:15:52.139Z",
       "description": "Tasks for master context"
     }
   }

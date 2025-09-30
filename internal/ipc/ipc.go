@@ -30,7 +30,8 @@ type GrantResponse struct {
 
 // StatusRequest is the payload for a status request.
 type StatusRequest struct {
-	Command string
+	Command    string
+	ConfigFile string
 }
 
 // StatusResponse is the payload for a status response.
@@ -43,6 +44,7 @@ type RevokeRequest struct {
 	Command    string
 	ConfigFile string
 	All        bool
+	Leases     []Lease
 }
 
 // RevokeResponse is the payload for a revoke response.

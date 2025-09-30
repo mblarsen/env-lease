@@ -24,6 +24,43 @@ var revokeCmd = &cobra.Command{
 		}
 
 		all, _ := cmd.Flags().GetBool("all")
+		interactive, _ := cmd.Flags().GetBool("interactive")
+
+		if interactive && !all {
+			statusReq := ipc.StatusRequest{Command: "status", ConfigFile: configFile}
+			var leasesResp ipc.StatusResponse
+			if err := client.Send(statusReq, &leasesResp); err != nil {
+				handleClientError(err)
+			}
+
+			var leasesToRevoke []ipc.Lease
+			for _, l := range leasesResp.Leases {
+				if confirm(fmt.Sprintf("Revoke lease for '%s'?", l.Source)) {
+					leasesToRevoke = append(leasesToRevoke, l)
+				}
+			}
+
+			if len(leasesToRevoke) == 0 {
+				fmt.Println("No leases selected for revocation.")
+				return nil
+			}
+
+			req := ipc.RevokeRequest{
+				Command:    "revoke",
+				ConfigFile: configFile,
+				Leases:     leasesToRevoke,
+			}
+			var revokeResp ipc.RevokeResponse
+			if err := client.Send(req, &revokeResp); err != nil {
+				handleClientError(err)
+			}
+			for _, msg := range revokeResp.Messages {
+				fmt.Println(msg)
+			}
+			fmt.Println("Revoke request sent.")
+			return nil
+		}
+
 		req := ipc.RevokeRequest{
 			Command:    "revoke",
 			ConfigFile: configFile,
@@ -85,5 +122,6 @@ var revokeCmd = &cobra.Command{
 func init() {
 	revokeCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
 	revokeCmd.Flags().Bool("all", false, "Revoke all active leases, across all projects.")
+	revokeCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before revoking each lease.")
 	rootCmd.AddCommand(revokeCmd)
 }
