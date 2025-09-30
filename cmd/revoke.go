@@ -62,18 +62,20 @@ var revokeCmd = &cobra.Command{
 			// Process parents and their children
 			for _, p := range parents {
 				uniqueID := p.Source + "->" + p.Destination
-				prompt := fmt.Sprintf("Revoke lease for '%s'?", p.Source)
-				if confirm(prompt) {
-					leasesToRevoke = append(leasesToRevoke, p)
-					leasesToRevoke = append(leasesToRevoke, childrenOfParent[uniqueID]...)
-				} else {
-					// If parent is not revoked, ask for each child
-					for _, child := range childrenOfParent[uniqueID] {
-						if confirm(fmt.Sprintf("Revoke lease for '%s'?", child.Variable)) {
-							leasesToRevoke = append(leasesToRevoke, child)
-						}
+				children := childrenOfParent[uniqueID]
+				var childrenToRevoke []ipc.Lease
+
+				for _, child := range children {
+					if confirm(fmt.Sprintf("Revoke lease for '%s'?", child.Variable)) {
+						childrenToRevoke = append(childrenToRevoke, child)
 					}
 				}
+
+				// If all children are being revoked, add the parent to the list too
+				if len(childrenToRevoke) == len(children) {
+					leasesToRevoke = append(leasesToRevoke, p)
+				}
+				leasesToRevoke = append(leasesToRevoke, childrenToRevoke...)
 			}
 
 			// Process normal leases

@@ -108,7 +108,13 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 		    }
 		
 		    resp := ipc.GrantResponse{Messages: []string{}}
-		    slog.Info("Granted leases", "count", len(req.Leases))
+		    actualLeaseCount := 0
+		    for _, l := range req.Leases {
+		        if l.Variable != "" {
+		            actualLeaseCount++
+		        }
+		    }
+		    slog.Info("Granted leases", "count", actualLeaseCount)
 		    return json.Marshal(resp)
 		}
 		

@@ -68,9 +68,29 @@ var statusCmd = &cobra.Command{
 			printLeases(leasesToDisplay, groupedLeases)
 		}
 
-		// Calculate other leases count
+		// Calculate other leases count, excluding parent leases from the count
 		if !showAll {
-			otherLeasesCount := len(allTopLevelLeases) - len(leasesToDisplay)
+			var allLeasesCount int
+			for _, lease := range allTopLevelLeases {
+				uniqueParentID := lease.Source + "->" + lease.Destination
+				if children, isParent := groupedLeases[uniqueParentID]; isParent {
+					allLeasesCount += len(children)
+				} else {
+					allLeasesCount++
+				}
+			}
+
+			var displayedLeasesCount int
+			for _, lease := range leasesToDisplay {
+				uniqueParentID := lease.Source + "->" + lease.Destination
+				if children, isParent := groupedLeases[uniqueParentID]; isParent {
+					displayedLeasesCount += len(children)
+				} else {
+					displayedLeasesCount++
+				}
+			}
+
+			otherLeasesCount := allLeasesCount - displayedLeasesCount
 			if otherLeasesCount > 0 {
 				fmt.Println("-------------------------------------------------------")
 				fmt.Printf("%d more active leases. Use --all to show all leases.\n", otherLeasesCount)
