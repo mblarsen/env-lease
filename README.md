@@ -15,6 +15,27 @@
 *   **Simple & Declarative:** Configure all your secret leases in a single, easy-to-read `env-lease.toml` file.
 *   **Developer-Friendly:** Get optional desktop notifications on macOS when a lease expires.
 
+### Example
+
+```toml
+# env-lease.toml
+
+[[lease]]
+source = "op://your_vault/your_item/your_field"
+destination = ".envrc"
+variable = "API_KEY"
+duration = "1h"
+```
+
+next run them **grant** command:
+
+```sh
+env-lease grant
+```
+
+The `API_KEY` will be revoked in 1 hour.
+
+
 ### Why?
 
 Managing secrets in local development often forces a choice between convenience and security. `env-lease` exists to offer a middle ground, prioritizing a fast, uninterrupted workflow while still providing strong, automated safeguards against leaving credentials exposed long-term.
