@@ -34,15 +34,25 @@ var revokeCmd = &cobra.Command{
 			}
 
 			var leasesToRevoke []ipc.Lease
-			var childrenOfParent = make(map[string][]ipc.Lease)
-			var parents []ipc.Lease
-			var normalLeases []ipc.Lease
+			childrenOfParent := make(map[string][]ipc.Lease)
+			var potentialParentsAndNormalLeases []ipc.Lease
 
-			// First, separate leases into parents, children, and normal leases
+			// First pass: separate children from potential parents/normal leases
 			for _, l := range leasesResp.Leases {
 				if l.ParentSource != "" {
 					childrenOfParent[l.ParentSource] = append(childrenOfParent[l.ParentSource], l)
-				} else if _, isParent := childrenOfParent[l.Source+"->"+l.Destination]; isParent {
+				} else {
+					potentialParentsAndNormalLeases = append(potentialParentsAndNormalLeases, l)
+				}
+			}
+
+			var parents []ipc.Lease
+			var normalLeases []ipc.Lease
+
+			// Second pass: separate actual parents from normal leases
+			for _, l := range potentialParentsAndNormalLeases {
+				uniqueID := l.Source + "->" + l.Destination
+				if _, isParent := childrenOfParent[uniqueID]; isParent {
 					parents = append(parents, l)
 				} else {
 					normalLeases = append(normalLeases, l)
@@ -51,12 +61,14 @@ var revokeCmd = &cobra.Command{
 
 			// Process parents and their children
 			for _, p := range parents {
-				if confirm(fmt.Sprintf("Revoke lease for '%s'?", p.Source)) {
+				uniqueID := p.Source + "->" + p.Destination
+				prompt := fmt.Sprintf("Revoke lease for '%s'?", p.Source)
+				if confirm(prompt) {
 					leasesToRevoke = append(leasesToRevoke, p)
-					leasesToRevoke = append(leasesToRevoke, childrenOfParent[p.Source+"->"+p.Destination]...)
+					leasesToRevoke = append(leasesToRevoke, childrenOfParent[uniqueID]...)
 				} else {
 					// If parent is not revoked, ask for each child
-					for _, child := range childrenOfParent[p.Source+"->"+p.Destination] {
+					for _, child := range childrenOfParent[uniqueID] {
 						if confirm(fmt.Sprintf("Revoke lease for '%s'?", child.Variable)) {
 							leasesToRevoke = append(leasesToRevoke, child)
 						}
@@ -66,7 +78,11 @@ var revokeCmd = &cobra.Command{
 
 			// Process normal leases
 			for _, l := range normalLeases {
-				if confirm(fmt.Sprintf("Revoke lease for '%s'?", l.Source)) {
+				promptVar := l.Source
+				if l.Variable != "" {
+					promptVar = l.Variable
+				}
+				if confirm(fmt.Sprintf("Revoke lease for '%s'?", promptVar)) {
 					leasesToRevoke = append(leasesToRevoke, l)
 				}
 			}
