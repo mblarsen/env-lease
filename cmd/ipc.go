@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/xdgpath"
 )

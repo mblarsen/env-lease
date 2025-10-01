@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"github.com/BurntSushi/toml"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 // Config represents the structure of the env-lease.toml file.
@@ -14,19 +15,19 @@ type Config struct {
 
 // Lease represents a single lease block in the config.
 type Lease struct {
-	Source        string `toml:"source"`
-	Destination   string `toml:"destination"`
-	Duration      string `toml:"duration"`
-	LeaseType     string `toml:"lease_type"`
-	Variable      string `toml:"variable"`
-	Format        string   `toml:"format"`
-	Transform     []string `toml:"transform"`
-	FileMode      string   `toml:"file_mode"`
-	OpAccount     string      `toml:"op_account" json:"op_account,omitempty"`
-	ExpiresAt     time.Time   `toml:"-" json:"expires_at"`
-	OrphanedSince *time.Time  `toml:"-" json:"orphaned_since,omitempty"`
-	ConfigFile    string      `toml:"-" json:"config_file"`
-	ParentSource  string      `toml:"-" json:"parent_source,omitempty"`
+	Source        string     `toml:"source"`
+	Destination   string     `toml:"destination"`
+	Duration      string     `toml:"duration"`
+	LeaseType     string     `toml:"lease_type"`
+	Variable      string     `toml:"variable"`
+	Format        string     `toml:"format"`
+	Transform     []string   `toml:"transform"`
+	FileMode      string     `toml:"file_mode"`
+	OpAccount     string     `toml:"op_account" json:"op_account,omitempty"`
+	ExpiresAt     time.Time  `toml:"-" json:"expires_at"`
+	OrphanedSince *time.Time `toml:"-" json:"orphaned_since,omitempty"`
+	ConfigFile    string     `toml:"-" json:"config_file"`
+	ParentSource  string     `toml:"-" json:"parent_source,omitempty"`
 }
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.

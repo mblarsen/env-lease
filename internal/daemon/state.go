@@ -3,10 +3,11 @@ package daemon
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
 	"os"
 	"time"
+
+	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 )
 
 // State represents the persistent state of the daemon.
@@ -17,10 +18,10 @@ type State struct {
 
 // RetryItem represents a lease that failed to be revoked.
 type RetryItem struct {
-	Lease         *config.Lease `json:"lease"`
-	Attempts      int           `json:"attempts"`
-	NextRetryTime time.Time     `json:"next_retry_time"`
-	InitialFailure time.Time `json:"initial_failure"`
+	Lease          *config.Lease `json:"lease"`
+	Attempts       int           `json:"attempts"`
+	NextRetryTime  time.Time     `json:"next_retry_time"`
+	InitialFailure time.Time     `json:"initial_failure"`
 }
 
 // NewState creates a new, empty state.

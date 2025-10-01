@@ -2,16 +2,17 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/mblarsen/env-lease/internal/provider"
-	"github.com/mblarsen/env-lease/internal/transform"
-	"github.com/spf13/cobra"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/provider"
+	"github.com/mblarsen/env-lease/internal/transform"
+	"github.com/spf13/cobra"
 )
 
 var shellMode bool

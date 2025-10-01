@@ -5,10 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/tidwall/gjson"
 	"gopkg.in/yaml.v3"
-	"strings"
 )
 
 // Transformer is an interface for transforming data.

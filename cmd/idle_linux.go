@@ -15,11 +15,11 @@ import (
 )
 
 const (
-	idleServiceName   = "env-lease-idle.service"
-	idleTimerName     = "env-lease-idle.timer"
-	idleScriptName    = "env-lease-idle-revoke.sh"
-	systemdDir        = ".config/systemd/user"
-	scriptDir         = ".local/bin"
+	idleServiceName = "env-lease-idle.service"
+	idleTimerName   = "env-lease-idle.timer"
+	idleScriptName  = "env-lease-idle-revoke.sh"
+	systemdDir      = ".config/systemd/user"
+	scriptDir       = ".local/bin"
 )
 
 func init() {

@@ -3,15 +3,16 @@ package daemon
 import (
 	"context"
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
-	"github.com/mblarsen/env-lease/internal/ipc"
 	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/ipc"
 )
 
 // Clock is an interface for time-related functions to allow for mocking.
@@ -246,9 +247,9 @@ func (d *Daemon) revokeExpiredLeases() {
 			if err != nil {
 				slog.Error("Failed to revoke lease, adding to retry queue", "id", id, "err", err)
 				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
-					Lease:         lease,
-					Attempts:      1,
-					NextRetryTime: now.Add(2 * time.Second),
+					Lease:          lease,
+					Attempts:       1,
+					NextRetryTime:  now.Add(2 * time.Second),
 					InitialFailure: now,
 				})
 			} else {

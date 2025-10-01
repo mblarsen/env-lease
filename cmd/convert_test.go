@@ -129,7 +129,7 @@ func TestConvertToToml(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "simple case",
+			name:  "simple case",
 			input: `export API_KEY="op://vault/item/field"`,
 			expected: `[[lease]]
 variable = "API_KEY"
@@ -182,7 +182,7 @@ duration = "1h"
 `,
 		},
 		{
-			name: "no quotes",
+			name:  "no quotes",
 			input: `DB_PASSWORD=op://vault/db/password`,
 			expected: `[[lease]]
 variable = "DB_PASSWORD"

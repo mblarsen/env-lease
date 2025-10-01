@@ -1,11 +1,12 @@
 package daemon
 
 import (
-	"github.com/mblarsen/env-lease/internal/config"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mblarsen/env-lease/internal/config"
 )
 
 func TestState(t *testing.T) {

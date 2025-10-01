@@ -3,6 +3,12 @@ default_install_hook_types:
   - pre-commit
 
 repos:
+  - repo: https://github.com/tekwizely/pre-commit-golang
+    rev: 645165368711be670d1945c15060e746f5ed15c6
+    hooks:
+      - id: go-imports
+        args: ["-w"]
+
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v1.17.0
     hooks:

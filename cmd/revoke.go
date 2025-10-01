@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
+
+	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/spf13/cobra"
 )
 
 var revokeCmd = &cobra.Command{
@@ -88,7 +89,6 @@ var revokeCmd = &cobra.Command{
 					leasesToRevoke = append(leasesToRevoke, l)
 				}
 			}
-
 
 			if len(leasesToRevoke) == 0 {
 				fmt.Println("No leases selected for revocation.")

@@ -1,99 +1,100 @@
 package transform
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestPipeline(t *testing.T) {
 	tests := []struct {
-		name          string
+		name            string
 		transformations []string
-		input         string
-		expected      string
-		expectErr     bool
+		input           string
+		expected        string
+		expectErr       bool
 	}{
 		{
-			name:          "base64 encode",
+			name:            "base64 encode",
 			transformations: []string{"base64-encode"},
-			input:         "hello",
-			expected:      "aGVsbG8=",
-			expectErr:     false,
+			input:           "hello",
+			expected:        "aGVsbG8=",
+			expectErr:       false,
 		},
 		{
-			name:          "base64 decode",
+			name:            "base64 decode",
 			transformations: []string{"base64-decode"},
-			input:         "aGVsbG8=",
-			expected:      "hello",
-			expectErr:     false,
+			input:           "aGVsbG8=",
+			expected:        "hello",
+			expectErr:       false,
 		},
 		{
-			name:          "json select",
+			name:            "json select",
 			transformations: []string{"json", "select 'data.key'"},
-			input:         `{"data": {"key": "value"}}`,
-			expected:      "value",
-			expectErr:     false,
+			input:           `{"data": {"key": "value"}}`,
+			expected:        "value",
+			expectErr:       false,
 		},
 		{
-			name:          "toml select",
+			name:            "toml select",
 			transformations: []string{"toml", "select 'data.key'"},
-			input:         `[data]
+			input: `[data]
 key = "value"`,
-			expected:      "value",
-			expectErr:     false,
+			expected:  "value",
+			expectErr: false,
 		},
 		{
-			name:          "yaml select",
+			name:            "yaml select",
 			transformations: []string{"yaml", "select 'data.key'"},
-			input:         `data:
+			input: `data:
   key: value`,
-			expected:      "value",
-			expectErr:     false,
+			expected:  "value",
+			expectErr: false,
 		},
 		{
-			name:          "complex pipeline",
+			name:            "complex pipeline",
 			transformations: []string{"base64-decode", "json", "select 'data.key'"},
-			input:         "eyJkYXRhIjogeyJrZXkiOiAidmFsdWUifX0=",
-			expected:      "value",
-			expectErr:     false,
+			input:           "eyJkYXRhIjogeyJrZXkiOiAidmFsdWUifX0=",
+			expected:        "value",
+			expectErr:       false,
 		},
 		{
-			name:          "invalid transformer",
+			name:            "invalid transformer",
 			transformations: []string{"invalid"},
-			input:         "hello",
-			expected:      "",
-			expectErr:     true,
+			input:           "hello",
+			expected:        "",
+			expectErr:       true,
 		},
 		{
-			name:          "to_json",
+			name:            "to_json",
 			transformations: []string{"json", "select 'data'", "to_json"},
-			input:         `{"data": {"key": "value"}}`,
-			expected:      `{
+			input:           `{"data": {"key": "value"}}`,
+			expected: `{
   "key": "value"
 }`,
-			expectErr:     false,
+			expectErr: false,
 		},
 		{
-			name:          "to_yaml",
+			name:            "to_yaml",
 			transformations: []string{"json", "select 'data'", "to_yaml"},
-			input:         `{"data": {"key": "value"}}`,
-			expected:      "key: value\n",
-			expectErr:     false,
+			input:           `{"data": {"key": "value"}}`,
+			expected:        "key: value\n",
+			expectErr:       false,
 		},
 		{
-			name:          "to_toml",
+			name:            "to_toml",
 			transformations: []string{"json", "select 'data'", "to_toml"},
-			input:         `{"data": {"key": "value"}}`,
-			expected:      "key = \"value\"\n",
-			expectErr:     false,
+			input:           `{"data": {"key": "value"}}`,
+			expected:        "key = \"value\"\n",
+			expectErr:       false,
 		},
 		{
-			name:          "invalid pipeline",
+			name:            "invalid pipeline",
 			transformations: []string{"json", "base64-encode"},
-			input:         `{"data": {"key": "value"}}`,
-			expected:      "",
-			expectErr:     true, // Expect error on Run(), not NewPipeline()
+			input:           `{"data": {"key": "value"}}`,
+			expected:        "",
+			expectErr:       true, // Expect error on Run(), not NewPipeline()
 		},
 	}
 
@@ -109,7 +110,6 @@ key = "value"`,
 				}
 				return
 			}
-
 
 			output, err := pipeline.Run(tt.input)
 			if (err != nil) != tt.expectErr {
@@ -128,12 +128,12 @@ key = "value"`,
 
 func TestExplodeTransformerWithArgs(t *testing.T) {
 	tests := []struct {
-		name          string
+		name           string
 		transformation string
-		input         string
-		expected      ExplodedData
-		expectErr     bool
-		errContains   string
+		input          string
+		expected       ExplodedData
+		expectErr      bool
+		errContains    string
 	}{
 		{
 			name:           "no args",

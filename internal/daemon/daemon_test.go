@@ -2,18 +2,20 @@ package daemon
 
 import (
 	"context"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
-	"time"
 )
 
 type mockClock struct {
 	now time.Time
 }
+
 func (m *mockClock) Now() time.Time {
 	return m.now
 }
@@ -76,10 +78,10 @@ func TestDaemon_revokeExpiredLeases(t *testing.T) {
 	assert.Equal(t, 1, revoker.RevokeCount)
 	assert.Equal(t, 1, notifier.NotifyCount)
 	assert.Equal(t, "Lease Expired", notifier.LastTitle)
-		assert.Equal(t, "Lease for onepassword://vault/item/field has expired and was revoked.", notifier.LastMessage)
-		assert.Empty(t, state.Leases)
-		}
-	
+	assert.Equal(t, "Lease for onepassword://vault/item/field has expired and was revoked.", notifier.LastMessage)
+	assert.Empty(t, state.Leases)
+}
+
 func TestDaemon_revokeOrphanedLeases(t *testing.T) {
 	// Arrange
 	state := NewState()

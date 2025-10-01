@@ -3,10 +3,11 @@ package daemon
 import (
 	"context"
 	"crypto/rand"
-	"github.com/mblarsen/env-lease/internal/ipc"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/mblarsen/env-lease/internal/ipc"
 )
 
 func TestDaemonServer(t *testing.T) {

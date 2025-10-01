@@ -3,19 +3,20 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/spf13/cobra"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
+
 	"github.com/lmittmann/tint"
+	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
-	Use:          "env-lease",
-	Short:        "A CLI for managing temporary, leased secrets in environment files.",
-	Long:         `env-lease is a tool that automates the lifecycle of secrets in local
+	Use:   "env-lease",
+	Short: "A CLI for managing temporary, leased secrets in environment files.",
+	Long: `env-lease is a tool that automates the lifecycle of secrets in local
 development files. It fetches secrets, injects them into files, and revokes
 them after a specified lease duration.`,
 	SilenceUsage: true,

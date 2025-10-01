@@ -2,13 +2,14 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"sort"
 	"text/tabwriter"
 	"time"
+
+	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/spf13/cobra"
 )
 
 var statusCmd = &cobra.Command{

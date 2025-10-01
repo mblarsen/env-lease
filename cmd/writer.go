@@ -45,7 +45,6 @@ func writeFile(path, value string, fileModeStr string) (bool, error) {
 	return false, err
 }
 
-
 func writeEnvFile(path, key, value, format string, override bool, fileModeStr string) (bool, error) {
 	fileMode, err := parseFileMode(fileModeStr, 0600)
 	if err != nil {

@@ -6,17 +6,18 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
+
 	"github.com/lmittmann/tint"
 	"github.com/mblarsen/env-lease/internal/daemon"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/xdgpath"
 	"github.com/spf13/cobra"
-	"log/slog"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
 )
 
 var daemonCmd = &cobra.Command{

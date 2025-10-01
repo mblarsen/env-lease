@@ -23,8 +23,8 @@ func TestHandleGrant(t *testing.T) {
 		Duration:    "1h",
 	}
 	req := ipc.GrantRequest{
-		Command:  "grant",
-		Leases:   []ipc.Lease{lease},
+		Command: "grant",
+		Leases:  []ipc.Lease{lease},
 	}
 	payload, _ := json.Marshal(req)
 

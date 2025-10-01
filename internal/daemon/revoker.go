@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
 	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 )
 
 // Revoker is an interface for revoking leases.
@@ -63,7 +64,8 @@ func (r *FileRevoker) clearEnvVar(path, keyToRevoke string) error {
 
 		if keyPart == keyToRevoke {
 			originalKeyPart := parts[0]
-								out.WriteString(originalKeyPart + "=\n")		} else {
+			out.WriteString(originalKeyPart + "=\n")
+		} else {
 			out.WriteString(line + "\n")
 		}
 	}

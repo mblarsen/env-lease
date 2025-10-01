@@ -1,10 +1,11 @@
 package daemon
 
 import (
-	"github.com/mblarsen/env-lease/internal/config"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/mblarsen/env-lease/internal/config"
 )
 
 func TestFileRevoker_Revoke(t *testing.T) {
