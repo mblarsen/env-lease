@@ -1603,11 +1603,36 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 72,
+        "title": "Optimize Interactive Grant by Prompting Before Secret Lookup",
+        "description": "Fix a bug in the interactive grant command (`-i`) where secrets are fetched before the user is prompted for confirmation, causing unnecessary delays. This task will reverse the order of operations to improve performance and user experience.",
+        "details": "The current implementation of `env-lease grant -i`, introduced in Task #71, iterates through the list of secrets, fetches the secret value using the configured `SecretProvider`, and then asks the user for confirmation. This results in a noticeable delay before each prompt, even if the user intends to skip the secret.\n\nThe logic within the `grant` command's interactive mode needs to be refactored. The new execution flow for each secret in the configuration should be:\n1. Display the confirmation prompt to the user (e.g., `Grant lease for 'SECRET_NAME'? [y/N] `).\n2. Wait for and read the user's input.\n3. If the user confirms (e.g., inputs 'y'), then proceed to call the `Fetch` method of the corresponding `SecretProvider` to retrieve the secret's value.\n4. If the user denies or provides no input, skip the secret fetch entirely and move to the next secret in the list.\n\nThis change will be isolated to the `grant` command's execution logic and should not require any modifications to the `SecretProvider` interface or its various implementations.",
+        "testStrategy": "The fix will be verified through both manual and automated testing.\n\n1.  **Manual Verification:**\n    *   Configure `env-lease.toml` with multiple secrets from a provider that has a noticeable lookup latency (e.g., a cloud provider like AWS or Google Secret Manager).\n    *   Run `env-lease grant -i`.\n    *   Observe that the confirmation prompt for the first secret appears almost instantly, without a delay.\n    *   Enter 'y' and confirm that the delay now occurs *after* the input, during the secret fetch.\n    *   For the next secret, enter 'n' and confirm that the prompt for the subsequent secret appears immediately, with no fetch delay.\n\n2.  **Unit/Integration Testing:**\n    *   Modify the existing test suite for the interactive grant command.\n    *   Utilize a mocked `SecretProvider` that includes a counter or flag to track invocations of its `Fetch` method.\n    *   Create a test case that simulates a user denying a grant (e.g., inputting 'n'). Assert that the mock provider's `Fetch` method was **not** called.\n    *   Create another test case that simulates a user approving a grant (e.g., inputting 'y'). Assert that the mock provider's `Fetch` method **was** called exactly once.",
+        "status": "pending",
+        "dependencies": [
+          71,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 73,
+        "title": "Ensure Leases are Revoked Correctly After System Wake-up",
+        "description": "Fix a bug where leases that expire while a computer is asleep or powered off are not revoked upon system wake-up. This task will implement a mechanism to check for and revoke expired leases when the system becomes active again.",
+        "details": "The current lease expiration mechanism fails if the system is not running when a lease's expiration time is reached. This task will introduce a robust check that triggers on system startup or wake-up from sleep/hibernate.\n\n**Implementation Plan:**\n\n1.  **Create a New Internal Command:**\n    *   Implement a new, non-interactive command, e.g., `env-lease internal --check-expired`.\n    *   This command will read the application's lease state file.\n    *   It will iterate through all active leases and compare their expiration timestamp with the current time.\n    *   For each lease that has expired, it will trigger the standard revocation logic.\n    *   The command should execute silently on success and only log errors (e.g., network failure during revocation).\n\n2.  **Platform-Specific Wake-up Triggers:**\n    *   The core of the solution is to run the new command automatically after the system wakes up. This requires platform-specific configuration.\n    *   **macOS:** Use `launchd`. A `.plist` file will be created to run the command. It can be triggered by the `RunAtLoad` key (for startup) and by listening for wake notifications. Documentation should be provided for users to place this file in `~/Library/LaunchAgents`.\n    *   **Linux:** Use `systemd`. A user service unit file (`.service`) will be created. The service will be configured to run after targets like `suspend.target` and `hibernate.target` by using `After=suspend.target hibernate.target` and `WantedBy=suspend.target hibernate.target`.\n    *   **Windows:** Use the Task Scheduler. A task can be configured to run the command on specific system events, such as Event ID 1 from the `Power-Troubleshooter` source, which indicates the system has resumed from a low-power state.\n\n3.  **Documentation:**\n    *   Update the project documentation with clear instructions on how to set up these platform-specific triggers for the new functionality.",
+        "testStrategy": "Verification will combine unit tests for the core logic and manual end-to-end tests for the system integration.\n\n**1. Unit Tests:**\n*   Create a test suite for the `--check-expired` command's logic.\n*   Mock the lease state file with a mix of active, expired, and future-expiring leases.\n*   Verify that the logic correctly identifies *only* the expired leases.\n*   Mock the secret provider's `revoke` function to confirm it is called with the correct arguments for each expired lease.\n\n**2. Manual End-to-End Verification:**\n*   **Step 1: Setup:** Configure the platform-specific trigger (e.g., `launchd` on macOS) as described in the implementation details.\n*   **Step 2: Grant Lease:** Run `env-lease grant` to acquire a new lease with a short lifetime (e.g., 2 minutes). Confirm the lease is active.\n*   **Step 3: Induce Sleep:** Immediately put the machine to sleep or hibernate.\n*   **Step 4: Wait:** Keep the machine asleep for a duration longer than the lease's lifetime (e.g., 3 minutes).\n*   **Step 5: Wake and Verify:** Wake the machine. Wait a few moments for the trigger to fire. Check the status of the leases. The previously granted lease should now be revoked and no longer listed as active.\n*   **Step 6: Repeat:** Repeat the test for system reboot instead of sleep to ensure the check also runs on startup.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-09-30T10:42:10.812Z",
+      "updated": "2025-10-01T01:58:27.924Z",
       "description": "Tasks for master context"
     }
   }
