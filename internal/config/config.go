@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/BurntSushi/toml"
+	"strings"
 	"time"
 )
 
@@ -87,10 +88,16 @@ func Load(path string) (*Config, error) {
 			}
 		}
 
-		if lease.LeaseType == "env" || lease.LeaseType == "shell" {
-			if lease.Variable == "" {
-				return nil, fmt.Errorf("lease %d: variable is required for lease_type '%s'", i, lease.LeaseType)
+		isExplode := false
+		for _, t := range lease.Transform {
+			if strings.HasPrefix(t, "explode") {
+				isExplode = true
+				break
 			}
+		}
+
+		if (lease.LeaseType == "env" || lease.LeaseType == "shell") && lease.Variable == "" && !isExplode {
+			return nil, fmt.Errorf("lease %d: variable is required for lease_type '%s'", i, lease.LeaseType)
 		}
 	}
 

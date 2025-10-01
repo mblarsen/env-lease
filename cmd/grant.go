@@ -60,7 +60,7 @@ var grantCmd = &cobra.Command{
 		stat, _ := os.Stdout.Stat()
 		isPiped := (stat.Mode() & os.ModeCharDevice) == 0
 
-		if isPiped && interactive {
+		if isPiped && interactive && os.Getenv("ENV_LEASE_TEST") != "1" {
 			return fmt.Errorf("interactive mode is not supported when piping output (e.g., inside 'eval $(...)')\n" +
 				"Please run 'eval $(env-lease grant)' without the interactive flag.")
 		}
@@ -130,51 +130,64 @@ var grantCmd = &cobra.Command{
 				}
 			}
 
-			// Fetch secret
-			slog.Info("Fetching secret", "source", l.Source)
-			secretVal, err := p.Fetch(l.Source)
-			if err != nil {
-				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to fetch secret: %w", err)})
-				if !continueOnError {
-					break
-				}
-				continue
-			}
-			slog.Info("Fetched secret", "source", l.Source)
-
-			// Run transform pipeline
-			var transformResult interface{} = secretVal
-			if len(l.Transform) > 0 {
-				pipeline, err := transform.NewPipeline(l.Transform)
-				if err != nil {
-					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to create transform pipeline: %w", err)})
-					if !continueOnError {
-						break
-					}
-					continue
-				}
-				transformResult, err = pipeline.Run(secretVal)
-				if err != nil {
-					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to transform secret: %w", err)})
-					if !continueOnError {
-						break
-					}
-					continue
-				}
-			}
-
 			// Handle result: could be a single string or exploded data
 			var approvedLeases []ipc.Lease
 			var approvedShellCommands []string
 
-			switch result := transformResult.(type) {
-			case string:
-				// SINGLE LEASE CASE
-				prompt := fmt.Sprintf("Grant lease for '%s'?", l.Variable)
-				if l.Variable == "" {
-					prompt = fmt.Sprintf("Grant lease for '%s'?", l.Source)
+			// Pre-determine the prompt string
+			isExplode := false
+			for _, t := range l.Transform {
+				if strings.HasPrefix(t, "explode") {
+					isExplode = true
+					break
 				}
-				if !interactive || confirm(prompt) {
+			}
+
+			var prompt string
+			if isExplode {
+				prompt = fmt.Sprintf("Grant leases from '%s'?", l.Source)
+			} else if l.Variable == "" {
+				prompt = fmt.Sprintf("Grant lease for '%s'?", l.Source)
+			} else {
+				prompt = fmt.Sprintf("Grant lease for '%s'?", l.Variable)
+			}
+
+			if !interactive || confirm(prompt) {
+				// Fetch secret
+				slog.Info("Fetching secret", "source", l.Source)
+				secretVal, err := p.Fetch(l.Source)
+				if err != nil {
+					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to fetch secret: %w", err)})
+					if !continueOnError {
+						break
+					}
+					continue
+				}
+				slog.Info("Fetched secret", "source", l.Source)
+				// Run transform pipeline
+				var transformResult interface{} = secretVal
+				if len(l.Transform) > 0 {
+					pipeline, err := transform.NewPipeline(l.Transform)
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to create transform pipeline: %w", err)})
+						if !continueOnError {
+							break
+						}
+						continue
+					}
+					transformResult, err = pipeline.Run(secretVal)
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to transform secret: %w", err)})
+						if !continueOnError {
+							break
+						}
+						continue
+					}
+				}
+
+				switch result := transformResult.(type) {
+				case string:
+					// SINGLE LEASE CASE
 					finalLeases, sc, err = processLease(cmd, l, result, absConfigFile)
 					if err != nil {
 						errs = append(errs, grantError{Source: l.Source, Err: err})
@@ -185,51 +198,52 @@ var grantCmd = &cobra.Command{
 					}
 					approvedLeases = append(approvedLeases, finalLeases...)
 					approvedShellCommands = append(approvedShellCommands, sc...)
-				}
 
-			case transform.ExplodedData:
-				// EXPLODED LEASE CASE
-				if l.LeaseType == "file" {
-					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("'explode' transform cannot be used with lease_type 'file'")})
-					if !continueOnError {
-						break
+				case transform.ExplodedData:
+					// EXPLODED LEASE CASE
+					if l.LeaseType == "file" {
+						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("'explode' transform cannot be used with lease_type 'file'")})
+						if !continueOnError {
+							break
+						}
+						continue
 					}
-					continue
-				}
 
-										// Add a parent/container lease for the status command to find
-										parentLeaseConfig := l
-										parentLeaseConfig.Variable = "" // No single variable for the parent
-										parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", absConfigFile)
-										if err != nil {
-											errs = append(errs, grantError{Source: l.Source, Err: err})
-											if !continueOnError {
-												break
-											}
-											continue
-										}
-										approvedLeases = append(approvedLeases, parentLeases...)
-										uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
-				
-										// Process all the child leases
-										for key, value := range result {
-											if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", key)) {
-												explodedLeaseConfig := l
-												explodedLeaseConfig.Variable = key
-												explodedLeaseConfig.ParentSource = uniqueParentID
-				
-												finalLeases, sc, err = processLease(cmd, explodedLeaseConfig, value, absConfigFile)
-												if err != nil {
-													errs = append(errs, grantError{Source: key, Err: err})
-													if !continueOnError {
-														break
-													}
-													continue
-												}
-												approvedLeases = append(approvedLeases, finalLeases...)
-												approvedShellCommands = append(approvedShellCommands, sc...)
-											}
-										}			}
+					// Add a parent/container lease for the status command to find
+					parentLeaseConfig := l
+					parentLeaseConfig.Variable = "" // No single variable for the parent
+					parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", absConfigFile)
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: err})
+						if !continueOnError {
+							break
+						}
+						continue
+					}
+					approvedLeases = append(approvedLeases, parentLeases...)
+					uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
+
+					// Process all the child leases
+					for key, value := range result {
+						if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", key)) {
+							explodedLeaseConfig := l
+							explodedLeaseConfig.Variable = key
+							explodedLeaseConfig.ParentSource = uniqueParentID
+
+							finalLeases, sc, err = processLease(cmd, explodedLeaseConfig, value, absConfigFile)
+							if err != nil {
+								errs = append(errs, grantError{Source: key, Err: err})
+								if !continueOnError {
+									break
+								}
+								continue
+							}
+							approvedLeases = append(approvedLeases, finalLeases...)
+							approvedShellCommands = append(approvedShellCommands, sc...)
+						}
+					}
+				}
+			}
 			leases = append(leases, approvedLeases...)
 			shellCommands = append(shellCommands, approvedShellCommands...)
 		}

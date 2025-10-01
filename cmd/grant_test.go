@@ -232,4 +232,82 @@ format = "%s=%q"
 			t.Fatalf("expected content %q, got %q", expectedContent, string(content))
 		}
 	})
+
+	t.Run("interactive mode", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, ".env.interactive")
+		configContent := `
+[[lease]]
+source = "mock"
+destination = "` + destFile + `"
+variable = "API_KEY"
+duration = "1m"
+format = "export %s=%q"
+`
+		configFile := writeConfig(configContent)
+		grantCmd.Flags().Set("config", configFile)
+		grantCmd.Flags().Set("interactive", "true")
+
+		// Test case where user denies
+		originalConfirm := confirm
+		confirm = func(prompt string) bool { return false }
+		err := grantCmd.RunE(grantCmd, []string{})
+		if err != nil {
+			t.Fatalf("grant command failed: %v", err)
+		}
+		confirm = originalConfirm
+		content, err := os.ReadFile(destFile)
+		if err == nil && len(content) > 0 {
+			t.Fatalf("file should be empty, but has content: %s", content)
+		}
+
+		// Test case where user accepts
+		confirm = func(prompt string) bool { return true }
+		err = grantCmd.RunE(grantCmd, []string{})
+		if err != nil {
+			t.Fatalf("grant command failed: %v", err)
+		}
+		confirm = originalConfirm
+		content, err = os.ReadFile(destFile)
+		if err != nil {
+			t.Fatalf("failed to read destination file: %v", err)
+		}
+		expected := `export API_KEY="secret-for-mock"`
+		if !strings.Contains(string(content), expected) {
+			t.Fatalf("expected content %q, got %q", expected, string(content))
+		}
+	})
+
+	t.Run("interactive mode with explode", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, ".env.interactive.explode")
+		configContent := `
+[[lease]]
+source = "mock-explode"
+destination = "` + destFile + `"
+variable = "EXPLODED_VARS"
+duration = "1m"
+transform = ["json", "explode"]
+lease_type = "shell"
+`
+		configFile := writeConfig(configContent)
+		grantCmd.Flags().Set("config", configFile)
+		grantCmd.Flags().Set("interactive", "true")
+
+		var prompts []string
+		originalConfirm := confirm
+		confirm = func(prompt string) bool {
+			prompts = append(prompts, prompt)
+			return true
+		}
+
+		err := grantCmd.RunE(grantCmd, []string{})
+		if err != nil {
+			t.Fatalf("grant command failed: %v", err)
+		}
+		confirm = originalConfirm
+
+		expectedPrompt := "Grant leases from 'mock-explode'?"
+		if len(prompts) == 0 || prompts[0] != expectedPrompt {
+			t.Fatalf("expected prompt %q, got %q", expectedPrompt, prompts[0])
+		}
+	})
 }

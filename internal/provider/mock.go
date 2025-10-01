@@ -10,5 +10,8 @@ func (p *MockProvider) Fetch(sourceURI string) (string, error) {
 	if sourceURI == "mock-fail" {
 		return "", fmt.Errorf("failed to fetch mock secret")
 	}
+	if sourceURI == "mock-explode" {
+		return `{"KEY1": "VALUE1", "KEY2": "VALUE2"}`, nil
+	}
 	return fmt.Sprintf("secret-for-%s", sourceURI), nil
 }

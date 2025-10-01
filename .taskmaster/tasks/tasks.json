@@ -1610,7 +1610,7 @@
         "description": "Fix a bug in the interactive grant command (`-i`) where secrets are fetched before the user is prompted for confirmation, causing unnecessary delays. This task will reverse the order of operations to improve performance and user experience.",
         "details": "The current implementation of `env-lease grant -i`, introduced in Task #71, iterates through the list of secrets, fetches the secret value using the configured `SecretProvider`, and then asks the user for confirmation. This results in a noticeable delay before each prompt, even if the user intends to skip the secret.\n\nThe logic within the `grant` command's interactive mode needs to be refactored. The new execution flow for each secret in the configuration should be:\n1. Display the confirmation prompt to the user (e.g., `Grant lease for 'SECRET_NAME'? [y/N] `).\n2. Wait for and read the user's input.\n3. If the user confirms (e.g., inputs 'y'), then proceed to call the `Fetch` method of the corresponding `SecretProvider` to retrieve the secret's value.\n4. If the user denies or provides no input, skip the secret fetch entirely and move to the next secret in the list.\n\nThis change will be isolated to the `grant` command's execution logic and should not require any modifications to the `SecretProvider` interface or its various implementations.",
         "testStrategy": "The fix will be verified through both manual and automated testing.\n\n1.  **Manual Verification:**\n    *   Configure `env-lease.toml` with multiple secrets from a provider that has a noticeable lookup latency (e.g., a cloud provider like AWS or Google Secret Manager).\n    *   Run `env-lease grant -i`.\n    *   Observe that the confirmation prompt for the first secret appears almost instantly, without a delay.\n    *   Enter 'y' and confirm that the delay now occurs *after* the input, during the secret fetch.\n    *   For the next secret, enter 'n' and confirm that the prompt for the subsequent secret appears immediately, with no fetch delay.\n\n2.  **Unit/Integration Testing:**\n    *   Modify the existing test suite for the interactive grant command.\n    *   Utilize a mocked `SecretProvider` that includes a counter or flag to track invocations of its `Fetch` method.\n    *   Create a test case that simulates a user denying a grant (e.g., inputting 'n'). Assert that the mock provider's `Fetch` method was **not** called.\n    *   Create another test case that simulates a user approving a grant (e.g., inputting 'y'). Assert that the mock provider's `Fetch` method **was** called exactly once.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           71,
           11
@@ -1632,7 +1632,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-01T01:58:27.924Z",
+      "updated": "2025-10-01T06:49:29.291Z",
       "description": "Tasks for master context"
     }
   }
