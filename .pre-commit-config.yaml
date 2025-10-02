@@ -1,6 +1,7 @@
 default_install_hook_types:
   - commit-msg
   - pre-commit
+  - pre-push
 
 repos:
   - repo: https://github.com/tekwizely/pre-commit-golang
@@ -25,3 +26,16 @@ repos:
         entry: trufflehog git file://. --since-commit HEAD --results=verified --fail
         language: golang
         pass_filenames: false
+        stages:
+          - pre-push
+
+  - repo: local
+    hooks:
+    -   id: go-build-linux
+        name: Go Build (linux/amd64)
+        language: golang
+        types: [go]
+        pass_filenames: false
+        stages:
+          - pre-push
+        entry: bash -c 'GOOS=linux GOARCH=amd64 go build ./...'
