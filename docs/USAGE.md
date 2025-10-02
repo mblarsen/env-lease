@@ -203,7 +203,7 @@ export API_KEY="op://vault/item/api-key"
 You can generate a configuration by running:
 
 ```sh
-env-lease convert > env-lease.toml
+env-lease convert .envrc > env-lease.toml
 ```
 
 This will produce an `env-lease.toml` file with leases for `DATABASE_URL` and `API_KEY`. You will still need to edit the file to set the desired `duration` for each lease.
