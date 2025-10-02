@@ -306,9 +306,10 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal string, configFi
 		}
 		absDest = filepath.Join(filepath.Dir(configFile), "<shell>")
 	} else {
-		// For file/env leases, only write if there's a variable.
-		// This prevents writing the parent/container lease of an explode.
-		if l.Variable != "" {
+		// For file/env leases, only write if there's a variable,
+		// or if it's a file lease. This prevents writing the
+		// parent/container lease of an explode.
+		if l.LeaseType == "file" || l.Variable != "" {
 			override, _ := cmd.Flags().GetBool("override")
 			created, err := writeLease(l, secretVal, override)
 			if err != nil {
