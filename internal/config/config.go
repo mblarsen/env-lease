@@ -15,35 +15,37 @@ type Config struct {
 
 // Lease represents a single lease block in the config.
 type Lease struct {
-	Source        string     `toml:"source"`
-	Destination   string     `toml:"destination"`
-	Duration      string     `toml:"duration"`
-	LeaseType     string     `toml:"lease_type"`
-	Variable      string     `toml:"variable"`
-	Format        string     `toml:"format"`
-	Transform     []string   `toml:"transform"`
-	FileMode      string     `toml:"file_mode"`
-	OpAccount     string     `toml:"op_account" json:"op_account,omitempty"`
-	ExpiresAt     time.Time  `toml:"-" json:"expires_at"`
-	OrphanedSince *time.Time `toml:"-" json:"orphaned_since,omitempty"`
-	ConfigFile    string     `toml:"-" json:"config_file"`
-	ParentSource  string     `toml:"-" json:"parent_source,omitempty"`
+	Source         string     `toml:"source"`
+	Destination    string     `toml:"destination"`
+	Duration       string     `toml:"duration"`
+	LeaseType      string     `toml:"lease_type"`
+	Variable       string     `toml:"variable"`
+	Format         string     `toml:"format"`
+	Transform      []string   `toml:"transform"`
+	FileMode       string     `toml:"file_mode"`
+	OpAccount      string     `toml:"op_account" json:"op_account,omitempty"`
+	BwOrganization string     `toml:"bw_organization" json:"bw_organization,omitempty"`
+	ExpiresAt      time.Time  `toml:"-" json:"expires_at"`
+	OrphanedSince  *time.Time `toml:"-" json:"orphaned_since,omitempty"`
+	ConfigFile     string     `toml:"-" json:"config_file"`
+	ParentSource   string     `toml:"-" json:"parent_source,omitempty"`
 }
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.
 func Load(path string) (*Config, error) {
 	var rawConfig struct {
 		Lease []struct {
-			Source      string   `toml:"source"`
-			Destination string   `toml:"destination"`
-			Duration    string   `toml:"duration"`
-			LeaseType   string   `toml:"lease_type"`
-			Variable    string   `toml:"variable"`
-			Format      string   `toml:"format"`
-			Transform   []string `toml:"transform"`
-			Encoding    string   `toml:"encoding"` // Keep for backward compatibility
-			FileMode    string   `toml:"file_mode"`
-			OpAccount   string   `toml:"op_account"`
+			Source         string   `toml:"source"`
+			Destination    string   `toml:"destination"`
+			Duration       string   `toml:"duration"`
+			LeaseType      string   `toml:"lease_type"`
+			Variable       string   `toml:"variable"`
+			Format         string   `toml:"format"`
+			Transform      []string `toml:"transform"`
+			Encoding       string   `toml:"encoding"` // Keep for backward compatibility
+			FileMode       string   `toml:"file_mode"`
+			OpAccount      string   `toml:"op_account"`
+			BwOrganization string   `toml:"bw_organization"`
 		} `toml:"lease"`
 	}
 
@@ -56,15 +58,16 @@ func Load(path string) (*Config, error) {
 
 	for i, rawLease := range rawConfig.Lease {
 		config.Lease[i] = Lease{
-			Source:      rawLease.Source,
-			Destination: rawLease.Destination,
-			Duration:    rawLease.Duration,
-			LeaseType:   rawLease.LeaseType,
-			Variable:    rawLease.Variable,
-			Format:      rawLease.Format,
-			Transform:   rawLease.Transform,
-			FileMode:    rawLease.FileMode,
-			OpAccount:   rawLease.OpAccount,
+			Source:         rawLease.Source,
+			Destination:    rawLease.Destination,
+			Duration:       rawLease.Duration,
+			LeaseType:      rawLease.LeaseType,
+			Variable:       rawLease.Variable,
+			Format:         rawLease.Format,
+			Transform:      rawLease.Transform,
+			FileMode:       rawLease.FileMode,
+			OpAccount:      rawLease.OpAccount,
+			BwOrganization: rawLease.BwOrganization,
 		}
 
 		// Backward compatibility for encoding

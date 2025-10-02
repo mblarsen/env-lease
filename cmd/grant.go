@@ -98,7 +98,25 @@ var grantCmd = &cobra.Command{
 			if os.Getenv("ENV_LEASE_TEST") == "1" {
 				p = &provider.MockProvider{}
 			} else {
-				p = &provider.OnePasswordCLI{Account: l.OpAccount}
+				if strings.HasPrefix(l.Source, "onepassword://") || strings.HasPrefix(l.Source, "op+file://") {
+					p = &provider.OnePasswordCLI{Account: l.OpAccount}
+				} else if strings.HasPrefix(l.Source, "bw://") || strings.HasPrefix(l.Source, "bw+file://") {
+					p, err = provider.NewBitwardenCLI()
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: err})
+						if !continueOnError {
+							break
+						}
+						continue
+					}
+					p.(*provider.BitwardenCLI).OrganizationID = l.BwOrganization
+				} else {
+					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("unknown provider for source: %s", l.Source)})
+					if !continueOnError {
+						break
+					}
+					continue
+				}
 			}
 
 			// Duration validation

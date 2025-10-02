@@ -63,7 +63,7 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 
 | Key           | Required | Description                                                                                                                                                          | Example                                                       |
 | ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `source`      | Yes      | The URI of the secret. For 1Password, this can be the canonical `op://` reference or the user-friendly `op+file://<item-name>/<file-name>` for document attachments. | `"op://vault/item/secret"` or `"op+file://My Item/file.json"` |
+| `source`      | Yes      | The URI of the secret. See the "Providers" section below for specific formats for each supported provider.                                                         | `"op://vault/item/secret"` or `"bw://My Item/password"`       |
 | `destination` | Yes\*    | The relative path to the target file. _Required for `env` and `file` types only._                                                                                    | `".envrc"`                                                    |
 | `duration`    | Yes      | The lease duration (e.g., "10m", "1h", "8h").                                                                                                                        | `"8h"`                                                        |
 | `lease_type`  | No       | The type of lease. Can be `"env"` (default), `"file"`, or `"shell"`.                                                                                                 | `"shell"`                                                     |
@@ -71,6 +71,68 @@ The `env-lease.toml` file is the heart of the configuration. It's a declarative 
 | `format`      | No       | A Go `sprintf`-style format string for `env` leases. Defaults are applied for `.env` and `.envrc`.                                                                   | `"export %s=%q"`                                              |
 | `transform`   | No       | An array of transformations to apply to the secret before writing it. See the "Transformations" section below.                                                       | `["base64-decode", "json", "select 'key'"]`                   |
 | `op_account`  | No       | The 1Password account to use. Overrides the `OP_ACCOUNT` environment variable.                                                                                       | `"my-account"`                                                |
+| `bw_organization` | No   | The Bitwarden organization ID to use for fetching secrets.                                                                                                         | `"your-org-id"`                                               |
+
+## Providers
+
+`env-lease` fetches secrets from external providers using their respective command-line tools.
+
+### 1Password
+
+- **Requirement:** `op` (1Password CLI) must be installed and configured.
+
+#### Source URI Formats
+
+1.  **Standard Secret (`op://`)**
+    This is the canonical URI for a secret stored in a specific field of an item.
+    - **Format:** `op://<vault-name>/<item-name>/<field-name>`
+    - **Example:**
+      ```toml
+      source = "op://your_vault/api-key/credential"
+      ```
+
+2.  **Document Attachment (`op+file://`)**
+    This is a user-friendly URI for leasing the content of a file attached to a 1Password "Document" item. It uses the item and file names directly, avoiding the need for internal IDs.
+    - **Format:** `op+file://<item-name>/<attachment-name>`
+    - **Example:**
+      ```toml
+      source = "op+file://app-iac container env/container_env.json"
+      ```
+
+### Bitwarden
+
+- **Requirement:** `bw` (Bitwarden CLI) must be installed and configured.
+
+#### Source URI Formats
+
+1.  **Item (`bw://`)**
+    Fetches the entire item as a JSON object. This is useful when you need to transform or select multiple fields from the same item.
+    - **Format:** `bw://<item-name-or-id>`
+    - **Example:**
+      ```toml
+      source = "bw://My API Credentials"
+      transform = ["json", "select 'password'"]
+      ```
+
+2.  **Specific Field (`bw://`)**
+    Fetches a single field from an item. If the field is omitted, it defaults to `password`.
+    - **Format:** `bw://<item-name-or-id>/<field-name>`
+    - **Example:**
+      ```toml
+      # Fetches the 'password' field
+      source = "bw://My API Credentials"
+
+      # Fetches the 'notes' field
+      source = "bw://My API Credentials/notes"
+      ```
+
+3.  **Document Attachment (`bw+file://`)**
+    Leases the content of a file attached to a Bitwarden item.
+    - **Format:** `bw+file://<item-name-or-id>/<attachment-name>`
+    - **Example:**
+      ```toml
+      source = "bw+file://gcp-service-account/key.json"
+      ```
 
 ## Secret Transformations
 
@@ -302,7 +364,7 @@ Revoke lease for 'GOOGLE_API_KEY'? [y/n/a/d/?] a
 > [!NOTE]
 > Interactive mode is not supported for `shell` type leases, as they require being run inside `eval $(...)` which is non-interactive.
 
-## 1Password Examples
+## Examples
 
 ### Example 1: Lease to an Environment Variable
 
