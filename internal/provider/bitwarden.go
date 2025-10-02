@@ -3,6 +3,7 @@ package provider
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os/exec"
 	"strings"
@@ -54,6 +55,7 @@ func (p *BitwardenCLI) fetchField(source string) (string, error) {
 	itemID := document
 	if p.OrganizationID != "" {
 		var err error
+		slog.Debug("Bitwarden: organization ID present, resolving name to ID", "name", document)
 		itemID, err = p.findItemID(document)
 		if err != nil {
 			return "", err
@@ -66,6 +68,7 @@ func (p *BitwardenCLI) fetchField(source string) (string, error) {
 	} else {
 		args = append(args, field, itemID)
 	}
+	slog.Debug("Bitwarden: executing final get command", "args", args)
 	cmd := execCommand("bw", args...)
 
 	output, err := cmd.CombinedOutput()
@@ -104,10 +107,12 @@ type bwItem struct {
 //
 // A fallback global search is included for items not associated with an organization.
 func (p *BitwardenCLI) findItemID(name string) (string, error) {
+	slog.Debug("Bitwarden: finding item ID", "name", name, "organizationID", p.OrganizationID)
 	args := []string{"list", "items", "--raw"}
 	if p.OrganizationID != "" {
 		args = append(args, "--organizationid", p.OrganizationID)
 	}
+	slog.Debug("Bitwarden: executing command", "args", args)
 	cmd := execCommand("bw", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -118,6 +123,7 @@ func (p *BitwardenCLI) findItemID(name string) (string, error) {
 	if err := json.Unmarshal(output, &items); err != nil {
 		return "", fmt.Errorf("failed to parse bitwarden items: %w", err)
 	}
+	slog.Debug("Bitwarden: initial item list returned", "count", len(items))
 
 	var foundItems []bwItem
 	for _, item := range items {
@@ -125,10 +131,12 @@ func (p *BitwardenCLI) findItemID(name string) (string, error) {
 			foundItems = append(foundItems, item)
 		}
 	}
+	slog.Debug("Bitwarden: found items after filtering by exact name", "count", len(foundItems))
 
 	if len(foundItems) == 0 {
 		// If we didn't find it, try a global search as a fallback for non-org items
 		if p.OrganizationID == "" {
+			slog.Debug("Bitwarden: item not found, falling back to global search")
 			args = []string{"list", "items", "--search", name, "--raw"}
 			cmd = execCommand("bw", args...)
 			output, err = cmd.CombinedOutput()
@@ -138,11 +146,13 @@ func (p *BitwardenCLI) findItemID(name string) (string, error) {
 			if err := json.Unmarshal(output, &items); err != nil {
 				return "", fmt.Errorf("failed to parse bitwarden items: %w", err)
 			}
+			slog.Debug("Bitwarden: fallback search returned", "count", len(items))
 			for _, item := range items {
 				if item.Name == name {
 					foundItems = append(foundItems, item)
 				}
 			}
+			slog.Debug("Bitwarden: found items after fallback filtering", "count", len(foundItems))
 		}
 	}
 
@@ -152,6 +162,7 @@ func (p *BitwardenCLI) findItemID(name string) (string, error) {
 	if len(foundItems) > 1 {
 		return "", fmt.Errorf("multiple items named '%s' found, please use ID", name)
 	}
+	slog.Debug("Bitwarden: found unique item ID", "id", foundItems[0].ID)
 	return foundItems[0].ID, nil
 }
 
