@@ -39,21 +39,8 @@ func TestHelperProcess(t *testing.T) {
 			switch getWhat {
 			case "item":
 				doc := args[0]
-				args = args[1:]
-				var orgID string
-				for i, arg := range args {
-					if arg == "--organizationid" && i+1 < len(args) {
-						orgID = args[i+1]
-						break
-					}
-				}
-
-				if doc == "my-item-id" {
-					if orgID != "" && orgID != "org-id-123" {
-						fmt.Fprint(os.Stderr, "item not found in organization")
-						os.Exit(1)
-					}
-					fmt.Fprint(os.Stdout, `{"id":"item-id-123","name":"my-item-id"}`)
+				if doc == "my-item-id" || doc == "org-item-id-456" || doc == "item-id-123" {
+					fmt.Fprintf(os.Stdout, `{"id":"%s","name":"%s","attachments":[{"fileName":"my-attachment.txt"}]}`, doc, doc)
 				} else {
 					fmt.Fprint(os.Stderr, "item not found")
 					os.Exit(1)
@@ -63,6 +50,8 @@ func TestHelperProcess(t *testing.T) {
 				switch doc {
 				case "my-item-id":
 					fmt.Fprint(os.Stdout, "my-secret")
+				case "org-item-id-456":
+					fmt.Fprint(os.Stdout, "org-secret")
 				case "not-found":
 					fmt.Fprint(os.Stderr, "not found")
 					os.Exit(1)
@@ -80,7 +69,7 @@ func TestHelperProcess(t *testing.T) {
 						break
 					}
 				}
-				if attachmentName == "my-attachment.txt" && itemID == "item-id-123" {
+				if attachmentName == "my-attachment.txt" && (itemID == "item-id-123" || itemID == "org-item-id-456") {
 					fmt.Fprint(os.Stdout, "attachment content")
 				} else {
 					fmt.Fprint(os.Stderr, "attachment not found")
@@ -91,15 +80,24 @@ func TestHelperProcess(t *testing.T) {
 			listWhat := args[0]
 			args = args[1:]
 			if listWhat == "items" {
-				var search string
+				var search, orgID string
 				for i, arg := range args {
 					if arg == "--search" && i+1 < len(args) {
 						search = args[i+1]
-						break
+					}
+					if arg == "--organizationid" && i+1 < len(args) {
+						orgID = args[i+1]
 					}
 				}
-				if search == "my-doc" {
-					fmt.Fprint(os.Stdout, `[{"id":"item-id-123","name":"my-doc","attachments":[{"fileName":"my-attachment.txt"}]}]`)
+
+				if orgID == "org-id-123" {
+					// Return all items for the org; filtering happens in the Go code.
+					fmt.Fprint(os.Stdout, `[
+						{"id":"org-item-id-456","name":"OrgItem"},
+						{"id":"another-org-item","name":"AnotherOrgItem"}
+					]`)
+				} else if search == "my-doc" {
+					fmt.Fprint(os.Stdout, `[{"id":"item-id-123","name":"my-doc"}]`)
 				} else {
 					fmt.Fprint(os.Stdout, `[]`)
 				}
@@ -147,14 +145,14 @@ func TestBitwardenCLIFetch(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		expectedSecret := `{"id":"item-id-123","name":"my-item-id"}`
+		expectedSecret := `{"id":"my-item-id","name":"my-item-id","attachments":[{"fileName":"my-attachment.txt"}]}`
 		if secret != expectedSecret {
 			t.Errorf("expected secret to be '%s', got '%s'", expectedSecret, secret)
 		}
 	})
 
 	t.Run("successful fetch with organization id", func(t *testing.T) {
-		source := "bw://my-item-id"
+		source := "bw://OrgItem/password"
 		provider := &BitwardenCLI{OrganizationID: "org-id-123"}
 
 		secret, err := provider.Fetch(source)
@@ -162,16 +160,14 @@ func TestBitwardenCLIFetch(t *testing.T) {
 			t.Fatalf("expected no error, got %v", err)
 		}
 
-		expectedSecret := `{"id":"item-id-123","name":"my-item-id"}`
-		if secret != expectedSecret {
-			t.Errorf("expected secret to be '%s', got '%s'", expectedSecret, secret)
+		if secret != "org-secret" {
+			t.Errorf("expected secret to be 'org-secret', got '%s'", secret)
 		}
 	})
 
 	t.Run("successful attachment fetch", func(t *testing.T) {
 		source := "bw+file://my-doc/my-attachment.txt"
 		provider := &BitwardenCLI{}
-
 		secret, err := provider.Fetch(source)
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
