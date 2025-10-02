@@ -38,6 +38,8 @@ The `API_KEY` will be revoked in 1 hour.
 
 ### Why?
 
+`env-lease` is built on the belief that if there is less friction, a developer is more likely to do the right thing. Tools like the `op` CLI can cause constant friction that leads to frustration or prevents the adoption of best practices. `env-lease` is designed to reduce this friction.
+
 Managing secrets in local development often forces a choice between convenience and security. `env-lease` exists to offer a middle ground, prioritizing a fast, uninterrupted workflow while still providing strong, automated safeguards against leaving credentials exposed long-term.
 
 It offers a different set of trade-offs centered on:
