@@ -1639,11 +1639,33 @@
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 75,
+        "title": "Integrate beeep library for notifications",
+        "description": "Use the beeep library for cross-platform notifications. More info at github.com/gen2brain/beeep",
+        "details": "",
+        "testStrategy": "",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 76,
+        "title": "Add daemon status command",
+        "description": "Create an `env-lease daemon status` command. This command should be similar to the existing `idle status` command, focusing on checking if the OS-specific service (e.g., plist on macOS) is installed.",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "medium",
+        "details": "",
+        "testStrategy": "",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-02T05:01:57.858Z",
+      "updated": "2025-10-02T06:28:28.160Z",
       "description": "Tasks for master context"
     }
   }
