@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
@@ -65,6 +66,9 @@ var revokeCmd = &cobra.Command{
 			for _, p := range parents {
 				uniqueID := p.Source + "->" + p.Destination
 				children := childrenOfParent[uniqueID]
+				sort.Slice(children, func(i, j int) bool {
+					return children[i].Variable < children[j].Variable
+				})
 				var childrenToRevoke []ipc.Lease
 
 				for _, child := range children {
@@ -81,6 +85,9 @@ var revokeCmd = &cobra.Command{
 			}
 
 			// Process normal leases
+			sort.Slice(normalLeases, func(i, j int) bool {
+				return normalLeases[i].Variable < normalLeases[j].Variable
+			})
 			for _, l := range normalLeases {
 				promptVar := l.Source
 				if l.Variable != "" {
