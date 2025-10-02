@@ -110,7 +110,11 @@ func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
 		expiresIn := time.Until(lease.ExpiresAt).Round(time.Second)
 		variable := lease.Variable
 		if variable == "" {
-			variable = "<exploded>"
+			if lease.LeaseType == "file" {
+				variable = "<file>"
+			} else {
+				variable = "<exploded>"
+			}
 		}
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", variable, lease.Source, lease.Destination, expiresIn)
 
