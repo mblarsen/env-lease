@@ -250,7 +250,7 @@ env-lease idle uninstall
 
 | Command                  | Description                                                                                               |
 |--------------------------|-----------------------------------------------------------------------------------------------------------|
-| `env-lease grant`        | Grants all leases defined in `env-lease.toml`. Flags: `--override`, `--continue-on-error`.                 |
+| `env-lease grant`        | Grants all leases defined in `env-lease.toml`.                                                            |
 | `env-lease revoke`       | Immediately revokes all secrets defined in the current project's `env-lease.toml`.                          |
 | `env-lease status`       | Lists all currently active leases managed by the daemon.                                                  |
 | `env-lease convert`      | Scaffolds an `env-lease.toml` file from an existing `.env` or `.envrc` file.                               |
@@ -262,6 +262,40 @@ env-lease idle uninstall
 | `env-lease idle install` | Installs and starts the idle revocation service. Flags: `--timeout`, `--check-interval`.                  |
 | `env-lease idle uninstall`| Stops and uninstalls the idle revocation service.                                                         |
 | `env-lease idle status`  | Checks the status of the idle revocation service.                                                         |
+
+### Command Flags
+
+#### `grant`
+- `--override`: Re-grant leases even if they are already active.
+- `--continue-on-error`: Continue granting leases even if one fails.
+- `-i`, `--interactive`: Prompt for confirmation before granting each lease.
+
+#### `revoke`
+- `--all`: Revoke all active leases, regardless of which project they belong to.
+- `-i`, `--interactive`: Prompt for confirmation before revoking each lease.
+
+### Interactive Mode
+
+The `-i` or `--interactive` flag can be used with `grant` and `revoke` to confirm each action individually.
+
+**Granting Leases:**
+```sh
+$ env-lease grant -i
+Grant lease for 'GOOGLE_API_KEY'? [y/N] y
+Grant lease for 'OPENAI_API_KEY'? [y/N] n
+```
+
+**Revoking Leases:**
+```sh
+$ env-lease revoke -i
+Revoke lease for 'GOOGLE_API_KEY'? [y/N] y
+Revoke lease for 'OPENAI_API_KEY'? [y/N] n
+```
+
+> [!NOTE]
+> Interactive mode is not supported for `shell` type leases, as they require being run inside `eval $(...)` which is non-interactive.
+
+---
 
 ---
 
