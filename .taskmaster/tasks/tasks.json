@@ -1646,7 +1646,7 @@
         "description": "Use the beeep library for cross-platform notifications. More info at github.com/gen2brain/beeep",
         "details": "",
         "testStrategy": "",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": []
@@ -1665,7 +1665,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-02T06:33:40.780Z",
+      "updated": "2025-10-02T06:47:48.294Z",
       "description": "Tasks for master context"
     }
   }
