@@ -14,6 +14,7 @@ var revokeCmd = &cobra.Command{
 	Short: "Revoke all active leases for the current project.",
 	Long:  `Revoke all active leases for the current project.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		resetConfirmState()
 		client := newClient()
 
 		configFile, err := filepath.Abs("env-lease.toml")

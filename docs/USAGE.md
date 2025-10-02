@@ -275,22 +275,27 @@ env-lease idle uninstall
 
 ### Interactive Mode
 
-The `-i` or `--interactive` flag can be used with `grant` and `revoke` to confirm each action individually.
+The `-i` or `--interactive` flag can be used with `grant` and `revoke` to confirm each action individually. In this mode, you have several options:
+
+- `y`: Yes, perform this action.
+- `n` or `<Enter>`: No, skip this action.
+- `a`: Yes to this and all subsequent actions in this run.
+- `d`: No to this and all subsequent actions in this run.
+- `?`: Show help.
 
 **Granting Leases:**
 
 ```sh
 $ env-lease grant -i
-Grant lease for 'GOOGLE_API_KEY'? [y/N] y
-Grant lease for 'OPENAI_API_KEY'? [y/N] n
+Grant lease for 'GOOGLE_API_KEY'? [y/n/a/d/?] y
+Grant lease for 'OPENAI_API_KEY'? [y/n/a/d/?] n
 ```
 
 **Revoking Leases:**
 
 ```sh
 $ env-lease revoke -i
-Revoke lease for 'GOOGLE_API_KEY'? [y/N] y
-Revoke lease for 'OPENAI_API_KEY'? [y/N] n
+Revoke lease for 'GOOGLE_API_KEY'? [y/n/a/d/?] a
 ```
 
 > [!NOTE]

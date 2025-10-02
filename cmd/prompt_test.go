@@ -1,71 +1,134 @@
 package cmd
 
 import (
-	"bufio"
 	"bytes"
-	"fmt"
-	"io"
-	"os"
 	"strings"
 	"testing"
 )
 
-// confirmFunc is a type for the confirm function, so we can swap it out in tests.
-type confirmFunc func(string) bool
-
-// originalConfirm holds the original confirm function that talks to /dev/tty
-var originalConfirm = confirm
-
-// testConfirm is a mock confirm function that reads from a provided reader.
-func testConfirm(prompt string, r io.Reader, w io.Writer) bool {
-	fmt.Fprintf(w, "%s [y/N] ", prompt)
-	scanner := bufio.NewScanner(r)
-	scanner.Scan()
-	response := strings.TrimSpace(strings.ToLower(scanner.Text()))
-	return response == "y" || response == "yes"
-}
-
-func TestConfirm(t *testing.T) {
+func TestDoConfirm(t *testing.T) {
 	tests := []struct {
-		name  string
-		input string
-		want  bool
+		name       string
+		inputs     []string // Each string is a separate line of input for a single prompt.
+		prompts    []string // The prompts to display.
+		expected   []bool   // The expected return values from confirm.
+		finalState interactiveState
 	}{
-		{"yes", "y", true},
-		{"YES", "Y", true},
-		{"Yes", "Yes", true},
-		{"no", "n", false},
-		{"NO", "N", false},
-		{"No", "No", false},
-		{"empty", "", false},
-		{"random", "asdf", false},
+		{
+			name:       "Yes",
+			inputs:     []string{"y"},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{true},
+			finalState: stateAsk,
+		},
+		{
+			name:       "No",
+			inputs:     []string{"n"},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{false},
+			finalState: stateAsk,
+		},
+		{
+			name:       "Default to No",
+			inputs:     []string{""},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{false},
+			finalState: stateAsk,
+		},
+		{
+			name:       "All",
+			inputs:     []string{"a"},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{true},
+			finalState: stateAlways,
+		},
+		{
+			name:       "Deny",
+			inputs:     []string{"d"},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{false},
+			finalState: stateDeny,
+		},
+		{
+			name:       "Help then Yes",
+			inputs:     []string{"?", "y"},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{true},
+			finalState: stateAsk,
+		},
+		{
+			name:       "Invalid then No",
+			inputs:     []string{"x", "n"},
+			prompts:    []string{"Prompt 1?"},
+			expected:   []bool{false},
+			finalState: stateAsk,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			in := bytes.NewBufferString(tt.input + "\n")
-			out := bytes.NewBuffer(nil)
+			resetConfirmState()
+			input := strings.Join(tt.inputs, "\n")
+			in := bytes.NewBufferString(input)
 
-			// Use the testConfirm function instead of the real one
-			if got := testConfirm("test prompt", in, out); got != tt.want {
-				t.Errorf("confirm() = %v, want %v", got, tt.want)
+			for i, prompt := range tt.prompts {
+				result := doConfirm(prompt, in)
+				if i < len(tt.expected) && result != tt.expected[i] {
+					t.Errorf("doConfirm() for prompt '%s' got %v, want %v", prompt, result, tt.expected[i])
+				}
 			}
 
-			// Check if the prompt was written
-			if !strings.Contains(out.String(), "test prompt [y/N] ") {
-				t.Errorf("prompt was not written correctly, got: %s", out.String())
+			if confirmState != tt.finalState {
+				t.Errorf("final confirmState got %v, want %v", confirmState, tt.finalState)
 			}
 		})
 	}
-}
 
-// This is a trick to allow grant_test.go to compile, as it uses the confirm function.
-// In a real test run of grant_test, we would swap out the confirm function.
-func init() {
-	if os.Getenv("GO_TEST") == "1" {
-		confirm = func(prompt string) bool {
-			// In a non-interactive test, we default to 'yes'
-			return true
+	t.Run("All then next is auto-yes", func(t *testing.T) {
+		resetConfirmState()
+		in := bytes.NewBufferString("a\n")
+		_ = doConfirm("P1?", in)
+		if confirmState != stateAlways {
+			t.Fatalf("confirmState after 'a' got %v, want %v", confirmState, stateAlways)
 		}
-	}
+		result := doConfirm("P2?", in)
+		if !result {
+			t.Errorf("doConfirm() for prompt 'P2?' got %v, want %v", result, true)
+		}
+	})
+
+	t.Run("Deny then next is auto-no", func(t *testing.T) {
+		resetConfirmState()
+		in := bytes.NewBufferString("d\n")
+		_ = doConfirm("P1?", in)
+		if confirmState != stateDeny {
+			t.Fatalf("confirmState after 'd' got %v, want %v", confirmState, stateDeny)
+		}
+		result := doConfirm("P2?", in)
+		if result {
+			t.Errorf("doConfirm() for prompt 'P2?' got %v, want %v", result, false)
+		}
+	})
+
+	t.Run("Yes then All", func(t *testing.T) {
+		resetConfirmState()
+		inY := bytes.NewBufferString("y\n")
+		inA := bytes.NewBufferString("a\n")
+
+		resultY := doConfirm("P1?", inY)
+		if !resultY {
+			t.Errorf("doConfirm() for 'y' got %v, want %v", resultY, true)
+		}
+		if confirmState != stateAsk {
+			t.Errorf("confirmState after 'y' got %v, want %v", confirmState, stateAsk)
+		}
+
+		resultA := doConfirm("P2?", inA)
+		if !resultA {
+			t.Errorf("doConfirm() for 'a' got %v, want %v", resultA, true)
+		}
+		if confirmState != stateAlways {
+			t.Errorf("confirmState after 'a' got %v, want %v", confirmState, stateAlways)
+		}
+	})
 }

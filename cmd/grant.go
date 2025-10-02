@@ -47,8 +47,9 @@ func (e *GrantErrors) Error() string {
 var grantCmd = &cobra.Command{
 	Use:   "grant",
 	Short: "Grant all leases defined in env-lease.toml.",
-	Long:  `Grant all leases defined in env--lease.toml.`,
+	Long:  `Grant all leases defined in env-lease.toml.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		resetConfirmState()
 		var (
 			cfg           *config.Config
 			err           error
