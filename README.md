@@ -1,7 +1,7 @@
 # env-lease
 
 > [!IMPORTANT]
-> ⚠️ **This is a toy project and is not intended for real-world use.** ⚠️
+> ⚠️ **This is still a toy project and is not intended for real-world use yet.** ⚠️
 >
 > This software is provided "as is" without warranty of any kind. Please do not use it to handle sensitive credentials. **Use at your own risk.**
 
