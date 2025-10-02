@@ -1655,7 +1655,7 @@
         "id": 76,
         "title": "Add daemon status command",
         "description": "Create an `env-lease daemon status` command. This command should be similar to the existing `idle status` command, focusing on checking if the OS-specific service (e.g., plist on macOS) is installed.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "details": "",
@@ -1665,7 +1665,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-02T06:28:28.160Z",
+      "updated": "2025-10-02T06:33:40.780Z",
       "description": "Tasks for master context"
     }
   }

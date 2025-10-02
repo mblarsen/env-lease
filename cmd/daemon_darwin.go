@@ -4,227 +4,107 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
-	"github.com/lmittmann/tint"
-	"github.com/mblarsen/env-lease/internal/daemon"
 	"github.com/mblarsen/env-lease/internal/fileutil"
-	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/mblarsen/env-lease/internal/xdgpath"
 	"github.com/spf13/cobra"
 )
 
-var daemonCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "Manage the env-lease daemon.",
-	Long:  `Manage the env-lease daemon.`,
+const (
+	daemonServiceName = "com.user.env-lease.plist"
+)
+
+func init() {
+	daemonInstallCmd.RunE = runInstallDaemon
+	daemonUninstallCmd.RunE = runUninstallDaemon
+	daemonStatusCmd.RunE = runStatusDaemon
 }
 
-var installCmd = &cobra.Command{
-	Use:   "install",
-	Short: "Install the env-lease daemon.",
-	Long:  `Install the env-lease daemon.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		executable, err := os.Executable()
-		if err != nil {
-			return err
-		}
+func runInstallDaemon(cmd *cobra.Command, args []string) error {
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
 
-		homeDir := os.Getenv("HOME")
-		plist := fmt.Sprintf(plistTemplate, executable, homeDir, homeDir)
-		if print, _ := cmd.Flags().GetBool("print"); print {
-			fmt.Fprint(os.Stdout, plist)
-			fmt.Fprintln(os.Stderr, "WARNING: Service configuration printed but not installed.")
-			return nil
-		}
-		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-lease.plist")
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
 
-		if _, err := fileutil.AtomicWriteFile(plistPath, []byte(plist), 0644); err != nil {
-			return err
-		}
+	// Write the launchd plist
+	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
+	plistContent := fmt.Sprintf(daemonPlistTemplate, executable, homeDir, homeDir)
+	if _, err := fileutil.AtomicWriteFile(plistPath, []byte(plistContent), 0644); err != nil {
+		return err
+	}
 
-		if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
-			return err
-		}
+	// Load the service
+	if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
+		return fmt.Errorf("failed to load launchd service: %w", err)
+	}
 
-		fmt.Printf("Successfully installed env-lease daemon service. Configuration file created at: %s\n", plistPath)
+	fmt.Printf("Successfully installed and started daemon service.\n")
+	return nil
+}
+
+func runUninstallDaemon(cmd *cobra.Command, args []string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
+
+	// Unload the service
+	_ = exec.Command("launchctl", "unload", plistPath).Run()
+
+	// Remove files
+	_ = os.Remove(plistPath)
+
+	fmt.Println("Successfully uninstalled daemon service.")
+	return nil
+}
+
+func runStatusDaemon(cmd *cobra.Command, args []string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
+	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+		fmt.Println("Daemon service is not installed.")
 		return nil
-	},
+	}
+
+	fmt.Println("Daemon service is installed.")
+	fmt.Printf("Configuration file: %s\n", plistPath)
+	return nil
 }
 
-var uninstallCmd = &cobra.Command{
-	Use:   "uninstall",
-	Short: "Uninstall the env-lease daemon.",
-	Long:  `Uninstall the env-lease daemon.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-lease.plist")
-
-		if err := exec.Command("launchctl", "unload", plistPath).Run(); err != nil {
-			// Ignore errors, as the service may not be loaded
-		}
-
-		if err := os.Remove(plistPath); err != nil {
-			return err
-		}
-
-		fmt.Println("Successfully uninstalled env-lease daemon service.")
-		return nil
-	},
-}
-
-var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Run the env-lease daemon.",
-	Long:  `Run the env-lease daemon.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// set up logger
-		logLevel := slog.LevelInfo
-		if levelStr := os.Getenv("ENV_LEASE_LOG_LEVEL"); levelStr != "" {
-			var l slog.Level
-			if err := l.UnmarshalText([]byte(levelStr)); err == nil {
-				logLevel = l
-			}
-		}
-		slog.SetDefault(slog.New(
-			tint.NewHandler(os.Stderr, &tint.Options{
-				Level:      logLevel,
-				TimeFormat: time.Kitchen,
-			}),
-		))
-		slog.Info("Starting daemon...")
-
-		// Configuration paths
-		socketPath, err := xdgpath.RuntimePath("daemon.sock")
-		if err != nil {
-			return fmt.Errorf("failed to get runtime path: %w", err)
-		}
-		statePath, err := xdgpath.StatePath("state.json")
-		if err != nil {
-			return fmt.Errorf("failed to get state path: %w", err)
-		}
-		secretPath, err := xdgpath.StatePath("auth.token")
-		if err != nil {
-			return fmt.Errorf("failed to get secret path: %w", err)
-		}
-
-		// Get or create secret
-		secret, err := ipc.GetOrCreateSecret(secretPath)
-		if err != nil {
-			return err
-		}
-
-		// Load state
-		state, err := daemon.LoadState(statePath)
-		if err != nil {
-			slog.Warn("No state file found, initializing new state.")
-		} else {
-			slog.Info("Loaded state", "leases", len(state.Leases))
-		}
-
-		// Set up dependencies
-		clock := &daemon.RealClock{}
-		revoker := &daemon.FileRevoker{}
-		notifier := &daemon.OsaScriptNotifier{}
-		ipcServer, err := ipc.NewServer(socketPath, secret)
-		if err != nil {
-			return err
-		}
-
-		// Create and run daemon
-		d := daemon.NewDaemon(state, statePath, clock, ipcServer, revoker, notifier)
-		slog.Info("Daemon startup successful.", "socket", ipcServer.SocketPath())
-
-		return d.Run(context.Background())
-	},
-}
-
-var cleanupCmd = &cobra.Command{
-	Use:   "cleanup",
-	Short: "Cleanup orphaned leases.",
-	Long:  `Cleanup orphaned leases.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		client := newClient()
-		req := ipc.CleanupRequest{Command: "cleanup"}
-		var resp ipc.CleanupResponse
-
-		if err := client.Send(req, &resp); err != nil {
-			handleClientError(err)
-		}
-
-		for _, msg := range resp.Messages {
-			fmt.Println(msg)
-		}
-		return nil
-	},
-}
-
-var reloadCmd = &cobra.Command{
-	Use:   "reload",
-	Short: "Reload the env-lease daemon.",
-	Long:  `Reload the env-lease daemon.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "com.user.env-lease.plist")
-
-		// If the service file doesn't exist, do nothing.
-		if _, err := os.Stat(plistPath); os.IsNotExist(err) {
-			fmt.Println("Daemon service not installed, nothing to do.")
-			return nil
-		}
-
-		// Unload the service, ignoring errors in case it's not loaded.
-		_ = exec.Command("launchctl", "unload", plistPath).Run()
-
-		// Load the service.
-		if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
-			return err
-		}
-
-		fmt.Println("Successfully reloaded env-lease daemon service.")
-		return nil
-	},
-}
-
-const plistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
+const daemonPlistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>Label</key>
-	<string>com.user.env-lease</string>
-	<key>ProgramArguments</key>
-	<array>
-		<string>%s</string>
-		<string>daemon</string>
-		<string>run</string>
-	</array>
-	<key>RunAtLoad</key>
-	<true/>
-	<key>KeepAlive</key>
-	<true/>
-	<key>EnvironmentVariables</key>
-	<dict>
-		<key>ENV_LEASE_LOG_LEVEL</key>
-		<string>info</string>
-	</dict>
-	<key>StandardOutPath</key>
-	<string>%s/Library/Logs/env-lease.log</string>
-	<key>StandardErrorPath</key>
-	<string>%s/Library/Logs/env-lease.error.log</string>
+    <key>Label</key>
+    <string>com.user.env-lease</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>%s</string>
+        <string>daemon</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>%s/Library/Logs/env-lease.log</string>
+    <key>StandardErrorPath</key>
+    <string>%s/Library/Logs/env-lease.error.log</string>
 </dict>
 </plist>
 `
-
-func init() {
-	installCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
-	daemonCmd.AddCommand(installCmd)
-	daemonCmd.AddCommand(uninstallCmd)
-	daemonCmd.AddCommand(reloadCmd)
-	daemonCmd.AddCommand(runCmd)
-	daemonCmd.AddCommand(cleanupCmd)
-	rootCmd.AddCommand(daemonCmd)
-}

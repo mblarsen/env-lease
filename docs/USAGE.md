@@ -254,6 +254,7 @@ env-lease idle uninstall
 | `env-lease enable-notifications` | (macOS only) Guides the user to grant notification permissions.                          |
 | `env-lease daemon install`       | Installs and starts the daemon as a user service.                                        |
 | `env-lease daemon uninstall`     | Stops and uninstalls the daemon.                                                         |
+| `env-lease daemon status`        | Checks the status of the daemon service.                                                 |
 | `env-lease daemon reload`        | Reloads the daemon service.                                                              |
 | `env-lease daemon cleanup`       | Manually purges all orphaned leases from the daemon's state.                             |
 | `env-lease idle install`         | Installs and starts the idle revocation service. Flags: `--timeout`, `--check-interval`. |
