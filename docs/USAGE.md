@@ -55,26 +55,22 @@ You can see all active leases and their remaining time with the `status` command
 env-lease status
 ```
 
----
-
 ## Configuration (`env-lease.toml`)
 
 The `env-lease.toml` file is the heart of the configuration. It's a declarative file that defines all the leases for a project.
 
 ### Lease Options
 
-| Key           | Required | Description                                                                                             | Example                               |
-|---------------|----------|---------------------------------------------------------------------------------------------------------|---------------------------------------|
+| Key           | Required | Description                                                                                                                                                          | Example                                                       |
+| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `source`      | Yes      | The URI of the secret. For 1Password, this can be the canonical `op://` reference or the user-friendly `op+file://<item-name>/<file-name>` for document attachments. | `"op://vault/item/secret"` or `"op+file://My Item/file.json"` |
-| `destination` | Yes*     | The relative path to the target file. *Required for `env` and `file` types only.*                       | `".envrc"`                            |
-| `duration`    | Yes      | The lease duration (e.g., "10m", "1h", "8h").                                                           | `"8h"`                                |
-| `lease_type`  | No       | The type of lease. Can be `"env"` (default), `"file"`, or `"shell"`.                                    | `"shell"`                             |
-| `variable`    | Yes*     | The name of the environment variable to set. *Required for `env` and `shell` types.*                      | `"API_KEY"`                           |
-| `format`      | No       | A Go `sprintf`-style format string for `env` leases. Defaults are applied for `.env` and `.envrc`.    | `"export %s=%q"`                      |
-| `transform`   | No       | An array of transformations to apply to the secret before writing it. See the "Transformations" section below. | `["base64-decode", "json", "select 'key'"]` |
-| `op_account`  | No       | The 1Password account to use. Overrides the `OP_ACCOUNT` environment variable.                      | `"my-account"`                        |
-
----
+| `destination` | Yes\*    | The relative path to the target file. _Required for `env` and `file` types only._                                                                                    | `".envrc"`                                                    |
+| `duration`    | Yes      | The lease duration (e.g., "10m", "1h", "8h").                                                                                                                        | `"8h"`                                                        |
+| `lease_type`  | No       | The type of lease. Can be `"env"` (default), `"file"`, or `"shell"`.                                                                                                 | `"shell"`                                                     |
+| `variable`    | Yes\*    | The name of the environment variable to set. _Required for `env` and `shell` types._                                                                                 | `"API_KEY"`                                                   |
+| `format`      | No       | A Go `sprintf`-style format string for `env` leases. Defaults are applied for `.env` and `.envrc`.                                                                   | `"export %s=%q"`                                              |
+| `transform`   | No       | An array of transformations to apply to the secret before writing it. See the "Transformations" section below.                                                       | `["base64-decode", "json", "select 'key'"]`                   |
+| `op_account`  | No       | The 1Password account to use. Overrides the `OP_ACCOUNT` environment variable.                                                                                       | `"my-account"`                                                |
 
 ## Secret Transformations
 
@@ -95,24 +91,25 @@ For example, you cannot have `json` as the last step, because its output is stru
 
 ### Transformer Reference
 
-| Transformer | Description | Input Type | Output Type |
-| :--- | :--- | :--- | :--- |
-| `base64-encode` | Encodes the input string to standard base64. | `string` | `string` |
-| `base64-decode` | Decodes a base64-encoded input string. | `string` | `string` |
-| `json` | Parses a valid JSON string into structured data. | `string` | `structured_data` |
-| `toml` | Parses a valid TOML string into structured data. | `string` | `structured_data` |
-| `yaml` | Parses a valid YAML string into structured data. | `string` | `structured_data` |
-| `select '<path>'` | Extracts a value from structured data using dot-notation. The path must be quoted. | `structured_data` | `string` or `structured_data` |
-| `explode(...)` | **Terminating transform.** Expands structured data into multiple variables. Accepts optional `filter` and `prefix` arguments. Must be the last transform. | `structured_data` | `exploded_data` |
-| `to_json` | Converts structured data to a JSON string. | `structured_data` | `string` |
-| `to_yaml` | Converts structured data to a YAML string. | `structured_data` | `string` |
-| `to_toml` | Converts structured data to a TOML string. | `structured_data` | `string` |
+| Transformer       | Description                                                                                                                                               | Input Type        | Output Type                   |
+| :---------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------- | :---------------------------- |
+| `base64-encode`   | Encodes the input string to standard base64.                                                                                                              | `string`          | `string`                      |
+| `base64-decode`   | Decodes a base64-encoded input string.                                                                                                                    | `string`          | `string`                      |
+| `json`            | Parses a valid JSON string into structured data.                                                                                                          | `string`          | `structured_data`             |
+| `toml`            | Parses a valid TOML string into structured data.                                                                                                          | `string`          | `structured_data`             |
+| `yaml`            | Parses a valid YAML string into structured data.                                                                                                          | `string`          | `structured_data`             |
+| `select '<path>'` | Extracts a value from structured data using dot-notation. The path must be quoted.                                                                        | `structured_data` | `string` or `structured_data` |
+| `explode(...)`    | **Terminating transform.** Expands structured data into multiple variables. Accepts optional `filter` and `prefix` arguments. Must be the last transform. | `structured_data` | `exploded_data`               |
+| `to_json`         | Converts structured data to a JSON string.                                                                                                                | `structured_data` | `string`                      |
+| `to_yaml`         | Converts structured data to a YAML string.                                                                                                                | `structured_data` | `string`                      |
+| `to_toml`         | Converts structured data to a TOML string.                                                                                                                | `structured_data` | `string`                      |
 
 ### Example: Extracting a Nested Value from JSON
 
 This is a common use case where a single 1Password item stores multiple related values.
 
 **Secret stored in 1Password:**
+
 ```json
 {
   "database": {
@@ -140,10 +137,12 @@ transform = ["json", "select 'database.pass'"]
 ### Example: Expanding a JSON Object with `explode`
 
 The `explode` transform is a powerful way to turn a single structured secret into multiple environment variables. It accepts two optional, named arguments:
+
 - `filter=PREFIX_`: Only processes keys that already start with `PREFIX_`.
 - `prefix=PREFIX_`: Adds `PREFIX_` to the beginning of every processed key.
 
 **Secret stored in 1Password:**
+
 ```json
 {
   "ORY_API_KEY": "key-12345",
@@ -156,6 +155,7 @@ The `explode` transform is a powerful way to turn a single structured secret int
 
 **1. Filter Only:**
 To get only the `ORY_` variables:
+
 ```toml
 transform = ["json", "explode(filter=ORY_)"]
 # Result: ORY_API_KEY, ORY_API_SECRET
@@ -163,6 +163,7 @@ transform = ["json", "explode(filter=ORY_)"]
 
 **2. Prefix Only:**
 To add `MYAPP_` to all variables:
+
 ```toml
 transform = ["json", "explode(prefix=MYAPP_)"]
 # Result: MYAPP_ORY_API_KEY, MYAPP_ORY_API_SECRET, MYAPP_AWS_REGION
@@ -170,6 +171,7 @@ transform = ["json", "explode(prefix=MYAPP_)"]
 
 **3. Filter and Prefix:**
 To get only the `ORY_` variables and then add a `REACT_` prefix to them:
+
 ```toml
 transform = ["json", "explode(filter=ORY_, prefix=REACT_)"]
 # Result: REACT_ORY_API_KEY, REACT_ORY_API_SECRET
@@ -177,16 +179,15 @@ transform = ["json", "explode(filter=ORY_, prefix=REACT_)"]
 
 **4. No Arguments:**
 To get all variables as they are:
+
 ```toml
 transform = ["json", "explode"]
 # Result: ORY_API_KEY, ORY_API_SECRET, AWS_REGION
 ```
 
-**Safety Blacklist:** To prevent accidental clobbering of critical system variables, `env-lease` enforces a blacklist on the *final* generated variable name. If a generated variable is blacklisted (e.g., `PATH`), the grant operation will fail.
+**Safety Blacklist:** To prevent accidental clobbering of critical system variables, `env-lease` enforces a blacklist on the _final_ generated variable name. If a generated variable is blacklisted (e.g., `PATH`), the grant operation will fail.
 
 > **Note:** The `explode` transform can only be used with `lease_type = "env"` or `lease_type = "shell"`. It cannot be used to create multiple files.
-
----
 
 ## Scaffolding Configuration from `.env`
 
@@ -207,8 +208,6 @@ env-lease convert .envrc > env-lease.toml
 ```
 
 This will produce an `env-lease.toml` file with leases for `DATABASE_URL` and `API_KEY`. You will still need to edit the file to set the desired `duration` for each lease.
-
----
 
 ## Automatic Revocation on Idle
 
@@ -244,33 +243,33 @@ To stop the service and remove all its components, use the `idle uninstall` comm
 env-lease idle uninstall
 ```
 
----
-
 ## Command Reference
 
-| Command                  | Description                                                                                               |
-|--------------------------|-----------------------------------------------------------------------------------------------------------|
-| `env-lease grant`        | Grants all leases defined in `env-lease.toml`.                                                            |
-| `env-lease revoke`       | Immediately revokes all secrets defined in the current project's `env-lease.toml`.                          |
-| `env-lease status`       | Lists all currently active leases managed by the daemon.                                                  |
-| `env-lease convert`      | Scaffolds an `env-lease.toml` file from an existing `.env` or `.envrc` file.                               |
-| `env-lease enable-notifications` | (macOS only) Guides the user to grant notification permissions.                                           |
-| `env-lease daemon install`| Installs and starts the daemon as a user service.                                                         |
-| `env-lease daemon uninstall`| Stops and uninstalls the daemon.                                                                          |
-| `env-lease daemon reload`| Reloads the daemon service.                                                                               |
-| `env-lease daemon cleanup`| Manually purges all orphaned leases from the daemon's state.                                              |
-| `env-lease idle install` | Installs and starts the idle revocation service. Flags: `--timeout`, `--check-interval`.                  |
-| `env-lease idle uninstall`| Stops and uninstalls the idle revocation service.                                                         |
-| `env-lease idle status`  | Checks the status of the idle revocation service.                                                         |
+| Command                          | Description                                                                              |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `env-lease grant`                | Grants all leases defined in `env-lease.toml`.                                           |
+| `env-lease revoke`               | Immediately revokes all secrets defined in the current project's `env-lease.toml`.       |
+| `env-lease status`               | Lists all currently active leases managed by the daemon.                                 |
+| `env-lease convert`              | Scaffolds an `env-lease.toml` file from an existing `.env` or `.envrc` file.             |
+| `env-lease enable-notifications` | (macOS only) Guides the user to grant notification permissions.                          |
+| `env-lease daemon install`       | Installs and starts the daemon as a user service.                                        |
+| `env-lease daemon uninstall`     | Stops and uninstalls the daemon.                                                         |
+| `env-lease daemon reload`        | Reloads the daemon service.                                                              |
+| `env-lease daemon cleanup`       | Manually purges all orphaned leases from the daemon's state.                             |
+| `env-lease idle install`         | Installs and starts the idle revocation service. Flags: `--timeout`, `--check-interval`. |
+| `env-lease idle uninstall`       | Stops and uninstalls the idle revocation service.                                        |
+| `env-lease idle status`          | Checks the status of the idle revocation service.                                        |
 
 ### Command Flags
 
 #### `grant`
+
 - `--override`: Re-grant leases even if they are already active.
 - `--continue-on-error`: Continue granting leases even if one fails.
 - `-i`, `--interactive`: Prompt for confirmation before granting each lease.
 
 #### `revoke`
+
 - `--all`: Revoke all active leases, regardless of which project they belong to.
 - `-i`, `--interactive`: Prompt for confirmation before revoking each lease.
 
@@ -279,6 +278,7 @@ env-lease idle uninstall
 The `-i` or `--interactive` flag can be used with `grant` and `revoke` to confirm each action individually.
 
 **Granting Leases:**
+
 ```sh
 $ env-lease grant -i
 Grant lease for 'GOOGLE_API_KEY'? [y/N] y
@@ -286,6 +286,7 @@ Grant lease for 'OPENAI_API_KEY'? [y/N] n
 ```
 
 **Revoking Leases:**
+
 ```sh
 $ env-lease revoke -i
 Revoke lease for 'GOOGLE_API_KEY'? [y/N] y
@@ -294,10 +295,6 @@ Revoke lease for 'OPENAI_API_KEY'? [y/N] n
 
 > [!NOTE]
 > Interactive mode is not supported for `shell` type leases, as they require being run inside `eval $(...)` which is non-interactive.
-
----
-
----
 
 ## 1Password Examples
 
@@ -386,7 +383,6 @@ eval $(env-lease revoke)
 
 > **Note on Automatic Revocation:** While the lease is tracked by the `env-lease` daemon and expires automatically, the environment variable will **remain in your shell** after expiration. You must manually run `eval $(env-lease revoke)` or close the shell session to remove it. This is a fundamental limitation of how shell environments work.
 
----
 ## Upgrading
 
 **Important:** Before upgrading to a new version of `env-lease`, especially during this pre-release stage of development, it is crucial to revoke all active leases.
@@ -399,7 +395,6 @@ env-lease revoke --all
 
 This will ensure a clean state before you upgrade.
 
----
 ## Limitations
 
 ### Inline Comments
@@ -417,9 +412,6 @@ Will become this after a lease is granted and then revoked:
 ```
 export API_KEY=""
 ```
-
-
----
 
 ## Security Model
 
