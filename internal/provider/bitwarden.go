@@ -96,7 +96,8 @@ type bwItem struct {
 // `list items` command.
 //
 //  1. `bw get item <name>` does NOT respect `--organizationid`, leading to
-//     ambiguous results if items with the same name exist globally.
+//     ambiguous results if items with the same name exist globally. See:
+//     https://github.com/bitwarden/clients/issues/2736
 //  2. `bw list items --search <name> --organizationid <id>` does NOT work as
 //     expected. It appears to perform the search globally *before* filtering,
 //     often returning an empty set for the organization even if the item exists.
