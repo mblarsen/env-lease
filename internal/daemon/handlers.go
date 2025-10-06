@@ -144,7 +144,9 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 					}
 				}
 				delete(d.state.Leases, id)
-				count++
+				if lease.LeaseType == "file" || lease.Variable != "" {
+					count++
+				}
 			}
 		}
 	} else {
@@ -161,7 +163,9 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 					}
 				}
 				delete(d.state.Leases, id)
-				count++
+				if lease.LeaseType == "file" || lease.Variable != "" {
+					count++
+				}
 			}
 		}
 	}
