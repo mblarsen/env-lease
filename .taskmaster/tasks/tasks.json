@@ -1661,11 +1661,95 @@
         "details": "",
         "testStrategy": "",
         "subtasks": []
+      },
+      {
+        "id": 77,
+        "title": "Make 'destination' optional for file-based leases",
+        "description": "Update the configuration parsing logic to make the 'destination' field optional for leases with 'lease_type = file'. When omitted, the destination filename will be automatically derived from the 'source' field. This task is tracked by GitHub issue #11.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          4,
+          6
+        ],
+        "priority": "medium",
+        "details": "The current implementation requires a 'destination' for all file-based leases. This change will improve user experience by inferring the filename from the source URI when the destination is not specified. The modification should be made in the configuration parsing module. After parsing the 'env-lease.toml' file, iterate through the leases. For any lease where 'lease_type' is 'file' and the 'destination' field is empty, populate the destination by taking the base name of the source path. For example, a source of 'op+file://app-iac container env/container_env.json' should result in a destination of 'container_env.json'. Similarly, 'op://devops/app/db_pass' should result in 'db_pass'. The standard library's 'path.Base()' function should be suitable for this extraction. This logic must only apply to file leases and should not affect leases where the destination is explicitly provided.\n\n**Issue Tracking:**\nThis task is tracked by GitHub issue #11. When committing your changes, please include 'Closes #11' in your commit message.",
+        "testStrategy": "Unit tests should be added to the configuration parsing suite. Create test cases with 'env-lease.toml' snippets where file leases omit the 'destination' field. Verify that the parsed configuration struct has the 'destination' field correctly populated based on the 'source' value. Include tests for various source URI formats, including those with and without file extensions. Also, add a test case where a 'destination' is explicitly provided to ensure it is not overridden. For manual verification, create a sample 'env-lease.toml' with a file lease missing a destination, run 'env-lease grant', and confirm that the secret file is created in the correct location with the inferred name and correct content.",
+        "subtasks": []
+      },
+      {
+        "id": 78,
+        "title": "Restrict File Lease Destination to Project Root Directory",
+        "description": "Implement a security check to ensure that for file-based leases, the destination path is within the project's root directory where `env-lease.toml` resides. Add a flag to allow overriding this behavior. This task is tracked by GitHub issue #12.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          11
+        ],
+        "priority": "medium",
+        "details": "This task enhances security by default, preventing file-based leases from writing to arbitrary locations on the filesystem. The 'project root' is defined as the directory containing the `env-lease.toml` file being processed. The validation logic must be integrated into the `env-lease grant` command. A new boolean flag, `--destination-outside-root`, will be added to the `grant` command to bypass this check when explicitly required. When the `grant` command is executed, it will first determine the absolute path of the configuration file's directory. Then, for each lease of `lease_type = \"file\"`, it will resolve the absolute path of the `destination`. If the destination path is not a subpath of the project root directory and the `--destination-outside-root` flag is not set, the command must exit with a non-zero status code and print an informative error message.\n\nWhen committing changes for this task, please include 'Closes #12' in the commit message.",
+        "testStrategy": "Testing will be divided into unit and integration tests. For unit tests, create a dedicated test suite for the path validation logic, covering cases where the destination is inside the root, outside the root, in a parent directory, and in a sibling directory. Test edge cases involving relative paths like '.' and '..'. For integration tests, create a temporary directory with a sample `env-lease.toml`. First, test the default failing case: configure a file lease with a destination outside the project root (e.g., '/tmp/secret') and run `env-lease grant`. Verify the command fails with the expected error. Second, test the success case: configure the destination to be within the project root and verify the command succeeds. Finally, test the override flag: use the failing case configuration but run `env-lease grant --destination-outside-root` and verify that the command now succeeds.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add '--destination-outside-root' flag to 'grant' command",
+            "description": "Use the CLI framework to add a new boolean flag `--destination-outside-root` to the `env-lease grant` command.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "Implement path validation logic",
+            "description": "Create a utility function that takes two absolute paths, a root directory and a destination path, and returns whether the destination is within the root directory.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Integrate validation into the grant command flow",
+            "description": "In the `grant` command, for each file lease, resolve the absolute paths for the project root and the destination. Call the validation logic and exit with an error if it fails, unless the override flag is set.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Implement unit tests for path validation",
+            "description": "Create a test suite for the path validation utility, covering all cases mentioned in the test strategy (inside, outside, parent, sibling, relative paths).",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Implement integration tests for the grant command",
+            "description": "Create integration tests that execute the `env-lease grant` command to verify the end-to-end behavior: default failure, success within root, and successful override.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Update documentation",
+            "description": "Update the command's help text and any relevant user documentation to explain the new security feature and the `--destination-outside-root` flag.",
+            "status": "pending",
+            "dependencies": [],
+            "details": "",
+            "testStrategy": ""
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-02T06:47:48.294Z",
+      "updated": "2025-10-06T02:52:18.883Z",
       "description": "Tasks for master context"
     }
   }
