@@ -111,7 +111,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	resp := ipc.GrantResponse{Messages: []string{}}
 	actualLeaseCount := 0
 	for _, l := range req.Leases {
-		if l.Variable != "" {
+		if l.LeaseType == "file" || l.Variable != "" {
 			actualLeaseCount++
 		}
 	}
