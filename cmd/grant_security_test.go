@@ -22,6 +22,7 @@ func runGrantCommand(t *testing.T, args ...string) (string, string, error) {
 
 	rootCmd := &cobra.Command{Use: "env-lease"}
 	rootCmd.AddCommand(grantCmd)
+	rootCmd.AddCommand(revokeCmd)
 
 	os.Setenv("ENV_LEASE_TEST", "1")
 	defer os.Unsetenv("ENV_LEASE_TEST")
@@ -29,6 +30,38 @@ func runGrantCommand(t *testing.T, args ...string) (string, string, error) {
 	// The grant command requires a client, but we're in test mode, so it
 	// should not try to connect to the daemon.
 	rootCmd.SetArgs(append([]string{"grant"}, args...))
+	err := rootCmd.Execute()
+
+	wOut.Close()
+	wErr.Close()
+
+	var stdout strings.Builder
+	var stderr strings.Builder
+	io.Copy(&stdout, rOut)
+	io.Copy(&stderr, rErr)
+
+	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+
+	return stdout.String(), stderr.String(), err
+}
+
+func runRevokeCommand(t *testing.T, args ...string) (string, string, error) {
+	t.Helper()
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	rOut, wOut, _ := os.Pipe()
+	rErr, wErr, _ := os.Pipe()
+	os.Stdout = wOut
+	os.Stderr = wErr
+
+	rootCmd := &cobra.Command{Use: "env-lease"}
+	rootCmd.AddCommand(revokeCmd)
+
+	os.Setenv("ENV_LEASE_TEST", "1")
+	defer os.Unsetenv("ENV_LEASE_TEST")
+
+	rootCmd.SetArgs(append([]string{"revoke"}, args...))
 	err := rootCmd.Execute()
 
 	wOut.Close()
@@ -94,5 +127,26 @@ duration = "1h"
 	_, stderr, err = runGrantCommand(t, "--config", configFile)
 	if err != nil {
 		t.Errorf("Did not expect an error, but got: %v\nStderr: %s", err, stderr)
+	}
+
+	// Test case 4: Exploded lease, check for empty unset in revoke
+	configContent = `
+[[lease]]
+lease_type = "shell"
+source = "mock-explode"
+duration = "1h"
+transform = ["json", "explode"]
+`
+	os.WriteFile(configFile, []byte(configContent), 0644)
+	_, _, err = runGrantCommand(t, "--config", configFile)
+	if err != nil {
+		t.Errorf("Did not expect an error, but got: %v", err)
+	}
+	stdout, _, err := runRevokeCommand(t, "--all")
+	if err != nil {
+		t.Errorf("Did not expect an error, but got: %v", err)
+	}
+	if strings.Contains(stdout, "unset \n") || strings.HasSuffix(stdout, "unset ") {
+		t.Errorf("Found empty unset in revoke output: %q", stdout)
 	}
 }

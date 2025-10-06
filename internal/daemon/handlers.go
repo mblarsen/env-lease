@@ -135,7 +135,9 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 			if lease, ok := d.state.Leases[id]; ok {
 				slog.Debug("Revoking lease", "source", lease.Source)
 				if lease.LeaseType == "shell" {
-					shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+					if lease.Variable != "" {
+						shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+					}
 					slog.Debug("Ignoring revoker for shell lease type", "id", id)
 				} else {
 					if err := d.revoker.Revoke(lease); err != nil {
@@ -154,7 +156,9 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 			if req.All || lease.ConfigFile == req.ConfigFile {
 				slog.Debug("Revoking lease", "source", lease.Source)
 				if lease.LeaseType == "shell" {
-					shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+					if lease.Variable != "" {
+						shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
+					}
 					slog.Debug("Ignoring revoker for shell lease type", "id", id)
 				} else {
 					if err := d.revoker.Revoke(lease); err != nil {
