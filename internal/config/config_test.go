@@ -47,11 +47,63 @@ duration = "1h"
 		}
 	})
 
-	t.Run("missing required destination", func(t *testing.T) {
+	t.Run("file lease with missing destination", func(t *testing.T) {
+		content := `
+[[lease]]
+source = "op+file://app-iac container env/container_env.json"
+lease_type = "file"
+duration = "1h"
+`
+		path := createTempConfig(t, content)
+		defer os.Remove(path)
+
+		config, err := Load(path)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if len(config.Lease) != 1 {
+			t.Fatalf("expected 1 lease, got %d", len(config.Lease))
+		}
+
+		expected := "container_env.json"
+		if config.Lease[0].Destination != expected {
+			t.Errorf("expected destination to be '%s', got '%s'", expected, config.Lease[0].Destination)
+		}
+	})
+
+	t.Run("file lease with destination", func(t *testing.T) {
+		content := `
+[[lease]]
+source = "op+file://app-iac container env/container_env.json"
+destination = "my_file.json"
+lease_type = "file"
+duration = "1h"
+`
+		path := createTempConfig(t, content)
+		defer os.Remove(path)
+
+		config, err := Load(path)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if len(config.Lease) != 1 {
+			t.Fatalf("expected 1 lease, got %d", len(config.Lease))
+		}
+
+		expected := "my_file.json"
+		if config.Lease[0].Destination != expected {
+			t.Errorf("expected destination to be '%s', got '%s'", expected, config.Lease[0].Destination)
+		}
+	})
+
+	t.Run("env lease with missing destination", func(t *testing.T) {
 		content := `
 [[lease]]
 source = "op://vault/item/secret"
 duration = "1h"
+lease_type = "env"
 `
 		path := createTempConfig(t, content)
 		defer os.Remove(path)

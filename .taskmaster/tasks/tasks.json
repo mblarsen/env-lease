@@ -1666,7 +1666,7 @@
         "id": 77,
         "title": "Make 'destination' optional for file-based leases",
         "description": "Update the configuration parsing logic to make the 'destination' field optional for leases with 'lease_type = file'. When omitted, the destination filename will be automatically derived from the 'source' field. This task is tracked by GitHub issue #11.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           4,
@@ -1749,7 +1749,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-06T02:52:18.883Z",
+      "updated": "2025-10-06T12:09:06.121Z",
       "description": "Tasks for master context"
     }
   }

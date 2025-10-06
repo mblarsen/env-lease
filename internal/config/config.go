@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -83,9 +84,15 @@ func Load(path string) (*Config, error) {
 			return nil, fmt.Errorf("lease %d: source is required", i)
 		}
 
-		if lease.LeaseType == "env" || lease.LeaseType == "file" {
+		if lease.LeaseType == "env" {
 			if lease.Destination == "" {
 				return nil, fmt.Errorf("lease %d: destination is required for lease_type '%s'", i, lease.LeaseType)
+			}
+		}
+
+		if lease.LeaseType == "file" {
+			if lease.Destination == "" {
+				lease.Destination = filepath.Base(lease.Source)
 			}
 		}
 
