@@ -1681,7 +1681,7 @@
         "id": 78,
         "title": "Restrict File Lease Destination to Project Root Directory",
         "description": "Implement a security check to ensure that for file-based leases, the destination path is within the project's root directory where `env-lease.toml` resides. Add a flag to allow overriding this behavior. This task is tracked by GitHub issue #12.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           2,
           11
@@ -1694,7 +1694,7 @@
             "id": 1,
             "title": "Add '--destination-outside-root' flag to 'grant' command",
             "description": "Use the CLI framework to add a new boolean flag `--destination-outside-root` to the `env-lease grant` command.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1703,7 +1703,7 @@
             "id": 2,
             "title": "Implement path validation logic",
             "description": "Create a utility function that takes two absolute paths, a root directory and a destination path, and returns whether the destination is within the root directory.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1712,7 +1712,7 @@
             "id": 3,
             "title": "Integrate validation into the grant command flow",
             "description": "In the `grant` command, for each file lease, resolve the absolute paths for the project root and the destination. Call the validation logic and exit with an error if it fails, unless the override flag is set.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1721,7 +1721,7 @@
             "id": 4,
             "title": "Implement unit tests for path validation",
             "description": "Create a test suite for the path validation utility, covering all cases mentioned in the test strategy (inside, outside, parent, sibling, relative paths).",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1730,7 +1730,7 @@
             "id": 5,
             "title": "Implement integration tests for the grant command",
             "description": "Create integration tests that execute the `env-lease grant` command to verify the end-to-end behavior: default failure, success within root, and successful override.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1739,7 +1739,7 @@
             "id": 6,
             "title": "Update documentation",
             "description": "Update the command's help text and any relevant user documentation to explain the new security feature and the `--destination-outside-root` flag.",
-            "status": "pending",
+            "status": "done",
             "dependencies": [],
             "details": "",
             "testStrategy": ""
@@ -1749,7 +1749,7 @@
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-06T12:09:06.121Z",
+      "updated": "2025-10-06T12:34:24.701Z",
       "description": "Tasks for master context"
     }
   }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/mblarsen/env-lease/internal/transform"
@@ -47,7 +48,11 @@ func (e *GrantErrors) Error() string {
 var grantCmd = &cobra.Command{
 	Use:   "grant",
 	Short: "Grant all leases defined in env-lease.toml.",
-	Long:  `Grant all leases defined in env-lease.toml.`,
+	Long: `Grant all leases defined in env-lease.toml.
+
+For security, file-based leases are restricted to writing files only within the
+project root directory (the directory containing the env-lease.toml file).
+This can be overridden with the --destination-outside-root flag.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resetConfirmState()
 		var (
@@ -300,6 +305,20 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal string, configFi
 	var absDest string
 	var err error
 
+	if l.LeaseType == "file" {
+		destinationOutsideRoot, _ := cmd.Flags().GetBool("destination-outside-root")
+		if !destinationOutsideRoot {
+			projectRoot := filepath.Dir(configFile)
+			isInside, err := fileutil.IsPathInsideRoot(projectRoot, l.Destination)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to validate destination path: %w", err)
+			}
+			if !isInside {
+				return nil, nil, fmt.Errorf("destination path '%s' is outside the project root. Use --destination-outside-root to override", l.Destination)
+			}
+		}
+	}
+
 	if l.LeaseType == "shell" {
 		if l.Variable != "" {
 			shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
@@ -346,5 +365,6 @@ func init() {
 	grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
 	grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
 	grantCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before granting each lease.")
+	grantCmd.Flags().Bool("destination-outside-root", false, "Allow file-based leases to write outside of the project root.")
 	rootCmd.AddCommand(grantCmd)
 }

@@ -268,6 +268,7 @@ env-lease idle uninstall
 - `--override`: Re-grant leases even if they are already active.
 - `--continue-on-error`: Continue granting leases even if one fails.
 - `-i`, `--interactive`: Prompt for confirmation before granting each lease.
+- `--destination-outside-root`: Allow file-based leases to write outside of the project root.
 
 #### `revoke`
 
