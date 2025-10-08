@@ -73,8 +73,20 @@ func (d *Daemon) Run(ctx context.Context) error {
 	cleanupTicker := d.clock.Ticker(24 * time.Hour)
 	defer cleanupTicker.Stop()
 
+	lastCheckTime := d.clock.Now()
 	for {
 		slog.Debug("Daemon run loop tick")
+
+		// If the time since the last check is greater than a threshold, force an
+		// expiration check. This handles cases where the system has been asleep
+		// and the ticker may not have fired.
+		if d.clock.Now().Sub(lastCheckTime) > 5*time.Second {
+			slog.Info("Detected time jump, forcing expiration check")
+			d.revokeExpiredLeases()
+			d.processRetryQueue()
+			d.revokeOrphanedLeases()
+		}
+
 		select {
 		case <-ticker.C:
 			d.revokeExpiredLeases()
@@ -89,6 +101,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 			slog.Debug("Parent context cancelled, initiating shutdown...")
 			return d.Shutdown()
 		}
+		lastCheckTime = d.clock.Now()
 	}
 }
 
