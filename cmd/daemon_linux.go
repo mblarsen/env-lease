@@ -29,6 +29,15 @@ func init() {
 	daemonInstallCmd.RunE = runInstallDaemon
 	daemonUninstallCmd.RunE = runUninstallDaemon
 	daemonInstallCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
+	daemonReloadCmd.RunE = runReloadDaemon
+}
+
+func runReloadDaemon(cmd *cobra.Command, args []string) error {
+	if err := exec.Command("systemctl", "--user", "reload", "env-lease.service").Run(); err != nil {
+		return fmt.Errorf("failed to reload daemon service: %w", err)
+	}
+	fmt.Println("Successfully reloaded env-lease daemon service.")
+	return nil
 }
 
 func runInstallDaemon(cmd *cobra.Command, args []string) error {

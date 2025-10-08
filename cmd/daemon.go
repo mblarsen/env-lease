@@ -38,6 +38,12 @@ var daemonStatusCmd = &cobra.Command{
 	Long:  `Checks whether the daemon is installed and running.`,
 }
 
+var daemonReloadCmd = &cobra.Command{
+	Use:   "reload",
+	Short: "Reload the env-lease daemon.",
+	Long:  `Reload the env-lease daemon.`,
+}
+
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the env-lease daemon.",
@@ -130,5 +136,6 @@ func init() {
 	daemonCmd.AddCommand(daemonStatusCmd)
 	daemonCmd.AddCommand(runCmd)
 	daemonCmd.AddCommand(cleanupCmd)
+	daemonCmd.AddCommand(daemonReloadCmd)
 	rootCmd.AddCommand(daemonCmd)
 }

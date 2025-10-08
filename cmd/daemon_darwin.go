@@ -21,6 +21,29 @@ func init() {
 	daemonInstallCmd.RunE = runInstallDaemon
 	daemonUninstallCmd.RunE = runUninstallDaemon
 	daemonStatusCmd.RunE = runStatusDaemon
+	daemonReloadCmd.RunE = runReloadDaemon
+}
+
+func runReloadDaemon(cmd *cobra.Command, args []string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
+
+	// Unload the service
+	if err := exec.Command("launchctl", "unload", plistPath).Run(); err != nil {
+		return fmt.Errorf("failed to unload launchd service: %w", err)
+	}
+
+	// Load the service
+	if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
+		return fmt.Errorf("failed to load launchd service: %w", err)
+	}
+
+	fmt.Printf("Successfully reloaded daemon service.\n")
+	return nil
 }
 
 func runInstallDaemon(cmd *cobra.Command, args []string) error {

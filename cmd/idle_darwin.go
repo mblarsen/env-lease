@@ -17,7 +17,6 @@ import (
 const (
 	idleServiceName = "com.user.env-lease-idle.plist"
 	idleScriptName  = "env-lease-idle-revoke.sh"
-	launchdDir      = "Library/LaunchAgents"
 	scriptDir       = ".local/bin"
 )
 
