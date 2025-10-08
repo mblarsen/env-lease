@@ -1745,11 +1745,25 @@
             "testStrategy": ""
           }
         ]
+      },
+      {
+        "id": 79,
+        "title": "Fix `revoke --interactive` to Work with `--all` Flag",
+        "description": "Modify the `revoke` command to correctly handle the `--interactive` flag when used in conjunction with the `--all` flag, allowing users to selectively revoke leases from a global list.",
+        "details": "Currently, when `env-lease revoke --all --interactive` is executed, the `--all` flag takes precedence and revokes all active leases non-interactively, ignoring the `--interactive` flag. This task involves modifying the command's logic to combine these flags correctly. The command should first fetch the complete list of all active leases (the same list used by `--all`). This list should then be presented to the user in an interactive selection prompt. Based on the user's selection, a `RevokeRequest` should be sent to the daemon containing only the leases the user chose to revoke. If the user cancels or selects no leases, no revocation should occur.",
+        "testStrategy": "Testing requires a setup with at least two separate projects with distinct leases. First, grant leases for both projects to create a global lease state. 1. Run `env-lease revoke --all --interactive`. Verify the interactive prompt lists leases from *both* projects. Select one lease from each project and confirm. Use `env-lease status` to verify that only the selected leases were revoked. 2. Run `env-lease revoke --all --interactive` again, but this time cancel the operation or select no leases. Use `env-lease status` to confirm that no leases were revoked. 3. Perform a regression test by running `env-lease revoke --interactive` (without `--all`) inside one project directory and confirm it only shows leases for that project. 4. Perform another regression test by running `env-lease revoke --all` (without `--interactive`) and confirm it revokes all remaining leases without a prompt.",
+        "status": "done",
+        "dependencies": [
+          12,
+          37
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-06T12:34:24.701Z",
+      "updated": "2025-10-08T04:10:10.492Z",
       "description": "Tasks for master context"
     }
   }

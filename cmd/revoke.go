@@ -29,8 +29,11 @@ var revokeCmd = &cobra.Command{
 		all, _ := cmd.Flags().GetBool("all")
 		interactive, _ := cmd.Flags().GetBool("interactive")
 
-		if interactive && !all {
-			statusReq := ipc.StatusRequest{Command: "status", ConfigFile: configFile}
+		if interactive {
+			statusReq := ipc.StatusRequest{Command: "status"}
+			if !all {
+				statusReq.ConfigFile = configFile
+			}
 			var leasesResp ipc.StatusResponse
 			if err := client.Send(statusReq, &leasesResp); err != nil {
 				handleClientError(err)
