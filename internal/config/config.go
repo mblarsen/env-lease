@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"os"
+
 	"github.com/BurntSushi/toml"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 )
@@ -133,4 +135,49 @@ func Load(path string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// ResolveConfigFile determines the configuration file path based on a predefined
+// order of precedence:
+//
+//  1. --config flag: A path provided via a command-line flag.
+//  2. ENV_LEASE_CONFIG: An environment variable specifying the full path to the
+//     config file.
+//  3. ENV_LEASE_NAME: An environment variable specifying the name of the config
+//     file, which is then looked for in the current directory.
+//  4. Default: "env-lease.toml" in the current directory.
+//
+// It also handles path expansion (e.g., expanding ~ to the user's home
+// directory). The function returns the resolved absolute path to the
+// configuration file or an error if the path cannot be resolved.
+func ResolveConfigFile(configFlag string) (string, error) {
+	// 1. --config flag
+	if configFlag != "" && configFlag != "env-lease.toml" {
+		return expandAndAbs(configFlag)
+	}
+
+	// 2. ENV_LEASE_CONFIG
+	if envConfig := os.Getenv("ENV_LEASE_CONFIG"); envConfig != "" {
+		return expandAndAbs(envConfig)
+	}
+
+	// 3. ENV_LEASE_NAME
+	if envName := os.Getenv("ENV_LEASE_NAME"); envName != "" {
+		return expandAndAbs(envName)
+	}
+
+	// 4. Default
+	return expandAndAbs("env-lease.toml")
+}
+
+func expandAndAbs(path string) (string, error) {
+	expanded, err := fileutil.ExpandPath(path)
+	if err != nil {
+		return "", fmt.Errorf("could not expand path '%s': %w", path, err)
+	}
+	abs, err := filepath.Abs(expanded)
+	if err != nil {
+		return "", fmt.Errorf("could not get absolute path for '%s': %w", expanded, err)
+	}
+	return abs, nil
 }

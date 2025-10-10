@@ -3,12 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"text/tabwriter"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 )
@@ -30,14 +29,10 @@ var statusCmd = &cobra.Command{
 			return nil
 		}
 
-		configFile, _ := cmd.Flags().GetString("config")
-		absConfigFile, err := fileutil.ExpandPath(configFile)
+		configFileFlag, _ := cmd.Flags().GetString("config")
+		absConfigFile, err := config.ResolveConfigFile(configFileFlag)
 		if err != nil {
-			return fmt.Errorf("failed to expand config path: %w", err)
-		}
-		absConfigFile, err = filepath.Abs(absConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path for config: %w", err)
+			return err
 		}
 
 		showAll, _ := cmd.Flags().GetBool("all")

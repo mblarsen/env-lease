@@ -124,3 +124,85 @@ func createTempConfig(t *testing.T, content string) string {
 	}
 	return path
 }
+
+func TestResolveConfigFile(t *testing.T) {
+	t.Run("default config", func(t *testing.T) {
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(dir); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "env-lease.toml")
+		if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+		resolved, err := ResolveConfigFile("")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if resolved != path {
+			t.Errorf("expected %s, got %s", path, resolved)
+		}
+	})
+
+	t.Run("ENV_LEASE_NAME", func(t *testing.T) {
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chdir(dir); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "custom.toml")
+		if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("ENV_LEASE_NAME", "custom.toml")
+		resolved, err := ResolveConfigFile("")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if resolved != path {
+			t.Errorf("expected %s, got %s", path, resolved)
+		}
+	})
+
+	t.Run("ENV_LEASE_CONFIG", func(t *testing.T) {
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "env-lease.toml")
+		if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("ENV_LEASE_CONFIG", path)
+		resolved, err := ResolveConfigFile("")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if resolved != path {
+			t.Errorf("expected %s, got %s", path, resolved)
+		}
+	})
+
+	t.Run("config flag", func(t *testing.T) {
+		dir, err := filepath.EvalSymlinks(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "env-lease.toml")
+		if err := os.WriteFile(path, []byte(""), 0644); err != nil {
+			t.Fatal(err)
+		}
+		resolved, err := ResolveConfigFile(path)
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if resolved != path {
+			t.Errorf("expected %s, got %s", path, resolved)
+		}
+	})
+}

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 )
@@ -19,14 +19,10 @@ var revokeCmd = &cobra.Command{
 		resetConfirmState()
 		client := newClient()
 
-		configFile, _ := cmd.Flags().GetString("config")
-		absConfigFile, err := fileutil.ExpandPath(configFile)
+		configFileFlag, _ := cmd.Flags().GetString("config")
+		absConfigFile, err := config.ResolveConfigFile(configFileFlag)
 		if err != nil {
-			return fmt.Errorf("failed to expand config path: %w", err)
-		}
-		absConfigFile, err = filepath.Abs(absConfigFile)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path for config: %w", err)
+			return err
 		}
 
 		all, _ := cmd.Flags().GetBool("all")

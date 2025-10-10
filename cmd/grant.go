@@ -72,7 +72,11 @@ This can be overridden with the --destination-outside-root flag.`,
 				"Please run 'eval $(env-lease grant)' without the interactive flag.")
 		}
 
-		configFile, _ := cmd.Flags().GetString("config")
+		configFileFlag, _ := cmd.Flags().GetString("config")
+		configFile, err := config.ResolveConfigFile(configFileFlag)
+		if err != nil {
+			return err
+		}
 		cfg, err = config.Load(configFile)
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
