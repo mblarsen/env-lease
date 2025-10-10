@@ -7,11 +7,13 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"github.com/mblarsen/env-lease/internal/fileutil"
 )
 
 // Config represents the structure of the env-lease.toml file.
 type Config struct {
 	Lease []Lease `toml:"lease"`
+	Root  string  `toml:"-"`
 }
 
 // Lease represents a single lease block in the config.
@@ -48,17 +50,38 @@ func Load(path string) (*Config, error) {
 		} `toml:"lease"`
 	}
 
-	if _, err := toml.DecodeFile(path, &rawConfig); err != nil {
+	var err error
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not get absolute path for config: %w", err)
+	}
+
+	expandedPath, err := fileutil.ExpandPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not expand config path: %w", err)
+	}
+	absPath, err = filepath.Abs(expandedPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not get absolute path for config: %w", err)
+	}
+
+	if _, err := toml.DecodeFile(absPath, &rawConfig); err != nil {
 		return nil, err
 	}
 
 	var config Config
 	config.Lease = make([]Lease, len(rawConfig.Lease))
+	config.Root = filepath.Dir(absPath)
 
 	for i, rawLease := range rawConfig.Lease {
+		expandedDest, err := fileutil.ExpandPath(rawLease.Destination)
+		if err != nil {
+			return nil, fmt.Errorf("lease %d: could not expand destination path: %w", i, err)
+		}
+
 		config.Lease[i] = Lease{
 			Source:      rawLease.Source,
-			Destination: rawLease.Destination,
+			Destination: expandedDest,
 			Duration:    rawLease.Duration,
 			LeaseType:   rawLease.LeaseType,
 			Variable:    rawLease.Variable,

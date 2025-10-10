@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 
+	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 )
@@ -18,12 +19,14 @@ var revokeCmd = &cobra.Command{
 		resetConfirmState()
 		client := newClient()
 
-		configFile, err := filepath.Abs("env-lease.toml")
+		configFile, _ := cmd.Flags().GetString("config")
+		absConfigFile, err := fileutil.ExpandPath(configFile)
 		if err != nil {
-			// If --all is passed, we don't care about the config file.
-			if all, _ := cmd.Flags().GetBool("all"); !all {
-				return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
-			}
+			return fmt.Errorf("failed to expand config path: %w", err)
+		}
+		absConfigFile, err = filepath.Abs(absConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for config: %w", err)
 		}
 
 		all, _ := cmd.Flags().GetBool("all")
@@ -32,7 +35,7 @@ var revokeCmd = &cobra.Command{
 		if interactive {
 			statusReq := ipc.StatusRequest{Command: "status"}
 			if !all {
-				statusReq.ConfigFile = configFile
+				statusReq.ConfigFile = absConfigFile
 			}
 			var leasesResp ipc.StatusResponse
 			if err := client.Send(statusReq, &leasesResp); err != nil {
@@ -108,7 +111,7 @@ var revokeCmd = &cobra.Command{
 
 			req := ipc.RevokeRequest{
 				Command:    "revoke",
-				ConfigFile: configFile,
+				ConfigFile: absConfigFile,
 				Leases:     leasesToRevoke,
 			}
 			var revokeResp ipc.RevokeResponse
@@ -124,7 +127,7 @@ var revokeCmd = &cobra.Command{
 
 		req := ipc.RevokeRequest{
 			Command:    "revoke",
-			ConfigFile: configFile,
+			ConfigFile: absConfigFile,
 			All:        all,
 		}
 		var revokeResp ipc.RevokeResponse
@@ -184,5 +187,6 @@ func init() {
 	revokeCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
 	revokeCmd.Flags().Bool("all", false, "Revoke all active leases, across all projects.")
 	revokeCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before revoking each lease.")
+	revokeCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
 	rootCmd.AddCommand(revokeCmd)
 }

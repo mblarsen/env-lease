@@ -8,6 +8,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 )
@@ -29,9 +30,14 @@ var statusCmd = &cobra.Command{
 			return nil
 		}
 
-		configFile, err := filepath.Abs("env-lease.toml")
+		configFile, _ := cmd.Flags().GetString("config")
+		absConfigFile, err := fileutil.ExpandPath(configFile)
 		if err != nil {
-			return fmt.Errorf("failed to get absolute path for env-lease.toml: %w", err)
+			return fmt.Errorf("failed to expand config path: %w", err)
+		}
+		absConfigFile, err = filepath.Abs(absConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for config: %w", err)
 		}
 
 		showAll, _ := cmd.Flags().GetBool("all")
@@ -53,7 +59,7 @@ var statusCmd = &cobra.Command{
 			leasesToDisplay = allTopLevelLeases
 		} else {
 			for _, lease := range allTopLevelLeases {
-				if lease.ConfigFile == configFile {
+				if lease.ConfigFile == absConfigFile {
 					leasesToDisplay = append(leasesToDisplay, lease)
 				}
 			}
@@ -140,5 +146,6 @@ func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
 
 func init() {
 	statusCmd.Flags().Bool("all", false, "Show all active leases.")
+	statusCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
 	rootCmd.AddCommand(statusCmd)
 }

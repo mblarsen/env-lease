@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"unsafe"
@@ -12,16 +13,21 @@ import (
 	"github.com/mblarsen/env-lease/internal/fileutil"
 )
 
-func writeLease(l config.Lease, secretVal string, override bool) (bool, error) {
-	if _, err := os.Stat(l.Destination); os.IsNotExist(err) {
+func writeLease(l config.Lease, secretVal, projectRoot string, override bool) (bool, error) {
+	dest := l.Destination
+	if !filepath.IsAbs(dest) {
+		dest = filepath.Join(projectRoot, dest)
+	}
+
+	if _, err := os.Stat(dest); os.IsNotExist(err) {
 		// File doesn't exist, so it will be created.
 	}
 
 	switch l.LeaseType {
 	case "env":
-		return writeEnvFile(l.Destination, l.Variable, secretVal, l.Format, override, l.FileMode)
+		return writeEnvFile(dest, l.Variable, secretVal, l.Format, override, l.FileMode)
 	case "file":
-		return writeFile(l.Destination, secretVal, l.FileMode)
+		return writeFile(dest, secretVal, l.FileMode)
 	case "shell":
 		return false, fmt.Errorf("the 'shell' lease type should not be handled by writeLease")
 	default:

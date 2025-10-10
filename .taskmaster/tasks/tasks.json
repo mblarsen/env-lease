@@ -1759,11 +1759,41 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 80,
+        "title": "Correctly Set Project Root from --config Flag Path",
+        "description": "Fix a bug where commands using the --config flag incorrectly use the current working directory as the project root instead of the directory containing the specified configuration file.",
+        "details": "When a user runs a command like `env-lease grant --config /path/to/project/env-lease.toml` from a different directory, the application currently uses the present working directory (PWD) to resolve relative paths and identify the project. The correct behavior is to use the directory of the specified config file (`/path/to/project/`) as the project root. This change requires modifying the initial configuration loading logic shared by commands like `grant`, `revoke`, and `status`. The logic must resolve the absolute path of the file provided to the `--config` flag and then use its parent directory as the authoritative project root for all subsequent operations, including resolving relative paths for file leases.",
+        "testStrategy": "Create an automated integration test. The test should set up a directory structure like `/tmp/test-project/` with a config file at `/tmp/test-project/env-lease.toml`. This config file should define a file-based lease with a relative destination, e.g., `destination = \"output.txt\"`. The test will then change the current directory to `/tmp` and execute `env-lease grant --config /tmp/test-project/env-lease.toml`. Verify that the lease file `output.txt` is created at `/tmp/test-project/output.txt`, not `/tmp/output.txt`. Similarly, run `env-lease status --config /tmp/test-project/env-lease.toml` from `/tmp` and confirm it correctly reports the status for that project.",
+        "status": "done",
+        "dependencies": [
+          2,
+          11,
+          12,
+          13
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 82,
+        "title": "Support Configuration via ENV_LEASE_NAME and ENV_LEASE_CONFIG",
+        "description": "Implement support for two new environment variables, `ENV_LEASE_CONFIG` and `ENV_LEASE_NAME`, to provide more flexible ways of specifying the configuration file location and name.",
+        "details": "This task introduces two environment variables to control how the application finds its configuration file. The logic must be implemented in the shared configuration loading module to ensure all commands (grant, revoke, status, etc.) inherit this behavior. A clear order of precedence must be established: 1. The `--config` command-line flag (as implemented in Task 81) takes highest priority. 2. If `--config` is not used, the `ENV_LEASE_CONFIG` variable is checked. If set, it is treated as the absolute or relative path to the configuration file. 3. If `ENV_LEASE_CONFIG` is not set, the `ENV_LEASE_NAME` variable is checked. If set, the application will look for a file with this name in the current directory. 4. If none of the above are provided, the application falls back to the default behavior of looking for `env-lease.toml` in the current directory. The logic must also correctly integrate with the project root detection from Task 80, meaning if `ENV_LEASE_CONFIG` is used, the directory containing that file becomes the project root.",
+        "testStrategy": "A comprehensive integration test suite is required to verify the precedence logic. 1. Test `ENV_LEASE_CONFIG`: Set `ENV_LEASE_CONFIG` to `/tmp/test-config.toml`. Create this file and a default `env-lease.toml` in the CWD. Run `env-lease status` and verify it loads `/tmp/test-config.toml`. 2. Test `ENV_LEASE_NAME`: Unset `ENV_LEASE_CONFIG` and set `ENV_LEASE_NAME=custom.toml`. Create `custom.toml` in the CWD. Run `env-lease status` and verify `custom.toml` is loaded. 3. Test Precedence (ENV_LEASE_CONFIG over ENV_LEASE_NAME): Set both variables pointing to different files. Verify that the file specified by `ENV_LEASE_CONFIG` is used. 4. Test Precedence (`--config` over ENV): Set `ENV_LEASE_CONFIG` and also provide a `--config` flag pointing to a third file. Verify the file from the `--config` flag is used. 5. Test Project Root Integration: Use `ENV_LEASE_CONFIG` to point to a config file in a subdirectory that defines a relative file lease. Run `env-lease grant` and verify the secret file is created relative to the config file's location, not the CWD.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          80
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-08T04:49:38.769Z",
+      "updated": "2025-10-10T06:06:02.987Z",
       "description": "Tasks for master context"
     }
   }

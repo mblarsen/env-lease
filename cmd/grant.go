@@ -77,17 +77,13 @@ This can be overridden with the --destination-outside-root flag.`,
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
+		absConfigFile = filepath.Join(cfg.Root, filepath.Base(configFile))
 
 		for _, l := range cfg.Lease {
 			if l.LeaseType == "shell" {
 				shellMode = true
 				break
 			}
-		}
-
-		absConfigFile, err = filepath.Abs(configFile)
-		if err != nil {
-			return fmt.Errorf("failed to get absolute path for %s: %w", configFile, err)
 		}
 
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
@@ -195,7 +191,7 @@ This can be overridden with the --destination-outside-root flag.`,
 				switch result := transformResult.(type) {
 				case string:
 					// SINGLE LEASE CASE
-					finalLeases, sc, err = processLease(cmd, l, result, absConfigFile)
+					finalLeases, sc, err = processLease(cmd, l, result, cfg.Root, absConfigFile)
 					if err != nil {
 						errs = append(errs, grantError{Source: l.Source, Err: err})
 						if !continueOnError {
@@ -219,7 +215,7 @@ This can be overridden with the --destination-outside-root flag.`,
 					// Add a parent/container lease for the status command to find
 					parentLeaseConfig := l
 					parentLeaseConfig.Variable = "" // No single variable for the parent
-					parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", absConfigFile)
+					parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", cfg.Root, absConfigFile)
 					if err != nil {
 						errs = append(errs, grantError{Source: l.Source, Err: err})
 						if !continueOnError {
@@ -237,7 +233,7 @@ This can be overridden with the --destination-outside-root flag.`,
 							explodedLeaseConfig.Variable = key
 							explodedLeaseConfig.ParentSource = uniqueParentID
 
-							finalLeases, sc, err = processLease(cmd, explodedLeaseConfig, value, absConfigFile)
+							finalLeases, sc, err = processLease(cmd, explodedLeaseConfig, value, cfg.Root, absConfigFile)
 							if err != nil {
 								errs = append(errs, grantError{Source: key, Err: err})
 								if !continueOnError {
@@ -299,17 +295,38 @@ This can be overridden with the --destination-outside-root flag.`,
 	},
 }
 
-func processLease(cmd *cobra.Command, l config.Lease, secretVal string, configFile string) ([]ipc.Lease, []string, error) {
+// processLease handles the logic for processing a single lease, including validating
+// file paths, writing lease files, and preparing the lease for communication with
+// the daemon. It returns a slice of IPC leases, a slice of shell commands, or an
+// error.
+//
+// Parameters:
+//   - cmd: The cobra.Command object, used to access command-line flags.
+//   - l: The config.Lease object containing the lease details.
+//   - secretVal: The secret value fetched from the provider.
+//   - projectRoot: The absolute path to the project root directory, which is the
+//     directory containing the configuration file. This is used to resolve
+//     relative paths for file-based leases and ensure they are written within the
+//     project directory for security.
+//   - configFile: The absolute path to the configuration file. This is stored in the
+//     lease object to allow the daemon to associate the lease with a specific
+//     project, which is crucial for commands like `env-lease status` and
+//     `env-lease revoke` to correctly identify leases for the current project.
+func processLease(cmd *cobra.Command, l config.Lease, secretVal, projectRoot, configFile string) ([]ipc.Lease, []string, error) {
 	var shellCommands []string
 	var leases []ipc.Lease
 	var absDest string
 	var err error
 
+	// For file leases, ensure the destination is within the project root.
 	if l.LeaseType == "file" {
 		destinationOutsideRoot, _ := cmd.Flags().GetBool("destination-outside-root")
 		if !destinationOutsideRoot {
-			projectRoot := filepath.Dir(configFile)
-			isInside, err := fileutil.IsPathInsideRoot(projectRoot, l.Destination)
+			expandedDest, err := fileutil.ExpandPath(l.Destination)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not expand destination path: %w", err)
+			}
+			isInside, err := fileutil.IsPathInsideRoot(projectRoot, expandedDest)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to validate destination path: %w", err)
 			}
@@ -323,14 +340,14 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal string, configFi
 		if l.Variable != "" {
 			shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
 		}
-		absDest = filepath.Join(filepath.Dir(configFile), "<shell>")
+		absDest = filepath.Join(projectRoot, "<shell>")
 	} else {
 		// For file/env leases, only write if there's a variable,
 		// or if it's a file lease. This prevents writing the
 		// parent/container lease of an explode.
 		if l.LeaseType == "file" || l.Variable != "" {
 			override, _ := cmd.Flags().GetBool("override")
-			created, err := writeLease(l, secretVal, override)
+			created, err := writeLease(l, secretVal, projectRoot, override)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to write lease: %w", err)
 			}
@@ -338,9 +355,12 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal string, configFi
 				fmt.Fprintf(os.Stderr, "Created file: %s\n", l.Destination)
 			}
 		}
-		absDest, err = filepath.Abs(l.Destination)
+		absDest, err = fileutil.ExpandPath(l.Destination)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get absolute path for %s: %w", l.Destination, err)
+			return nil, nil, fmt.Errorf("failed to expand path for %s: %w", l.Destination, err)
+		}
+		if !filepath.IsAbs(absDest) {
+			absDest = filepath.Join(projectRoot, absDest)
 		}
 	}
 
