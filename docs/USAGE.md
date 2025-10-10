@@ -59,6 +59,21 @@ env-lease status
 
 The `env-lease.toml` file is the heart of the configuration. It's a declarative file that defines all the leases for a project.
 
+### Advanced Configuration
+
+In addition to the `env-lease.toml` file, you can use environment variables to control the configuration:
+
+- `ENV_LEASE_CONFIG`: Specifies the full path to the configuration file.
+- `ENV_LEASE_NAME`: Specifies the name of the configuration file, which is then looked for in the current directory.
+
+The order of precedence is:
+
+1.  `--config` flag
+2.  `ENV_LEASE_CONFIG`
+3.  `ENV_LEASE_NAME`
+4.  `env-lease.toml` (default)
+
+
 ### Lease Options
 
 | Key           | Required | Description                                                                                                                                                          | Example                                                       |
@@ -266,6 +281,7 @@ env-lease idle uninstall
 #### `grant`
 
 - `--override`: Re-grant leases even if they are already active.
+- `--config`: Path to the configuration file. This can be overridden by the `ENV_LEASE_CONFIG` and `ENV_LEASE_NAME` environment variables.
 - `--continue-on-error`: Continue granting leases even if one fails.
 - `-i`, `--interactive`: Prompt for confirmation before granting each lease.
 - `--destination-outside-root`: Allow file-based leases to write outside of the project root.
