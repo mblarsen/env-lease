@@ -37,11 +37,11 @@ type Lease struct {
 }
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.
-func Load(path string) (*Config, error) {
-	return loadAndMerge(path, 0)
+func Load(path, localPath string) (*Config, error) {
+	return loadAndMerge(path, localPath, 0)
 }
 
-func loadAndMerge(path string, depth int) (*Config, error) {
+func loadAndMerge(path, localPath string, depth int) (*Config, error) {
 	if depth > 10 {
 		return nil, fmt.Errorf("max include depth exceeded")
 	}
@@ -121,14 +121,26 @@ func loadAndMerge(path string, depth int) (*Config, error) {
 		}
 	}
 
-	// Load local override file
-	localPath := localOverridePath(absPath)
-	localConfig, err := loadAndMerge(localPath, depth+1)
-	if err != nil {
-		return nil, fmt.Errorf("could not load local config: %w", err)
+	if depth == 0 {
+		// Load local override file
+		resolvedLocalPath, err := resolveLocalConfigFile(absPath, localPath)
+		if err != nil {
+			return nil, fmt.Errorf("could not resolve local config path: %w", err)
+		}
+
+		var localConfig *Config
+		if resolvedLocalPath != "" {
+			localConfig, err = loadAndMerge(resolvedLocalPath, "", depth+1)
+			if err != nil {
+				return nil, fmt.Errorf("could not load local config: %w", err)
+			}
+		}
+
+		mergedConfig := mergeConfigs(&config, localConfig)
+		return &mergedConfig, nil
 	}
-	mergedConfig := mergeConfigs(&config, localConfig)
-	return &mergedConfig, nil
+
+	return &config, nil
 }
 
 func mergeConfigs(base, override *Config) Config {
@@ -232,4 +244,35 @@ func expandAndAbs(path string) (string, error) {
 		return "", fmt.Errorf("could not get absolute path for '%s': %w", expanded, err)
 	}
 	return abs, nil
+}
+
+func resolveLocalConfigFile(mainConfigPath, localConfigFlag string) (string, error) {
+	// 1. --local-config flag
+	if localConfigFlag != "" {
+		return expandAndAbs(localConfigFlag)
+	}
+
+	// 2. ENV_LEASE_LOCAL_CONFIG
+	if envConfig := os.Getenv("ENV_LEASE_LOCAL_CONFIG"); envConfig != "" {
+		return expandAndAbs(envConfig)
+	}
+
+	// 3. ENV_LEASE_LOCAL_NAME
+	if envName := os.Getenv("ENV_LEASE_LOCAL_NAME"); envName != "" {
+		p, err := expandAndAbs(filepath.Join(filepath.Dir(mainConfigPath), envName))
+		if err != nil {
+			return "", err
+		}
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
+		}
+	}
+
+	// 4. Default .local convention
+	localPath := localOverridePath(mainConfigPath)
+	if _, err := os.Stat(localPath); err == nil {
+		return localPath, nil
+	}
+
+	return "", nil
 }

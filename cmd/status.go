@@ -35,6 +35,15 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 
+		// The status command doesn't need to load the config, it just needs the path
+		// to filter leases. So we don't call config.Load here. But if we did, it
+		// would look like this:
+		// localConfigFileFlag, _ := cmd.Flags().GetString("local-config")
+		// _, err = config.Load(absConfigFile, localConfigFileFlag)
+		// if err != nil {
+		// 	return err
+		// }
+
 		showAll, _ := cmd.Flags().GetBool("all")
 
 		// Group all leases hierarchically first
@@ -142,5 +151,6 @@ func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
 func init() {
 	statusCmd.Flags().Bool("all", false, "Show all active leases.")
 	statusCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
+	statusCmd.Flags().String("local-config", "", "Path to local override config file.")
 	rootCmd.AddCommand(statusCmd)
 }

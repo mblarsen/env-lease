@@ -18,7 +18,7 @@ variable = "API_KEY"
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
 
-		config, err := Load(path)
+		config, err := Load(path, "")
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -41,7 +41,7 @@ duration = "1h"
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
 
-		_, err := Load(path)
+		_, err := Load(path, "")
 		if err == nil {
 			t.Fatal("expected an error, got nil")
 		}
@@ -57,7 +57,7 @@ duration = "1h"
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
 
-		config, err := Load(path)
+		config, err := Load(path, "")
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -83,7 +83,7 @@ duration = "1h"
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
 
-		config, err := Load(path)
+		config, err := Load(path, "")
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
@@ -108,7 +108,7 @@ lease_type = "env"
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
 
-		_, err := Load(path)
+		_, err := Load(path, "")
 		if err == nil {
 			t.Fatal("expected an error, got nil")
 		}

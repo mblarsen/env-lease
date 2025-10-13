@@ -126,7 +126,7 @@ func (d *Daemon) revokeOrphanedLeases() {
 			slog.Warn("Could not resolve config file, skipping", "config", configFile, "err", err)
 			continue
 		}
-		cfg, err := config.Load(resolvedConfigFile)
+		cfg, err := config.Load(resolvedConfigFile, "")
 		if err != nil {
 			// If config can't be loaded (e.g., deleted), revoke all leases associated with it.
 			slog.Warn("Config file not found or failed to load; revoking associated leases", "config", configFile, "err", err)

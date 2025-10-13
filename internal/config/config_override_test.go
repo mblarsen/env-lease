@@ -43,7 +43,7 @@ duration = "30m"
 	assert.NoError(t, err)
 
 	// Load the config
-	config, err := Load(mainConfigPath)
+	config, err := Load(mainConfigPath, "")
 	fmt.Println(config, err)
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
@@ -98,7 +98,7 @@ duration = "30m"
 	assert.NoError(t, err)
 
 	// Load the config
-	config, err := Load(mainConfigPath)
+	config, err := Load(mainConfigPath, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
 
@@ -147,7 +147,7 @@ duration = "30m"
 	assert.NoError(t, err)
 
 	// Load the config
-	config, err := Load(resolvedPath)
+	config, err := Load(resolvedPath, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
 
@@ -176,7 +176,7 @@ duration = "1h"
 	assert.NoError(t, err)
 
 	// Load the config
-	config, err := Load(mainConfigPath)
+	config, err := Load(mainConfigPath, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
 
@@ -209,10 +209,142 @@ duration = "1h"
 	assert.NoError(t, err)
 
 	// Load the config
-	config, err := Load(mainConfigPath)
+	config, err := Load(mainConfigPath, "")
 	assert.NoError(t, err)
 	assert.NotNil(t, config)
 
 	// Verify that only the lease from the main file is loaded
 	assert.Len(t, config.Lease, 1)
+}
+
+func TestEnvLeaseLocalConfigOverride(t *testing.T) {
+	// Create a temporary directory for the test configs
+	dir, err := os.MkdirTemp("", "env-lease-local-config-override-test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// Main config content
+	mainConfigContent := `
+[[lease]]
+source = "op://vault/item/secret"
+destination = ".env"
+variable = "API_KEY"
+duration = "1h"
+`
+
+	// Local override config content
+	localConfigContent := `
+[[lease]]
+source = "op://vault/item/another-secret"
+destination = ".env.local"
+variable = "LOCAL_API_KEY"
+duration = "30m"
+`
+
+	// Write the main and local config files
+	mainConfigPath := filepath.Join(dir, "env-lease.toml")
+	err = os.WriteFile(mainConfigPath, []byte(mainConfigContent), 0644)
+	assert.NoError(t, err)
+
+	localConfigPath := filepath.Join(dir, "custom.local.toml")
+	err = os.WriteFile(localConfigPath, []byte(localConfigContent), 0644)
+	assert.NoError(t, err)
+
+	// Set the environment variable
+	t.Setenv("ENV_LEASE_LOCAL_CONFIG", localConfigPath)
+
+	// Load the config
+	config, err := Load(mainConfigPath, "")
+	assert.NoError(t, err)
+	assert.NotNil(t, config)
+
+	// Verify that the leases from both files are loaded
+	assert.Len(t, config.Lease, 2)
+}
+
+func TestEnvLeaseLocalNameOverride(t *testing.T) {
+	// Create a temporary directory for the test configs
+	dir, err := os.MkdirTemp("", "env-lease-local-name-override-test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// Main config content
+	mainConfigContent := `
+[[lease]]
+source = "op://vault/item/secret"
+destination = ".env"
+variable = "API_KEY"
+duration = "1h"
+`
+
+	// Local override config content
+	localConfigContent := `
+[[lease]]
+source = "op://vault/item/another-secret"
+destination = ".env.local"
+variable = "LOCAL_API_KEY"
+duration = "30m"
+`
+
+	// Write the main and local config files
+	mainConfigPath := filepath.Join(dir, "env-lease.toml")
+	err = os.WriteFile(mainConfigPath, []byte(mainConfigContent), 0644)
+	assert.NoError(t, err)
+
+	localConfigPath := filepath.Join(dir, "custom.local.toml")
+	err = os.WriteFile(localConfigPath, []byte(localConfigContent), 0644)
+	assert.NoError(t, err)
+
+	// Set the environment variable
+	t.Setenv("ENV_LEASE_LOCAL_NAME", "custom.local.toml")
+
+	// Load the config
+	config, err := Load(mainConfigPath, "")
+	assert.NoError(t, err)
+	assert.NotNil(t, config)
+
+	// Verify that the leases from both files are loaded
+	assert.Len(t, config.Lease, 2)
+}
+
+func TestLocalConfigFlagOverride(t *testing.T) {
+	// Create a temporary directory for the test configs
+	dir, err := os.MkdirTemp("", "local-config-flag-override-test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(dir)
+
+	// Main config content
+	mainConfigContent := `
+[[lease]]
+source = "op://vault/item/secret"
+destination = ".env"
+variable = "API_KEY"
+duration = "1h"
+`
+
+	// Local override config content
+	localConfigContent := `
+[[lease]]
+source = "op://vault/item/another-secret"
+destination = ".env.local"
+variable = "LOCAL_API_KEY"
+duration = "30m"
+`
+
+	// Write the main and local config files
+	mainConfigPath := filepath.Join(dir, "env-lease.toml")
+	err = os.WriteFile(mainConfigPath, []byte(mainConfigContent), 0644)
+	assert.NoError(t, err)
+
+	localConfigPath := filepath.Join(dir, "custom.local.toml")
+	err = os.WriteFile(localConfigPath, []byte(localConfigContent), 0644)
+	assert.NoError(t, err)
+
+	// Load the config
+	config, err := Load(mainConfigPath, localConfigPath)
+	assert.NoError(t, err)
+	assert.NotNil(t, config)
+
+	// Verify that the leases from both files are loaded
+	assert.Len(t, config.Lease, 2)
 }

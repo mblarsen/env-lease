@@ -184,5 +184,6 @@ func init() {
 	revokeCmd.Flags().Bool("all", false, "Revoke all active leases, across all projects.")
 	revokeCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before revoking each lease.")
 	revokeCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
+	revokeCmd.Flags().String("local-config", "", "Path to local override config file.")
 	rootCmd.AddCommand(revokeCmd)
 }

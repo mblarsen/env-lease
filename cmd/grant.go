@@ -73,11 +73,12 @@ This can be overridden with the --destination-outside-root flag.`,
 		}
 
 		configFileFlag, _ := cmd.Flags().GetString("config")
+		localConfigFileFlag, _ := cmd.Flags().GetString("local-config")
 		configFile, err := config.ResolveConfigFile(configFileFlag)
 		if err != nil {
 			return err
 		}
-		cfg, err = config.Load(configFile)
+		cfg, err = config.Load(configFile, localConfigFileFlag)
 		if err != nil {
 			return fmt.Errorf("failed to load config: %w", err)
 		}
@@ -388,6 +389,7 @@ func init() {
 	grantCmd.Flags().Bool("continue-on-error", false, "Continue granting leases even if one fails.")
 	grantCmd.Flags().Bool("no-direnv", false, "Do not automatically run 'direnv allow'.")
 	grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
+	grantCmd.Flags().String("local-config", "", "Path to local override config file.")
 	grantCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before granting each lease.")
 	grantCmd.Flags().Bool("destination-outside-root", false, "Allow file-based leases to write outside of the project root.")
 	rootCmd.AddCommand(grantCmd)

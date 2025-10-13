@@ -65,6 +65,8 @@ In addition to the `env-lease.toml` file, you can use environment variables to c
 
 - `ENV_LEASE_CONFIG`: Specifies the full path to the configuration file.
 - `ENV_LEASE_NAME`: Specifies the name of the configuration file, which is then looked for in the current directory.
+- `ENV_LEASE_LOCAL_CONFIG`: Specifies the full path to the local override configuration file. This takes precedence over all other local override settings.
+- `ENV_LEASE_LOCAL_NAME`: Specifies the name of the local override configuration file, which is then looked for in the same directory as the main configuration file.
 
 The order of precedence is:
 
@@ -320,6 +322,7 @@ env-lease idle uninstall
 
 - `--override`: Re-grant leases even if they are already active.
 - `--config`: Path to the configuration file. This can be overridden by the `ENV_LEASE_CONFIG` and `ENV_LEASE_NAME` environment variables.
+- `--local-config`: Path to the local override configuration file. This takes precedence over the environment variables.
 - `--continue-on-error`: Continue granting leases even if one fails.
 - `-i`, `--interactive`: Prompt for confirmation before granting each lease.
 - `--destination-outside-root`: Allow file-based leases to write outside of the project root.
