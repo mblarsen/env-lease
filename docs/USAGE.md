@@ -73,6 +73,44 @@ The order of precedence is:
 3.  `ENV_LEASE_NAME`
 4.  `env-lease.toml` (default)
 
+### Local Overrides (`env-lease.local.toml`)
+
+For enhanced flexibility, `env-lease` supports an automatic local override file. This allows you to specify local-only configurations or override existing settings without modifying the main, version-controlled `env-lease.toml` file.
+
+**How it Works:**
+
+`env-lease` will automatically look for a file named `env-lease.local.toml` in the same directory as your main configuration file. If found, it will be merged on top of the main configuration.
+
+-   If you use a custom config file (e.g., `my-config.toml`), `env-lease` will look for `my-config.local.toml`.
+-   This works with both the `--config` flag and the `ENV_LEASE_CONFIG` environment variable.
+
+**Merge Strategy:**
+
+-   **`[[lease]]` blocks:** The `lease` blocks from the local file are **appended** to the leases from the main file. This allows you to add local-only leases.
+-   **Other Settings:** Any other top-level settings in the local file will **override** the settings from the main file.
+
+**Example:**
+
+**`env-lease.toml`**
+```toml
+[[lease]]
+source = "op://vault/prod-db/credential"
+destination = ".envrc"
+variable = "DATABASE_URL"
+duration = "8h"
+```
+
+**`env-lease.local.toml`**
+```toml
+[[lease]]
+source = "op://vault/dev-db/credential"
+destination = ".envrc"
+variable = "DATABASE_URL_DEV"
+duration = "1h"
+```
+
+When you run `env-lease grant`, both leases will be granted.
+
 
 ### Lease Options
 

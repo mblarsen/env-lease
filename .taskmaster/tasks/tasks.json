@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": 1,
+        "id": "1",
         "title": "Project Scaffolding and Initialization",
         "description": "Set up the basic Go project structure, initialize Go modules, and create the initial directory layout for the CLI and daemon components.",
         "details": "Initialize a new Go module using `go mod init github.com/user/env-lease`. Create a standard Go project layout, for example: `/cmd/env-lease`, `/cmd/env-leased`, `/internal/config`, `/internal/daemon`, `/internal/ipc`, `/internal/provider`. Use a CLI framework like `cobra` to structure the commands.",
@@ -18,7 +18,8 @@
             "dependencies": [],
             "details": "Based on the expansion guidance, create the following directory structure: `/cmd/env-lease`, `/cmd/env-leased`, `/internal/config`, `/internal/daemon`, `/internal/ipc`, and `/internal/provider`.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -29,7 +30,8 @@
             ],
             "details": "Create a new file `/cmd/root.go` to define the main `cobra.Command`. Then, create `main.go` files within `/cmd/env-lease/` and `/cmd/env-leased/` that call the root command's `Execute()` function.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -40,19 +42,20 @@
             ],
             "details": "Delete the `main.go` file located in the project's root directory. After removal, run `go build ./...` to verify that the project builds successfully with the new entrypoints in the `/cmd` directories.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 2,
+        "id": "2",
         "title": "Configuration Parsing (`env-lease.toml`)",
         "description": "Implement the logic to parse the `env-lease.toml` configuration file into Go structs. This includes defining the structs for leases and handling different lease types, formats, and encodings.",
         "details": "Use a robust TOML parsing library like `github.com/BurntSushi/toml`. Define Go structs that map directly to the TOML structure. For example: `type Config struct { Leases map[string]Lease }`, `type Lease struct { Type string; Format string; Encoding string; Source string; Destination string; Duration string }`. Implement validation for required fields and default values (e.g., `lease_type` defaults to `\"env\"`).",
         "testStrategy": "Create a suite of unit tests with various valid and invalid `env-lease.toml` files. Test cases should include missing fields, invalid value types, different lease types (`env`, `file`), and custom formats/encodings.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": [
@@ -63,7 +66,8 @@
             "dependencies": [],
             "details": "The `Config` struct should contain a map of leases, e.g., `Leases map[string]Lease`. The `Lease` struct should include fields like `Type`, `Format`, `Encoding`, `Source`, `Destination`, and `Duration`. The `Load` function will be the core entry point for configuration parsing.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -74,7 +78,8 @@
             ],
             "details": "After successfully parsing the TOML file into structs, iterate through the loaded leases. Validate that required fields (e.g., `Source`, `Destination`) are present. For optional fields like `Type`, set a default value (e.g., 'env') if it's not specified in the file. Return an error for any invalid or missing required configuration.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -86,32 +91,33 @@
             ],
             "details": "The test suite should cover multiple scenarios: a perfectly valid TOML file, a file with missing required fields (should error), a file with invalid data types, a file that relies on default values, and other edge cases. Use temporary files or in-memory strings to represent different TOML configurations for testing the `Load` function.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 3,
+        "id": "3",
         "title": "Define SecretProvider Interface",
         "description": "Define a Go interface for abstracting the secret-fetching logic. This will allow for multiple secret backends to be implemented in the future.",
         "details": "In the `/internal/provider` package, define the interface. `type SecretProvider interface { Fetch(source string) (string, error) }`. The `source` string will be the provider-specific identifier for the secret (e.g., a 1Password secret reference URI).",
         "testStrategy": "This is an interface definition, so no direct tests are needed. The correctness will be validated by the tests for the concrete implementations.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 4,
+        "id": "4",
         "title": "Implement 1Password CLI Secret Provider",
         "description": "Create the first implementation of the `SecretProvider` interface that uses the 1Password CLI (`op`) to fetch secrets.",
         "details": "Create a `OnePasswordCLI` struct that implements the `SecretProvider` interface. The `Fetch` method will use the `os/exec` package to call `op read <source>`. It must handle potential errors, such as the `op` command not being in the PATH, the user not being logged in (which should result in a clear error message), or the secret not being found.",
         "testStrategy": "Unit test the provider by mocking `os/exec`. Create test cases for successful secret retrieval, `op` command not found, and `op` returning an error (e.g., locked vault). An integration test could be added that runs only if the `op` CLI is configured and available in the test environment.",
         "priority": "high",
         "dependencies": [
-          3
+          "3"
         ],
         "status": "done",
         "subtasks": [
@@ -122,7 +128,8 @@
             "dependencies": [],
             "details": "In the `internal/provider` package, create the `onepassword.go` file. Define the `OnePasswordCLI` struct and ensure it satisfies the `SecretProvider` interface. Implement the `Fetch` method to use `os/exec` to call `op read <source>` and capture its standard output. Basic error checking for the command execution itself should be included.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -133,7 +140,8 @@
             ],
             "details": "Expand the `Fetch` method to differentiate between different error conditions. Specifically, handle cases where: 1) the `op` executable is not found in the system's PATH; 2) the command returns a non-zero exit code (e.g., user not logged in, secret not found); 3) the command succeeds but produces no output. The function should return distinct and informative errors for each scenario.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -144,19 +152,20 @@
             ],
             "details": "In `onepassword_test.go`, implement unit tests for the `Fetch` method. Use a mocking library or technique to replace the actual `os/exec.Command` execution. Create test cases to verify correct behavior for a successful secret retrieval, as well as for all the specific failure modes implemented in the previous subtask (command not found, non-zero exit code, empty output).",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 5,
+        "id": "5",
         "title": "Implement IPC Framework with HMAC Security",
         "description": "Develop the shared communication layer for the CLI and daemon using a Unix Domain Socket. Implement HMAC signatures to ensure message authenticity and integrity.",
         "details": "Create an `/internal/ipc` package. Define message structs for commands (`GrantRequest`, `RevokeRequest`, `StatusRequest`) and responses. Use `net.Listen(\"unix\", socketPath)` for the server and `net.Dial(\"unix\", socketPath)` for the client. For security, generate a shared secret token. Each message should be serialized (e.g., JSON), and sent with an HMAC-SHA256 signature in a header or as part of the message envelope. Use the `crypto/hmac` and `crypto/sha256` standard libraries.",
         "testStrategy": "Create unit tests for the HMAC signing and verification logic. Write an integration test that starts a mock server and has a client send a message, verifying successful and authenticated communication.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": [
@@ -167,7 +176,8 @@
             "dependencies": [],
             "details": "This foundational subtask focuses on the data structures and cryptographic primitives. The `Sign` and `Verify` functions should be self-contained and unit-testable without requiring any networking code.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -178,7 +188,8 @@
             ],
             "details": "The server implementation should handle the complete lifecycle of an incoming request, from accepting the raw connection to verifying its authenticity and preparing it for processing. Error handling for invalid signatures or malformed messages is critical.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -189,7 +200,8 @@
             ],
             "details": "This subtask encapsulates all client-side logic for communicating with the daemon. It will be the primary interface used by the CLI commands to send requests.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -201,32 +213,33 @@
             ],
             "details": "These tests are crucial to ensure the entire framework is robust. Test cases should include successful communication, communication with an invalid HMAC signature, and handling of connection errors.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 6,
+        "id": "6",
         "title": "Implement Atomic File Writer Utility",
         "description": "Create a utility function for performing atomic file writes. This ensures that destination files like `.envrc` are never left in a corrupted state.",
         "details": "Create a helper function, e.g., `AtomicWriteFile(filename string, data []byte, perm fs.FileMode)`. The logic should be: 1. Create a temporary file in the same directory using `os.CreateTemp`. 2. Write the data to the temporary file. 3. Close the temporary file. 4. Rename the temporary file to the final destination filename using `os.Rename`. This is an atomic operation on POSIX systems.",
         "testStrategy": "Unit test the utility using a temporary directory. Verify that the file is created with the correct content and permissions. Test edge cases like the destination directory not existing or permission errors during the rename.",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "done",
         "subtasks": []
       },
       {
-        "id": 7,
+        "id": "7",
         "title": "Implement Daemon State Management",
         "description": "Implement the daemon's ability to persist the state of active leases to a JSON file, allowing it to resume operations after a restart.",
         "details": "Define a struct for the daemon's state, likely a map of lease identifiers to their expiration times and other metadata. Create `LoadState()` and `SaveState()` methods. The state file should be located at `~/.config/env-lease/state.json`. `LoadState()` should be called on daemon startup. `SaveState()` should be called whenever the set of active leases changes. Use `encoding/json` for serialization.",
         "testStrategy": "Unit test the `LoadState` and `SaveState` methods. Use a temporary file to verify that state is correctly written to and read from disk. Test edge cases like the state file not existing, being empty, or containing corrupted JSON.",
         "priority": "high",
         "dependencies": [
-          2
+          "2"
         ],
         "status": "done",
         "subtasks": [
@@ -237,7 +250,8 @@
             "dependencies": [],
             "details": "The `State` struct should contain a map of lease identifiers to their metadata and expiration times. The `SaveState` function must ensure the target directory exists before writing the file. The `LoadState` function should handle cases where the file doesn't exist by returning a new, empty state object.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -248,7 +262,8 @@
             ],
             "details": "Test cases must include: saving state and successfully loading it back; loading from a non-existent file (should result in a clean state); attempting to load from a file with corrupted JSON (should return an error); and verifying that `SaveState` correctly creates the directory structure if it's missing.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -259,21 +274,22 @@
             ],
             "details": "Call the `LoadState` function when the daemon process starts to restore any previously active leases from `~/.config/env-lease/state.json`. Hook the `SaveState` function into the parts of the code that grant, revoke, or otherwise modify leases to ensure the state on disk is always up-to-date.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 8,
+        "id": "8",
         "title": "Implement Daemon Core Logic and Timer Loop",
         "description": "Build the main loop of the `env-leased` daemon. This loop will manage lease timers, trigger expirations, and handle the automatic revocation of secrets.",
         "details": "The daemon's main run loop will use a `time.Ticker` for periodic checks (e.g., every second). On each tick, it will iterate through the active leases from its state. If a lease's expiration time has passed, it will trigger the revocation logic (removing the line from the `.env` file or deleting the temp file). Upon startup, it should immediately check for and revoke any leases that expired while it was offline.",
         "testStrategy": "Unit test the core loop logic with a mocked clock (`time.After`) and a mock filesystem. Verify that leases are correctly identified as expired and that the revocation function is called. Test the startup logic to ensure it correctly handles leases that expired while the daemon was not running.",
         "priority": "high",
         "dependencies": [
-          4,
-          6,
-          7
+          "4",
+          "6",
+          "7"
         ],
         "status": "done",
         "subtasks": [
@@ -284,7 +300,8 @@
             "dependencies": [],
             "details": "Define the `Daemon` struct with fields for a state manager, a secret revoker, and a clock interface (e.g., `type Clock interface { Now() time.Time; Ticker(d time.Duration) *time.Ticker }`). This sets up the foundation for dependency injection as specified in the expansion guidance.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -295,7 +312,8 @@
             ],
             "details": "Within the `Run()` method, before the main loop begins, iterate through all leases loaded from the state. For each lease, compare its expiration time with the current time provided by the clock dependency. If expired, call the revocation logic. Ensure state is saved after this initial cleanup.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -306,7 +324,8 @@
             ],
             "details": "In the `Run()` method, after the initial startup check, create a `time.Ticker` using the clock dependency. Use a `select` statement within a `for` loop to listen on the ticker's channel and a separate channel for shutdown signals (e.g., from an OS signal handler).",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -318,20 +337,21 @@
             ],
             "details": "On each tick received from the `time.Ticker`, get the current list of active leases from the state manager. Iterate through them, comparing `lease.Expiration` with `clock.Now()`. If a lease is expired, call the injected secret revoker's `Revoke()` method and update the daemon's state by removing the lease.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 9,
+        "id": "9",
         "title": "Implement Daemon IPC Server",
         "description": "Integrate the IPC framework into the daemon, allowing it to listen for and respond to commands from the `env-lease` CLI.",
         "details": "In the daemon's main function, start a goroutine that listens on the Unix Domain Socket defined in the IPC package. It should accept connections, read incoming messages, verify their HMAC signature, and dispatch them to handler functions (e.g., `handleGrant`, `handleRevoke`). The handlers will modify the daemon's state and trigger actions in the core loop.",
         "testStrategy": "Write integration tests where a mock client (from the IPC package tests) connects to a running instance of the daemon. Send `grant`, `revoke`, and `status` commands and verify that the daemon's internal state changes as expected.",
         "priority": "high",
         "dependencies": [
-          5,
-          8
+          "5",
+          "8"
         ],
         "status": "done",
         "subtasks": [
@@ -342,7 +362,8 @@
             "dependencies": [],
             "details": "Add a new field for the `ipc.Server` to the `Daemon` struct. Ensure the server is properly initialized during the daemon's setup. The call to `go d.ipcServer.Listen()` should be placed within the `Daemon.Run()` method, along with appropriate error handling if the server fails to start.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -353,7 +374,8 @@
             ],
             "details": "Define a `sync.Mutex` in the `Daemon` struct. Implement `handleGrant`, `handleRevoke`, and `handleStatus` methods. Each method must acquire the lock before reading or writing to the daemon's state (e.g., the lease map) and release it afterward. The functions should accept request data and return a corresponding response object.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -364,19 +386,20 @@
             ],
             "details": "The `ipc.Server` will need a mechanism to map request types to the handler methods on the `Daemon` instance. This could be a map or a switch statement within the connection handling loop. The server should pass the request payload to the handler and send the handler's response back to the client.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 10,
+        "id": "10",
         "title": "Implement CLI IPC Client",
         "description": "Implement the client-side logic for the `env-lease` CLI to connect to the daemon, sign messages, and send commands.",
         "details": "Create a client struct in the `/internal/ipc` package that encapsulates dialing the socket, serializing a request, signing it with HMAC, sending it, and then reading and verifying the response. This client will be used by all CLI commands that need to interact with the daemon.",
         "testStrategy": "The client logic will be tested implicitly through the command implementation tests. Direct unit tests can be written to verify correct message formatting and signing.",
         "priority": "high",
         "dependencies": [
-          5
+          "5"
         ],
         "status": "done",
         "subtasks": [
@@ -387,7 +410,8 @@
             "dependencies": [],
             "details": "This core method should handle the low-level details of establishing a connection, writing the signed payload, reading the response, and closing the connection. It will be used by the higher-level methods defined in the next subtask. Focus on robustly handling the raw byte stream and HMAC verification.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -398,20 +422,21 @@
             ],
             "details": "Each method will be responsible for creating the appropriate request object, calling the core communication method, and then decoding the response into the correct type. Implement clear error wrapping to distinguish between connection errors (e.g., daemon not running) and application-level errors returned by the daemon.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 11,
+        "id": "11",
         "title": "Implement `env-lease grant` Command",
         "description": "Build the `grant` command. This command will parse the configuration, communicate with the daemon to grant all defined leases, and handle user flags.",
         "details": "Using the `cobra` framework, create the `grant` command. It will first parse `env-lease.toml`. Then, it will use the IPC client to send a `GrantRequest` to the daemon containing the lease definitions. It must implement the `--override` and `--continue-on-error` flags, passing them along in the request. By default, the operation should be transactional ('all or nothing').",
         "testStrategy": "Write integration tests that execute the `grant` command against a mock daemon. Verify that the correct `GrantRequest` is sent. Test the default transactional behavior and the behavior when `--continue-on-error` is used.",
         "priority": "high",
         "dependencies": [
-          2,
-          10
+          "2",
+          "10"
         ],
         "status": "done",
         "subtasks": [
@@ -422,7 +447,8 @@
             "dependencies": [],
             "details": "Create the file `cmd/grant.go`. Instantiate a `cobra.Command` struct for the `grant` command. Use `cmd.Flags().Bool()` to add the `--override` and `--continue-on-error` flags. Add a placeholder `RunE` function that will contain the core logic.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -433,7 +459,8 @@
             ],
             "details": "In the `grant` command's `RunE` function, call the appropriate function from the `config` package to load the `env-lease.toml` file. Handle any errors during loading. Create an instance of the `ipc.GrantRequest` struct and populate it with the lease definitions from the config and the flag values from the command.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -444,19 +471,20 @@
             ],
             "details": "Instantiate a new `ipc.Client`. Use the client to send the `GrantRequest` object created in the previous subtask to the running daemon. Check the response from the daemon and print a success message or the returned error to the console.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 12,
+        "id": "12",
         "title": "Implement `env-lease revoke` Command",
         "description": "Build the `revoke` command, which allows a user to immediately revoke all active leases for the current project.",
         "details": "Create the `revoke` command using `cobra`. The command will use the IPC client to send a `RevokeRequest` to the daemon. The daemon will then be responsible for immediately revoking all leases associated with that project's configuration file.",
         "testStrategy": "Write an integration test. First, run `grant` to establish leases. Then, run `revoke` and query the mock daemon's state to verify that all leases have been removed.",
         "priority": "high",
         "dependencies": [
-          10
+          "10"
         ],
         "status": "done",
         "subtasks": [
@@ -467,7 +495,8 @@
             "dependencies": [],
             "details": "In the `cmd` package, create a new file named `revoke.go`. Inside this file, define a `cobra.Command` struct for the `revoke` command. Set its `Use`, `Short`, and `Long` properties appropriately. Add a placeholder `RunE` function. Finally, ensure this new command is added to the root command so it's available in the CLI.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -478,19 +507,20 @@
             ],
             "details": "Within the `RunE` function of the `revoke` command, instantiate an `ipc.Client`. Construct a `RevokeRequest` message, ensuring it includes the path to the current project's configuration file. Use the client to send this request to the daemon. Based on the daemon's response, print a success message to stdout or the returned error to stderr.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 13,
+        "id": "13",
         "title": "Implement `env-lease status` Command",
         "description": "Build the `status` command to display the state and remaining time for all active leases.",
         "details": "Create the `status` command using `cobra`. It will use the IPC client to send a `StatusRequest` to the daemon. The daemon will respond with a list of active leases and their remaining TTLs. The CLI will then format this information and print it to the console in a user-friendly table.",
         "testStrategy": "Write an integration test. Grant several leases with different durations, then run the `status` command. Capture the stdout and verify that it correctly displays the status and remaining time for each active lease.",
         "priority": "medium",
         "dependencies": [
-          10
+          "10"
         ],
         "status": "done",
         "subtasks": [
@@ -501,7 +531,8 @@
             "dependencies": [],
             "details": "The file should be `cmd/status.go`. The command should be named `status`. The `RunE` function can be a placeholder initially. Ensure the new command is registered with the main `rootCmd`.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -512,7 +543,8 @@
             ],
             "details": "This involves using the existing `ipc.Client` to create and send a `StatusRequest`. The response from the daemon, which will contain the list of active leases, should be stored in a variable for the next step. Implement error handling for the client connection and request sending.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -523,19 +555,20 @@
             ],
             "details": "The table should have clear headers (e.g., 'Destination', 'Time Remaining'). The remaining TTL, received as a duration, should be formatted into a user-friendly string. The final formatted table should be printed to standard output.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 14,
+        "id": "14",
         "title": "Implement Daemon Revocation Failure Handling",
         "description": "Implement the daemon's error handling logic for when a revocation operation fails. This includes periodic retries and creating a persistent failure notification file.",
         "details": "Modify the daemon's revocation logic. If revoking a secret fails (e.g., due to file permissions), the daemon should log the error and schedule a retry (e.g., using an exponential backoff strategy). If the failure persists for more than 5 minutes, the daemon must create a `.envrc.env-lease-REVOCATION-FAILURE` file in the project directory to alert the user.",
         "testStrategy": "Unit test this logic by mocking a revocation that always fails. Use a mock filesystem and a mock clock to verify that the retry mechanism is triggered and that the failure file is created after the specified duration.",
         "priority": "medium",
         "dependencies": [
-          8
+          "8"
         ],
         "status": "done",
         "subtasks": [
@@ -546,7 +579,8 @@
             "dependencies": [],
             "details": "Define a new struct for a retry item containing the lease, attempt count, and next retry time. Add this structure to the main daemon state object. Modify the `SaveState()` and `LoadState()` functions to handle the serialization and deserialization of this new retry queue. When a revocation initially fails, move the lease from the active list to this queue.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -557,7 +591,8 @@
             ],
             "details": "In the daemon's main processing loop, iterate through the retry queue. For each item, check if the current time is past its scheduled retry time. If so, attempt revocation. On success, remove the item from the queue. On failure, increment the attempt counter and calculate the next retry time using an exponential backoff formula (e.g., `base_delay * 2^attempts`), then update the item in the queue.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -568,19 +603,20 @@
             ],
             "details": "When a lease is first added to the retry queue, record the initial failure timestamp. Within the retry processing loop, check if the time elapsed since the initial failure exceeds 5 minutes for any given lease. If the threshold is crossed and the notification file does not already exist, create the file. Ensure this check is performed efficiently and the file is created only once per persistent failure.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 15,
+        "id": "15",
         "title": "Implement Orphaned Lease Cleanup",
         "description": "Add logic to the daemon to automatically purge leases whose configuration file has been deleted, and add a manual cleanup command.",
         "details": "Add a periodic task to the daemon (e.g., runs daily) that checks if the `env-lease.toml` file for each active lease still exists. If a config file is missing, mark the lease as orphaned. If it remains orphaned for 30 days, revoke and delete it from the state. Also, add a hidden `env-leased --cleanup` command that allows a user to trigger this process manually.",
         "testStrategy": "Unit test the cleanup logic. Create a state file with several leases. Use a mock filesystem to 'delete' the config file for one of them. Advance a mock clock by 31 days and verify that the orphaned lease is removed from the state.",
         "priority": "low",
         "dependencies": [
-          8
+          "8"
         ],
         "status": "done",
         "subtasks": [
@@ -591,7 +627,8 @@
             "dependencies": [],
             "details": "The `orphaned_since` field should be added to the lease metadata struct managed by the state manager. The state loading and saving functions must be updated to correctly handle this new field, ensuring backward compatibility with existing state files if possible (e.g., by treating a missing field as not orphaned).",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -602,7 +639,8 @@
             ],
             "details": "The function should perform two main actions: 1) For un-orphaned leases, check if the config file exists. If not, set the `orphaned_since` timestamp to the current time. 2) For already orphaned leases, check if `now() - orphaned_since > 30 days`. If true, revoke the lease's credentials and remove its entry from the daemon's state.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -613,19 +651,20 @@
             ],
             "details": "First, add a long-interval ticker (e.g., every 24 hours) to the daemon's main event loop that calls the cleanup function. Second, add a hidden `env-leased --cleanup` command-line flag. When the daemon starts with this flag, it should execute the cleanup function once and then exit, providing a way for users or scripts to trigger the process manually.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 16,
+        "id": "16",
         "title": "System Service Integration (launchd for macOS)",
         "description": "Create a `launchd` service file (`.plist`) and the necessary logic within the CLI to install, uninstall, and manage the daemon as a user agent on macOS.",
         "details": "Create a template for the `com.user.env-leased.plist` file. It should be configured to run as a user agent and keep the daemon running. Add commands like `env-lease daemon install` and `env-lease daemon uninstall` which will place/remove the plist file in `~/Library/LaunchAgents/` and use `launchctl` to load/unload it.",
         "testStrategy": "Manual testing on a macOS machine is required. Verify that `daemon install` correctly places the file and starts the service. Check `launchctl list | grep env-leased` to confirm it's running. Test that the service restarts automatically on login/reboot.",
         "priority": "medium",
         "dependencies": [
-          9
+          "9"
         ],
         "status": "done",
         "subtasks": [
@@ -636,7 +675,8 @@
             "dependencies": [],
             "details": "The plist template should be configured to run the daemon as a user agent and include the `KeepAlive` key to ensure it stays running. The command structure should be set up, but the core implementation logic will be in subsequent subtasks.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -647,7 +687,8 @@
             ],
             "details": "The implementation must dynamically determine the path to the current executable to correctly populate the `ProgramArguments` in the plist template. It will use `os/exec` to call `launchctl load <path-to-plist>`. Ensure robust error handling for file I/O and command execution.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -658,19 +699,20 @@
             ],
             "details": "The implementation will use `os/exec` to call `launchctl unload <path-to-plist>`. After successfully unloading the service, it should remove the plist file. It needs to handle cases where the file or service doesn't exist gracefully.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 17,
+        "id": "17",
         "title": "System Service Integration (systemd for Linux)",
         "description": "Create a `systemd` service file and the CLI logic to manage the daemon as a user service on Linux.",
         "details": "Create a template for the `env-leased.service` file. It should be a user service (`--user`). Add `env-lease daemon install/uninstall` commands that place/remove the service file in `~/.config/systemd/user/` and use `systemctl --user` to enable, disable, start, and stop the service.",
         "testStrategy": "Manual testing on a Linux machine with systemd. Verify that `daemon install` works and the service starts. Use `systemctl --user status env-leased` to check its state. Test that the service restarts automatically on login/reboot.",
         "priority": "medium",
         "dependencies": [
-          9
+          "9"
         ],
         "status": "done",
         "subtasks": [
@@ -681,7 +723,8 @@
             "dependencies": [],
             "details": "The template should be a standard `.service` file. It needs a `[Unit]` section with a description, a `[Service]` section specifying `ExecStart` (pointing to the `env-lease daemon run` command), and an `[Install]` section with `WantedBy=default.target`. This template will be embedded into the Go binary.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -692,7 +735,8 @@
             ],
             "details": "Use a build tag `//go:build linux`. Create a new `daemon` command in the `cmd` package. The `install` subcommand should locate the user's config directory (`~/.config/systemd/user/`), write the `env-leased.service` file from the template, and then execute `systemctl --user enable --now env-leased.service` using the `os/exec` package. Handle potential errors.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -703,23 +747,24 @@
             ],
             "details": "In `daemon_linux.go`, add the `uninstall` subcommand. It should first execute `systemctl --user disable --now env-leased.service` to stop and disable the service. After the command succeeds, it should remove the `env-leased.service` file from `~/.config/systemd/user/`. Provide clear feedback to the user on success or failure.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 18,
+        "id": "18",
         "title": "Build and Release Automation",
         "description": "Configure GoReleaser to automate the building of binaries for multiple platforms, and set up a Homebrew tap for easy distribution on macOS.",
         "details": "Create a `.goreleaser.yml` file. Configure it to build binaries for macOS (amd64, arm64) and Linux (amd64, arm64). Set up the `brews` section to publish a formula to a new GitHub repository that will serve as the Homebrew tap (e.g., `github.com/user/homebrew-tap`). The formula should include the service definitions.",
         "testStrategy": "Run `goreleaser release --snapshot --clean` locally to test the build process. For the Homebrew tap, a full release needs to be tagged and pushed to GitHub, followed by a manual `brew install user/tap/env-lease` to verify the installation process works correctly.",
         "priority": "low",
         "dependencies": [
-          11,
-          12,
-          13,
-          16,
-          17
+          "11",
+          "12",
+          "13",
+          "16",
+          "17"
         ],
         "status": "done",
         "subtasks": [
@@ -730,7 +775,8 @@
             "dependencies": [],
             "details": "In the project root, create a `.goreleaser.yml` file. Define two build configurations under the `builds` section, one for `cmd/env-lease` and one for `cmd/env-leased`. For each build, set the `goos` to `[linux, darwin]` and `goarch` to `[amd64, arm64]`. Configure the `archives` section to create `.tar.gz` packages and the `checksum` section to generate a `checksums.txt` file for the release artifacts.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -739,7 +785,8 @@
             "dependencies": [],
             "details": "Create a new public repository on GitHub with a name following the convention `homebrew-<tap-name>`, for example, `homebrew-env-lease`. Initialize it with a README.md file. Ensure that the Personal Access Token (PAT) used in the CI/CD environment has write permissions to this new repository.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -751,25 +798,26 @@
             ],
             "details": "Add a `brews` section to the `.goreleaser.yml` file. Configure the `tap` to point to the repository created in subtask 18.2. Define the formula details such as `homepage` and `description`. Add a `service` block to automatically generate a `launchd` plist file for the `env-leased` binary, enabling it to be managed by `brew services` on macOS.",
             "status": "done",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 19,
+        "id": "19",
         "title": "Create Comprehensive User Documentation",
         "description": "Develop comprehensive user documentation that includes usage examples for 1Password with both environment variable and file-based leases, and a detailed security section explaining the IPC model and HMAC token protection.",
         "details": "Create a new `/docs` directory in the project repository. The documentation should be written in Markdown. The main document (e.g., `README.md` or `docs/usage.md`) should cover:\n1. **Getting Started:** A quick-start guide covering installation via Homebrew (from the automated release process) and the basic workflow: `env-lease daemon install`, `env-lease grant`, `env-lease status`.\n2. **Configuration:** Detailed explanation of the `env-lease.toml` file structure.\n3. **1Password Examples:** Provide two clear, copy-pasteable examples for the 1Password provider. The first should demonstrate leasing a secret to an environment variable. The second should show how to lease a secret to a file (e.g., for use with `direnv`), highlighting the safety of atomic file writes.\n4. **Security Model:** A dedicated 'Security' section that explains the client-daemon architecture using a Unix Domain Socket. It must detail the HMAC-SHA256 authentication mechanism, explaining that it protects against other local, non-privileged processes impersonating the CLI. Crucially, it must also state the limitations: it does not protect against a root user or sophisticated attacks that can inspect process memory or environment variables to steal the token.\n5. **Command Reference:** A brief reference for all user-facing commands, including `grant`, `revoke`, `status`, and `daemon install/uninstall`.",
         "testStrategy": "The documentation will be verified through a multi-step review process. First, a peer developer will review all technical descriptions and code examples for accuracy by running them on both macOS and Linux test environments. Second, the entire document will be proofread for clarity, grammar, and conciseness. Finally, all links within the documentation must be checked to ensure they are not broken.",
         "status": "done",
         "dependencies": [
-          4,
-          5,
-          12,
-          13,
-          16,
-          17,
-          18
+          "4",
+          "5",
+          "12",
+          "13",
+          "16",
+          "17",
+          "18"
         ],
         "priority": "medium",
         "subtasks": [
@@ -780,7 +828,8 @@
             "dependencies": [],
             "details": "Create a `/docs` directory in the project root. Inside, create a new `USAGE.md` file. Write the 'Getting Started' section covering: 1. Installation instructions using Homebrew. 2. The primary workflow steps: running `env-lease daemon install`, creating a minimal `env-lease.toml`, running `env-lease grant`, and verifying the lease with `env-lease status`.",
             "status": "done",
-            "testStrategy": "A team member follows the 'Getting Started' guide on a clean macOS machine to ensure the steps are accurate, easy to follow, and lead to a successful outcome without errors."
+            "testStrategy": "A team member follows the 'Getting Started' guide on a clean macOS machine to ensure the steps are accurate, easy to follow, and lead to a successful outcome without errors.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -791,7 +840,8 @@
             ],
             "details": "In `docs/USAGE.md`, add a 'Configuration' section. Explain the purpose of the file and detail each key in the `[leases.<name>]` table (e.g., `provider`, `source`, `destination`, `type`, `duration`). Provide a complete, commented example `env-lease.toml`. Then, add a 'Command Reference' section that lists and briefly describes `grant`, `revoke`, `status`, and the `daemon install/uninstall` subcommands.",
             "status": "done",
-            "testStrategy": "Review the documented configuration options against the actual implementation in the Go structs (from Task 2). Verify that the command descriptions and flags match the CLI's `--help` output for accuracy."
+            "testStrategy": "Review the documented configuration options against the actual implementation in the Go structs (from Task 2). Verify that the command descriptions and flags match the CLI's `--help` output for accuracy.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -803,7 +853,8 @@
             ],
             "details": "In `docs/USAGE.md`, add a '1Password Examples' section. Example 1: Show the `env-lease.toml` configuration for leasing a 1Password secret to an environment variable. Include the `env-lease grant` command and how to verify it (e.g., `printenv SECRET_KEY`). Example 2: Show the configuration for leasing a secret to a file. Emphasize that this uses atomic writes for safety and is useful with tools like `direnv`. Provide the full configuration and commands for this scenario.",
             "status": "done",
-            "testStrategy": "Execute both examples in a real terminal session with the 1Password CLI configured. Verify that the secrets are correctly leased to the environment and the file, respectively, and that they can be successfully revoked."
+            "testStrategy": "Execute both examples in a real terminal session with the 1Password CLI configured. Verify that the secrets are correctly leased to the environment and the file, respectively, and that they can be successfully revoked.",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -814,7 +865,8 @@
             ],
             "details": "In `docs/USAGE.md`, create a 'Security' section. Explain the client-daemon architecture using a Unix Domain Socket for local IPC. Detail the HMAC-SHA256 authentication process: the daemon generates a token, the client reads it, and all subsequent requests are signed. Explicitly state that this prevents other local, non-privileged users from impersonating the client. Crucially, add a 'Limitations' subsection that clarifies it does *not* protect against a root user or attacks that can read process memory/environment to steal the token.",
             "status": "done",
-            "testStrategy": "Peer review by a developer familiar with the IPC implementation to ensure the technical explanation of the HMAC mechanism, its purpose, and its limitations is accurate and clearly communicated to the user."
+            "testStrategy": "Peer review by a developer familiar with the IPC implementation to ensure the technical explanation of the HMAC mechanism, its purpose, and its limitations is accurate and clearly communicated to the user.",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -828,25 +880,26 @@
             ],
             "details": "Read through the entire `docs/USAGE.md` file from start to finish. Check for consistent terminology and formatting. Manually verify all code blocks and command examples are correct. Proofread for spelling and grammar mistakes. Finally, edit the root `README.md` file to add a prominent 'Documentation' or 'Usage' section that links directly to `docs/USAGE.md`.",
             "status": "done",
-            "testStrategy": "Have a team member who was not involved in writing the documentation read it from the perspective of a new user. They should check if it's easy to understand, if all examples work as described, and if all internal and external links are correct."
+            "testStrategy": "Have a team member who was not involved in writing the documentation read it from the perspective of a new user. They should check if it's easy to understand, if all examples work as described, and if all internal and external links are correct.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 20,
+        "id": "20",
         "title": "Create Quick-Start README.md Guide",
         "description": "Develop a `README.md` file to serve as a quick-start guide for new users. It will cover essential installation, configuration, and usage steps to get started with the tool quickly.",
         "details": "The `README.md` file should be placed in the project root. It needs to be concise and focused on the most common user journey. The content should include:\n1. **Introduction:** A brief, one-paragraph summary of what `env-lease` is and the problem it solves.\n2. **Installation:** Provide the specific command for installing via the Homebrew tap, e.g., `brew install user/tap/env-lease`.\n3. **Setup:** A step-by-step guide on how to initialize the daemon for both macOS (`env-lease daemon install`) and Linux, explaining that this is a one-time setup.\n4. **Configuration:** Show a minimal `env-lease.toml` example focused solely on using the 1Password provider. The example should clearly illustrate the `op://` URI format for sourcing secrets.\n5. **Core Commands:** Demonstrate the primary workflow with simple, copy-pasteable examples for `env-lease grant`, `env-lease status`, and `env-lease revoke`.\n6. **Next Steps:** Conclude with a link to the full user documentation (from Task 19) for users seeking advanced configuration or more detailed explanations.",
         "testStrategy": "Verification will be performed by following the `README.md` guide from the perspective of a new user on a clean system. The tester must execute every command exactly as written to ensure accuracy. Key verification steps include:\n1. **Installation Check:** Run the `brew install` command on a macOS machine and confirm that the `env-lease` binary is installed correctly.\n2. **Daemon Check:** Follow the `env-lease daemon install` instructions for both macOS and Linux, and verify using `launchctl` and `systemctl` respectively that the service is running.\n3. **Functionality Check:** Use the provided example `env-lease.toml` to run `grant`, `status`, and `revoke`. Confirm that each command behaves as described in the guide.\n4. **Peer Review:** Another developer will review the document for technical accuracy, clarity, and grammatical correctness. The link to the full documentation must also be verified.",
         "status": "done",
         "dependencies": [
-          4,
-          12,
-          13,
-          16,
-          17,
-          18,
-          19
+          "4",
+          "12",
+          "13",
+          "16",
+          "17",
+          "18",
+          "19"
         ],
         "priority": "medium",
         "subtasks": [
@@ -857,7 +910,8 @@
             "dependencies": [],
             "details": "In the project root, create a new file named `README.md`. Add a main heading for the project. Write a concise, one-paragraph summary explaining what `env-lease` is and the problem it solves (e.g., managing short-lived secrets). Then, add a second-level heading for 'Installation' and provide the exact, copy-pasteable Homebrew command: `brew install user/tap/env-lease` within a Markdown code block.",
             "status": "done",
-            "testStrategy": "Review the generated Markdown file. Verify that the introduction is clear and accurately describes the project's purpose. Check that the Homebrew command is syntactically correct and matches the project's tap."
+            "testStrategy": "Review the generated Markdown file. Verify that the introduction is clear and accurately describes the project's purpose. Check that the Homebrew command is syntactically correct and matches the project's tap.",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -868,7 +922,8 @@
             ],
             "details": "Append a 'Setup' section to the `README.md`. Explain that this is a one-time step and provide the command `env-lease daemon install`, noting its support for both macOS and Linux. Next, add a 'Configuration' section. Explain that the configuration lives at `~/.config/env-lease/env-lease.toml`. Provide a minimal TOML code block example focused solely on a 1Password lease, clearly showing the `provider`, `source` (using `op://` URI format), and `duration` fields.",
             "status": "done",
-            "testStrategy": "Verify that the `env-lease daemon install` command is correct. Check the `env-lease.toml` example for valid TOML syntax and ensure it clearly demonstrates the required configuration for a 1Password lease. The example should be easy for a new user to adapt."
+            "testStrategy": "Verify that the `env-lease daemon install` command is correct. Check the `env-lease.toml` example for valid TOML syntax and ensure it clearly demonstrates the required configuration for a 1Password lease. The example should be easy for a new user to adapt.",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -879,26 +934,27 @@
             ],
             "details": "Add a 'Core Commands' or 'Usage' section to the `README.md`. Provide simple, copy-pasteable examples for the main workflow: 1. `env-lease grant <lease-name> -- <command-to-run>` to grant a lease. 2. `env-lease status` to check active leases. 3. `env-lease revoke <lease-name>` to revoke a lease. Finally, add a 'Next Steps' section at the end of the file. Include a hyperlink to the full user documentation (from Task 19), directing users there for advanced topics.",
             "status": "done",
-            "testStrategy": "From a user's perspective, read through the 'Core Commands' section and manually execute each example command to ensure they are correct and the descriptions are clear. Verify that the link in the 'Next Steps' section correctly points to the location of the comprehensive documentation."
+            "testStrategy": "From a user's perspective, read through the 'Core Commands' section and manually execute each example command to ensure they are correct and the descriptions are clear. Verify that the link in the 'Next Steps' section correctly points to the location of the comprehensive documentation.",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 21,
+        "id": "21",
         "title": "Add Go Package Documentation Headers",
         "description": "Implement standard Go documentation comments (godoc) for all public packages, functions, and types to improve code maintainability and enable auto-generated documentation.",
         "details": "Review every package in the project and add Go documentation comments where missing. The documentation should follow the official `godoc` conventions. Each public package should have a package-level comment (e.g., in a `doc.go` file) explaining its role. All exported functions, methods, types, and constants must have a clear, concise comment describing their purpose, parameters, and return values. For example, a function comment should start with the function's name: `// MyFunction does X and Y.`. Pay special attention to packages related to core logic such as IPC, configuration, daemon management, and the specific CLI commands for system service integration.",
         "testStrategy": "Verification will be done through a combination of automated checks and manual review. First, run a linter configured to report missing comments on public APIs. Second, start a local godoc server using `godoc -http=:6060` and browse to the project's documentation. A reviewer must check that all public packages, functions, and types are documented, and that the documentation is clear, accurate, and well-formatted. The review should confirm that package overviews are present and provide sufficient context.",
         "status": "done",
         "dependencies": [
-          16,
-          17
+          "16",
+          "17"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 22,
+        "id": "22",
         "title": "Implement Warning for Leases Exceeding 12 Hours",
         "description": "Modify the `env-lease grant` command to display a warning message to the user when they request a lease with a duration longer than 12 hours, promoting security best practices.",
         "details": "The `grant` command logic needs to be updated. After parsing the lease duration provided by the user (e.g., via a `--duration` flag), a check must be added to compare it against a 12-hour threshold (12 * 60 * 60 seconds). If the requested duration is greater than 12 hours, a warning message should be printed to standard error (stderr). The message should be informative, for example: \"Warning: Leases longer than 12 hours are discouraged for security reasons. Please consider a shorter duration.\" The command should then proceed with granting the lease as usual; this is a non-blocking warning, not an error.",
@@ -909,162 +965,174 @@
         "subtasks": []
       },
       {
-        "id": 23,
+        "id": "23",
         "title": "Implement `--override` Logic for `grant` Command",
         "description": "Modify the `grant` command's server-side logic to fail by default if an environment variable already exists, preventing accidental overwrites. The operation should only succeed if the `--override` flag is explicitly provided.",
         "details": "The current implementation of the `grant` command overwrites existing variables in the target `.env` file by default. This task corrects this behavior. The logic should be implemented in the daemon's `handleGrant` function. Before writing any variables, the handler must parse the target `.env` file to check for existing keys. If a variable from the grant request already exists in the file and the `override` flag in the `GrantRequest` is `false`, the entire operation must be aborted, and an error must be returned to the client. The error message should clearly state which variable caused the conflict and instruct the user to use the `--override` flag. If the flag is `true`, the existing variable should be overwritten as intended.",
         "testStrategy": "Create a multi-part test suite. 1. **Unit Test:** In the daemon's grant handler test, create a mock `.env` file with a pre-existing variable (e.g., `API_KEY=old_value`). Send a `GrantRequest` for the same variable without the override flag and assert that an error is returned and the file remains unchanged. Then, send the same request with the override flag set to `true` and assert that the operation succeeds and the file is updated. 2. **Integration Test:** Execute the `env-lease grant` CLI command against a test `.env` file containing a conflicting variable. Verify that the command fails with a non-zero exit code and an informative error message. Then, execute `env-lease grant --override` and verify that the command succeeds and the variable in the `.env` file is correctly updated.",
         "status": "done",
         "dependencies": [
-          9,
-          11
+          "9",
+          "11"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 24,
+        "id": "24",
         "title": "Improve CLI Error Handling for Daemon Connection Failure",
         "description": "Refine the CLI's error handling to provide a clear, user-friendly message when it fails to connect to the daemon, instead of showing a generic error and stack trace.",
         "details": "Currently, when the CLI attempts to communicate with a non-running daemon, it exits with a generic connection error and a stack trace. This task involves modifying the CLI client's IPC connection logic to specifically catch socket connection errors. When such an error is detected, the CLI should print a formatted, helpful message to stderr, such as 'Error: Could not connect to the env-lease daemon at [socket_path]. Is the daemon running? Try starting it with `env-lease daemon start`.' The application should then exit with a non-zero status code without displaying a stack trace. The socket path should be dynamically retrieved from the application's configuration.",
         "testStrategy": "To test this, first ensure the `env-leased` daemon is not running. Then, execute any CLI command that requires daemon communication, like `env-lease status` or `env-lease grant`. Verify that the command fails and prints a user-friendly error message to stderr that includes the socket path and suggests the daemon may not be running. Crucially, confirm that no Go stack trace is printed. Finally, start the daemon and run the same command again to ensure it now connects and executes successfully, confirming the error handling is specific to the connection failure scenario.",
         "status": "done",
         "dependencies": [
-          9
+          "9"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 25,
+        "id": "25",
         "title": "Implement Minimal Daemon Event Logging",
         "description": "Introduce basic logging to the daemon for key events such as successful grants, manual revocations, and automatic lease expirations to improve operational visibility.",
         "details": "Integrate the standard `log` package into the daemon's main process. Logging should be directed to standard output to be easily captured by service managers like systemd. Add single-line log messages at the following key locations:\n1. In the `handleGrant` function, after all secrets have been successfully fetched and written, log a message like `INFO: Leases granted for project [project_config_path]`.\n2. In the `handleRevoke` function, after all leases for a project have been successfully revoked, log a message like `INFO: Leases manually revoked for project [project_config_path]`.\n3. In the core timer loop that manages lease expiration, after a lease is successfully revoked due to its TTL expiring, log a message like `INFO: Lease [lease_identifier] expired and was revoked.`",
         "testStrategy": "Testing will be performed via integration tests that monitor the daemon's standard output. Start the daemon in a test process and capture its stdout/stderr streams. \n1. **Grant Logging:** Execute the `env-lease grant` command. Assert that the daemon's output contains the expected 'Leases granted' log message.\n2. **Revoke Logging:** After granting a lease, execute the `env-lease revoke` command. Assert that the daemon's output contains the 'Leases manually revoked' log message.\n3. **Expiration Logging:** Grant a lease with a very short TTL (e.g., 2 seconds). Wait for 3 seconds and then assert that the daemon's output contains the 'Lease expired and was revoked' log message.",
         "status": "done",
         "dependencies": [
-          9,
-          14,
-          23
+          "9",
+          "14",
+          "23"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 26,
+        "id": "26",
         "title": "Bugfix: Persist Daemon State Immediately After Modification",
         "description": "Fixes a critical bug where daemon state was only saved on graceful shutdown. This change ensures the state is written to disk immediately after any lease is granted, manually revoked, or automatically expired, preventing data loss on unexpected termination.",
         "details": "The current implementation only calls `SaveState()` during a graceful shutdown sequence. This creates a race condition where a `kill -9` or system crash can cause recently granted leases to be lost. To fix this, the `SaveState()` method, defined in Task 7, must be invoked immediately after any operation that modifies the daemon's lease map. Specifically, a call to `this.SaveState()` should be added in the following locations:\n1. In the `handleGrant` function (from Task 9), after a new lease has been successfully added to the state map.\n2. In the `handleRevoke` function (from Task 9), after a lease has been successfully removed from the state map.\n3. In the daemon's core timer loop (from Task 8), immediately after the logic that removes an expired lease from the state map.\nAny error returned by `SaveState()` should be logged as a warning, but should not cause the primary operation (grant/revoke) to fail.",
         "testStrategy": "Testing must verify that state is persisted correctly after each type of modification and survives an unclean shutdown.\n1. **Integration Test (Grant):** Start the daemon. Execute `env-lease grant`. Use `kill -9` to terminate the daemon process immediately. Manually inspect the `~/.config/env-lease/state.json` file to confirm the new lease is present. Restart the daemon and use `env-lease status` to verify the lease is active.\n2. **Integration Test (Manual Revoke):** Start the daemon with an existing lease. Execute `env-lease revoke`. Use `kill -9` to terminate the daemon. Inspect `state.json` to confirm the lease has been removed.\n3. **Unit Test (Timed Revocation):** In a unit test for the core daemon loop, use a mock clock and a mock filesystem. Grant a lease with a short duration (e.g., 1 second). Advance the mock clock to trigger the expiration. Verify that the mock `SaveState` function is called exactly once after the lease is removed from the internal state map.",
         "status": "done",
         "dependencies": [
-          7,
-          8,
-          9
+          "7",
+          "8",
+          "9"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 27,
+        "id": "27",
         "title": "Bugfix: Refine `grant` Override Logic to Ignore Empty Variables",
         "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
         "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted if the key exists, its value is non-empty, and the `override` flag is false.",
         "testStrategy": "Create a test suite targeting the daemon's `handleGrant` function. Prepare a target `.env` file containing `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. Send a GrantRequest for `EMPTY_VAR` without the override flag; assert that the operation succeeds and the file is updated. 2. Send a GrantRequest for `EXISTING_VAR` without the override flag; assert that the operation fails with an error. 3. Send a GrantRequest for `EXISTING_VAR` with the override flag; assert that the operation succeeds and the file is updated. 4. Send a GrantRequest for a completely new variable; assert it succeeds.",
         "status": "done",
         "dependencies": [
-          11,
-          23
+          "11",
+          "23"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 28,
+        "id": "28",
         "title": "Bugfix: Refine `grant` Override Logic to Ignore Empty Variables",
         "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
         "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted with an error if a grant is attempted for an existing key that has a non-empty value and the `--override` flag is false.",
         "testStrategy": "Create a comprehensive test suite targeting the daemon's `handleGrant` function. Prepare a target `.env` file containing `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. Send a GrantRequest for `EMPTY_VAR` with a new value but without the override flag; assert that the operation succeeds and the file is updated. 2. Send a GrantRequest for `EXISTING_VAR` without the override flag; assert that the operation fails and the file remains unchanged. 3. Send a GrantRequest for `EXISTING_VAR` with the override flag; assert that the operation succeeds and the file is updated. 4. Send a GrantRequest for a new variable not present in the file; assert it is added successfully.",
         "status": "done",
         "dependencies": [
-          11,
-          23
+          "11",
+          "23"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 29,
+        "id": "29",
         "title": "Bugfix: Make `grant` Command Idempotent by Ignoring Same-Value Overrides",
         "description": "Modify the `grant` command's override check to permit overwriting a variable if the exact line to be written already exists in the destination file. This makes the command idempotent and prevents unnecessary failures when re-running.",
         "status": "done",
         "dependencies": [
-          11,
-          27
+          "11",
+          "27"
         ],
         "priority": "medium",
         "details": "The current override protection in the daemon's `handleGrant` function is too strict. This change will make the check smarter by comparing the formatted output rather than parsing existing values.\n\nFor `env` lease types:\n1. The daemon must first format the new secret into the exact line that would be written to the file (e.g., `export API_KEY=\"secret123\"`).\n2. It will then read the destination file line by line.\n3. If any existing line is a byte-for-byte match for the newly formatted line, the write operation is skipped and the grant is considered a success. This avoids complex parsing of keys and values.\n\nFor `file` lease types:\n1. The daemon will read the entire content of the target file.\n2. If the existing content is byte-for-byte identical to the new secret value, the write is skipped and the grant succeeds.\n\nIf no match is found and the variable/file already exists with different content, the existing override logic (fail unless `--override` is specified) should still apply.",
-        "testStrategy": "Create integration tests that target the daemon's grant handling logic.\n1. **Env Lease Idempotency:** Prepare a `.env` file containing the exact line `API_KEY=secret123`. Send a GrantRequest for `API_KEY` with the value `secret123` without the override flag. Assert the command succeeds because an identical line is found.\n2. **Env Lease Conflict:** Using the same file, send a GrantRequest for `API_KEY` with a different value (`secret456`) without the override flag. Assert the command fails with an override error because no identical line is found and the key already exists.\n3. **File Lease Idempotency:** Prepare a file `secret.txt` containing `secret123`. Send a GrantRequest for a `file` lease targeting `secret.txt` with the same value. Assert the command succeeds based on a full content match.\n4. **File Lease Conflict:** Using the same file, send a GrantRequest for a `file` lease with a different value. Assert the command fails with an override error."
+        "testStrategy": "Create integration tests that target the daemon's grant handling logic.\n1. **Env Lease Idempotency:** Prepare a `.env` file containing the exact line `API_KEY=secret123`. Send a GrantRequest for `API_KEY` with the value `secret123` without the override flag. Assert the command succeeds because an identical line is found.\n2. **Env Lease Conflict:** Using the same file, send a GrantRequest for `API_KEY` with a different value (`secret456`) without the override flag. Assert the command fails with an override error because no identical line is found and the key already exists.\n3. **File Lease Idempotency:** Prepare a file `secret.txt` containing `secret123`. Send a GrantRequest for a `file` lease targeting `secret.txt` with the same value. Assert the command succeeds based on a full content match.\n4. **File Lease Conflict:** Using the same file, send a GrantRequest for a `file` lease with a different value. Assert the command fails with an override error.",
+        "complexity": 4,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Expand this task into subtasks for implementing the idempotency check. Create separate subtasks for handling `env`-type leases (line-by-line check) and `file`-type leases (full content check). Also, create a dedicated subtask for adding the integration tests described in the test strategy to verify both the successful idempotent runs and the conflict cases.",
+        "subtasks": []
       },
       {
-        "id": 30,
+        "id": "30",
         "title": "Bugfix: Preserve Unrelated Content in `.env` Files During Grant",
         "description": "Fix a bug where the `grant` command for `env`-type leases overwrites the entire destination file. The logic must be updated to parse the file, modify only the relevant lines, and preserve all other content.",
         "details": "The current implementation for handling `env`-type leases writes the secret directly to the destination file, truncating any existing content. This needs to be changed to a read-modify-write approach. The daemon's `handleGrant` function, when processing a lease for a `.env` file, must first read the entire file into memory. It should then parse the file line-by-line, identifying existing key-value pairs, comments, and empty lines. For each secret to be granted, the logic will check if the key already exists. If it does, the existing line will be replaced with the new `KEY=VALUE` pair. If it does not exist, a new line will be appended to the file content. All other lines, including comments and blank lines, must be preserved in their original order. Finally, the newly constructed content will be written back to the file, completely replacing the old content in an atomic operation (e.g., write to a temp file and rename).",
         "testStrategy": "Create a comprehensive integration test suite. Start with a predefined `.env` file containing:\n```\n# API Keys\nEXISTING_KEY=old_value\n\n# This should be preserved\nUNRELATED_KEY=abc\n```\n1. **Update Existing Variable:** Run `grant` for `EXISTING_KEY` with a new value. Verify that only the value for `EXISTING_KEY` is updated and all other lines (comments, blank lines, `UNRELATED_KEY`) are preserved.\n2. **Append New Variable:** Run `grant` for a `NEW_KEY`. Verify that `NEW_KEY=new_value` is appended to the file and the original content is untouched.\n3. **Target Non-Existent File:** Run `grant` targeting a file that does not exist. Verify the file is created with the correct content.\n4. **Multiple Operations:** Run a single `grant` command that updates `EXISTING_KEY` and adds `NEW_KEY`. Verify both operations are successful and the file integrity is maintained.",
         "status": "done",
         "dependencies": [
-          11,
-          27,
-          29
+          "11",
+          "27",
+          "29"
         ],
-        "priority": "medium"
+        "priority": "medium",
+        "complexity": 7,
+        "recommendedSubtasks": 4,
+        "expansionPrompt": "Expand this task into subtasks for refactoring the `.env` grant logic. Create a subtask to design and implement a self-contained utility that can parse `.env` file content, update or append a specific key-value pair, and return the modified content while preserving comments and blank lines. Create a second subtask to integrate this utility into the daemon's `handleGrant` function. A third subtask should ensure this new logic correctly incorporates the idempotency check from Task 29. Finally, add a subtask to implement the full integration test suite as described.",
+        "subtasks": []
       },
       {
-        "id": 31,
+        "id": "31",
         "title": "Implement `file_mode` Option for File-Type Leases",
         "description": "Add a `file_mode` option to the `env-lease.toml` configuration for `file`-type leases, allowing users to specify custom file permissions for the created secret files.",
         "details": "1. **Configuration Parsing:** Modify the Go struct representing a lease in the configuration parser (related to Task 2). Add a new optional field, such as `FileMode string`, to capture the `file_mode` setting from the TOML file. 2. **Daemon Logic:** Update the daemon's lease granting logic. When processing a `file`-type lease, check if the `FileMode` field is set. If it is, parse the string (e.g., \"0600\") into an `os.FileMode` (octal integer). Implement validation to ensure the provided string is a valid file mode. 3. **Default Value:** If the `FileMode` field is empty or not present in the configuration, the daemon must use a default file mode of `0644`. 4. **File Writing:** Pass the determined file mode (either the user-specified one or the default) to the `AtomicWriteFile` utility (from Task 6) when writing the secret to the destination file.",
         "testStrategy": "1. **Unit Tests (Configuration):** Add unit tests for the TOML parser. Create test cases with `file`-type leases that: a) include a valid `file_mode` like \"0600\", b) omit the `file_mode` key, and c) include an invalid `file_mode` like \"not_a_mode\". Verify the parser correctly populates the struct or returns an error. 2. **Unit Tests (Daemon):** Write unit tests for the daemon's file-lease handler. Using a mock filesystem, verify that the `AtomicWriteFile` utility is called with the correct `os.FileMode`: `0600` when specified, and `0644` when omitted. 3. **Integration Test:** Create an end-to-end test. Define an `env-lease.toml` with a `file`-type lease and `file_mode = \"0600\"`. Execute the `env-lease grant` command. After execution, use `os.Stat` to inspect the created file on the filesystem and assert that its permissions are exactly `0600`. Run a second integration test without the `file_mode` key and assert the permissions are `0644`.",
         "status": "done",
         "dependencies": [
-          2,
-          6,
-          11
+          "2",
+          "6",
+          "11"
         ],
-        "priority": "medium"
+        "priority": "medium",
+        "complexity": 3,
+        "recommendedSubtasks": 3,
+        "expansionPrompt": "Expand this task into subtasks. The first subtask should focus on updating the TOML configuration parsing by adding the optional `file_mode` field to the lease struct. The second subtask should implement the core logic within the daemon to read this new field, parse the string value into an `os.FileMode` with validation, apply a default of `0644` if absent, and pass it to the file writing function. The final subtask should be to create the unit and integration tests to verify that files are created with the correct permissions in all cases.",
+        "subtasks": []
       },
       {
-        "id": 32,
+        "id": "32",
         "title": "Combine CLI and Daemon into a Single Binary",
         "description": "Analyze the feasibility and benefits of merging the `env-lease` CLI and `env-leased` daemon into a single executable. Refactor the Cobra command structure to support both client and daemon subcommands within one binary.",
         "details": "The CLI and daemon currently exist as two separate binaries but share a common Cobra command structure, suggesting an opportunity for consolidation. This task involves refactoring the project to produce a single `env-lease` binary. The daemon's functionality will be moved under a new subcommand, for example, `env-lease daemon start`. All existing CLI commands (`grant`, `revoke`, `status`, etc.) will remain as top-level commands of the unified binary. This will involve merging the `main.go` files, reorganizing the Cobra command definitions, and updating the build process to produce only one artifact. The goal is to simplify distribution, reduce build complexity, and eliminate code duplication.",
         "testStrategy": "Verification will be performed end-to-end. First, update the build scripts and confirm that only a single `env-lease` binary is generated. Second, start the daemon in the background using the new subcommand (`env-lease daemon start`) and verify its logs (Task 25) indicate a successful startup. Third, execute all existing CLI commands (`grant`, `status`, `revoke`) against the running daemon and confirm they function identically to the previous two-binary setup. Finally, stop the daemon and run a command like `env-lease status` to ensure the user-friendly connection error message (from Task 24) is still displayed correctly.",
         "status": "done",
         "dependencies": [
-          9,
-          24
+          "9",
+          "24"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 33,
+        "id": "33",
         "title": "Update Systemd Service Template for Unified Binary",
         "description": "Modify the systemd service template and the `daemon install` command to support the new single-binary architecture, ensuring the service correctly starts the daemon using the `daemon start` subcommand.",
         "details": "Following the consolidation of the CLI and daemon into a single executable in Task 32, the systemd service integration from Task 17 is now broken. This task involves updating the service file template to execute the daemon via its new subcommand. The `ExecStart` directive in the service template must be changed from pointing to the old `env-leased` binary to invoking `env-lease daemon start`. The `env-lease daemon install` command logic needs to be updated to generate this new configuration. The path to the executable in `ExecStart` should be dynamically determined using a function like `os.Executable()` to ensure it points to the correct location of the running `env-lease` binary. The service file should also be renamed from `env-leased.service` to `env-lease.service` for consistency.",
         "testStrategy": "Testing must be performed on a Linux system with systemd. First, build the unified binary from Task 32. Then, run the updated `env-lease daemon install` command. Verify that a file named `env-lease.service` is created in `~/.config/systemd/user/`. Inspect the contents of this file to confirm the `ExecStart` line correctly points to the absolute path of the binary and uses the `daemon start` subcommand. Use `systemctl --user daemon-reload`, then `systemctl --user start env-lease.service`. Check the service's status with `systemctl --user status env-lease.service` to ensure it is active and running. Finally, check the daemon's logs via `journalctl --user -u env-lease.service` to confirm a successful startup message is present.",
         "status": "done",
         "dependencies": [
-          17,
-          32,
-          25
+          "17",
+          "32",
+          "25"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 34,
+        "id": "34",
         "title": "Add HashiCorp Vault Provider",
         "description": "Implement a new secret provider for HashiCorp Vault. The implementation should follow the existing pattern of the 1Password provider, using the Vault CLI ('vault') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (e.g., 'secret/data/my-secret key') and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Vault-specific errors.",
         "details": "",
@@ -1075,7 +1143,7 @@
         "subtasks": []
       },
       {
-        "id": 35,
+        "id": "35",
         "title": "Add AWS Secrets Manager Provider",
         "description": "Implement a new secret provider for AWS Secrets Manager. The implementation should follow the existing pattern of the 1Password provider, using the AWS CLI ('aws') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret ARN) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for AWS-specific errors.",
         "details": "",
@@ -1086,37 +1154,37 @@
         "subtasks": []
       },
       {
-        "id": 36,
+        "id": "36",
         "title": "Implement `--continue-on-error` Flag for `grant` Command",
         "description": "Modify the `grant` command to support a `--continue-on-error` flag. When enabled, the command will attempt to fetch all requested secrets, aggregate any errors encountered, and report them at the end, rather than exiting on the first failure.",
         "details": "This task involves modifying both the CLI and the daemon. On the CLI side, a new `--continue-on-error` boolean flag will be added to the `grant` command. The IPC `GrantRequest` struct must be updated to include a corresponding boolean field to transmit the flag's state to the daemon. On the daemon side, the `handleGrant` function will be updated. If the `ContinueOnError` field is true, the secret fetching loop should not exit on the first error. Instead, it should collect each error encountered into a slice. After iterating through all requested leases, if the error slice is not empty, the daemon should return a single, aggregated error message to the client detailing all the failures. Successfully fetched secrets should still be written to the environment file.",
         "testStrategy": "Testing will be multi-layered. First, create unit tests for the daemon's `handleGrant` function using a mock secret provider. Configure the mock to successfully return some secrets but fail on others. Test two scenarios: 1) With `ContinueOnError` set to false, assert that the handler returns immediately on the first failure. 2) With `ContinueOnError` set to true, assert that the handler processes all secrets, writes the successful ones, and returns a single aggregated error containing details for all failures. Second, add an end-to-end integration test. Configure a project with multiple secrets, run `env-lease grant --continue-on-error`, and verify that the command exits with a non-zero status, reports the specific failures to stderr, and that the successfully fetched secrets are present in the output file.",
         "status": "done",
         "dependencies": [
-          9,
-          10,
-          23
+          "9",
+          "10",
+          "23"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 37,
+        "id": "37",
         "title": "Modify `revoke` Command for Project-Scoped Revocation with `--all` Flag",
         "description": "Update the `revoke` command to only revoke leases for the current project by default, based on the `env-lease.toml` configuration. Introduce an `--all` flag to preserve the original global revocation behavior.",
         "details": "The current `revoke` command is too broad, clearing all active leases regardless of their origin. This task refactors it to be project-aware. The default behavior will be to revoke only the leases associated with the current project's `env-lease.toml` file. This includes leases that are currently active for the project but may have been removed from the configuration file since they were last granted. To support the original functionality, a new `--all` flag will be added to perform a global revocation of all active leases. This will require modifying the CLI command to parse the configuration and updating the IPC message and daemon logic to handle both scoped and global revocation requests.",
         "testStrategy": "Testing will be performed through a series of integration tests. \n1. **Default Scoped Revoke:** Create two separate project directories with distinct `env-lease.toml` files. Grant leases for both projects. `cd` into one project directory and run `env-lease revoke`. Use `env-lease status` to verify that only the leases for that specific project have been revoked, while the other project's leases remain active. \n2. **`--all` Flag Revoke:** Set up the same multi-project scenario as above. Run `env-lease revoke --all` from one of the project directories. Use `env-lease status` to verify that all leases from *both* projects have been revoked. \n3. **Stale Lease Revocation:** Grant leases for a project. Then, edit the `env-lease.toml` to remove one of the lease definitions. Run `env-lease revoke` in that project. Verify that all original leases for that project, including the one no longer in the config file, are successfully revoked.",
         "status": "done",
         "dependencies": [
-          12,
-          11,
-          2
+          "12",
+          "11",
+          "2"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 38,
+        "id": "38",
         "title": "Add Google Secret Manager Provider",
         "description": "Implement a new secret provider for Google Secret Manager. The implementation should follow the existing pattern of the 1Password provider, using the Google Cloud CLI ('gcloud') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret name and version) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Google Cloud-specific errors.",
         "details": "",
@@ -1127,7 +1195,7 @@
         "subtasks": []
       },
       {
-        "id": 39,
+        "id": "39",
         "title": "Add Azure Key Vault Provider",
         "description": "Implement a new secret provider for Azure Key Vault. The implementation should follow the existing pattern of the 1Password provider, using the Azure CLI ('az') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret name and vault name) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Azure-specific errors.",
         "details": "",
@@ -1138,41 +1206,41 @@
         "subtasks": []
       },
       {
-        "id": 40,
+        "id": "40",
         "title": "Add --print Flag to `daemon install` Command",
         "description": "Implement a `--print` flag for the `daemon install` command. This flag will output the generated service configuration file to stdout and prevent the actual installation, facilitating debugging and manual setup.",
         "details": "Modify the `daemon install` Cobra command, which was established as part of the unified binary in Task 32. Add a new persistent boolean flag named `--print`. The command's execution logic should be updated to check if this flag is present. If `--print` is true, the command must generate the appropriate service configuration content (a `.plist` file for macOS, a `.service` file for Linux) as a string. This string should be printed directly to standard output. Concurrently, a warning message, such as 'WARNING: Service configuration printed but not installed.', should be printed to standard error. The command should then exit without attempting to write any files to system directories or execute service management commands (`launchctl`, `systemctl`). If the `--print` flag is not provided, the command should execute its original installation logic without change.",
         "testStrategy": "Testing will involve running the command on both supported platforms and verifying the output streams and system state. 1. On Linux, run `env-lease daemon install --print`. Capture stdout and assert that its content is a valid systemd `.service` file. Capture stderr and assert it contains the warning message. Verify that no file was created in `~/.config/systemd/user/` and `systemctl` was not invoked. 2. On macOS, run `env-lease daemon install --print`. Capture stdout and assert its content is a valid XML `.plist` file. Capture stderr and assert it contains the warning message. Verify no file was created in `~/Library/LaunchAgents/` and `launchctl` was not invoked. 3. On both platforms, run `env-lease daemon install` without the flag to confirm that the original installation behavior is preserved and that nothing is printed to stdout.",
         "status": "done",
         "dependencies": [
-          32
+          "32"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 41,
+        "id": "41",
         "title": "Refine `grant` Override Logic to Allow Overwriting Empty Variables",
         "description": "Modify the `grant` command's override check to permit overwriting an environment variable if its existing value is empty, without requiring the `--override` flag. This improves usability when re-granting leases for variables that have been cleared.",
         "details": "The current override protection within the daemon's `handleGrant` function is overly strict and incorrectly flags a variable with an empty value as a conflict, contrary to the intent of previous fixes. This task will correct the logic. When the daemon processes a `GrantRequest`, it must parse the target file (e.g., `.env`) and check for existing variables. The check must be refined to differentiate between a variable with a non-empty value and one with an empty value. If a variable exists but its value is an empty string (e.g., `API_KEY=`), the operation should succeed without the `--override` flag, overwriting the line with the new key and secret. The conflict requiring `--override` should only be triggered if the existing variable has a non-empty value (e.g., `API_KEY=\"old_secret\"`).",
         "testStrategy": "Create a comprehensive integration test suite targeting the daemon's grant handling logic. Prepare a target `.env` file with the following contents: `EXISTING_VAR=old_value` and `EMPTY_VAR=`. 1. **Empty Value Overwrite:** Send a GrantRequest for `EMPTY_VAR` with a new value, but without the `--override` flag. Assert that the operation succeeds and the file is correctly updated. 2. **Non-Empty Conflict:** Send a GrantRequest for `EXISTING_VAR` with a new value, without the `--override` flag. Assert that the operation fails with an error indicating the variable already exists. 3. **Override Success:** Send a GrantRequest for `EXISTING_VAR` with a new value and the `--override` flag. Assert the operation succeeds and the file is updated.",
         "status": "done",
         "dependencies": [
-          11,
-          27
+          "11",
+          "27"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 42,
+        "id": "42",
         "title": "Implement `direnv` Integration for `grant` Command",
         "description": "Enhance the `grant` and `revoke` commands to automatically execute `direnv allow` when they modify a `.envrc` file. This behavior will be the default if `direnv` is installed. A `--no-direnv` flag will be added to both commands to disable the automatic execution and instead print a suggestion to the user.",
         "status": "done",
         "dependencies": [
-          10,
-          23,
-          25
+          "10",
+          "23",
+          "25"
         ],
         "priority": "medium",
         "details": "This logic should be implemented within the client-side execution flow for both the `grant` and `revoke` commands. After a successful operation, the CLI should check if the target output file is named `.envrc`. If it is, the client should check if the `direnv` executable is available in the system's `PATH`. If both conditions are met, the CLI should execute `direnv allow` and stream its output to the user. A new boolean flag, `--no-direnv`, should be added to both commands. If this flag is provided, the automatic execution should be skipped, and the message \".envrc modified. Run 'direnv allow' to apply changes.\" should be printed to standard output instead. The command's exit code should not be affected by the `direnv` integration logic.",
@@ -1185,7 +1253,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1194,7 +1263,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1203,7 +1273,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1212,7 +1283,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1221,7 +1293,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -1230,27 +1303,28 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 43,
+        "id": "43",
         "title": "Fully Implement Orphaned Lease Cleanup Daemon Logic and Command",
         "description": "Implement the complete daemon logic for detecting, marking, and purging orphaned leases. This includes a periodic background check and updating the `env-lease daemon cleanup` command to trigger the process manually.",
         "details": "This task involves two main components. First, enhance the daemon's core loop to include a periodic background job that runs, for example, every 24 hours. This job will iterate through all active leases managed in the state file (from Task 7). For each lease, it will check for the existence of the source `env-lease.toml` file. If the file does not exist, the lease's entry in the state file should be updated with a new field, such as `orphaned_since`, containing the current timestamp. The job should also check for leases already marked as orphaned. If the current time is more than 30 days past the `orphaned_since` timestamp, the daemon must trigger the internal revocation logic for that lease and remove its entry from the state entirely. Second, the `env-lease daemon cleanup` command must be updated. It will use the IPC client (from Task 10) to send a new `CleanupRequest` to the daemon. A corresponding handler must be added to the daemon's IPC server to receive this request and immediately execute the full orphan detection and purging logic on demand.",
         "testStrategy": "A multi-layered testing approach is required. For unit tests, mock the daemon's state manager and the filesystem. Create a test state with several leases. In one test case, 'delete' the config file for one lease and run the cleanup logic; assert that the lease is now marked as orphaned in the state with a correct timestamp. In another case, create a lease already marked as orphaned 29 days ago, advance a mock clock by two days, run the cleanup logic, and assert that the lease has been completely removed from the state. For integration testing, start a live daemon with a temporary state file, grant a lease, then manually delete the associated `env-lease.toml`. Execute the `env-lease daemon cleanup` command and then use `env-lease status` to verify the lease is now correctly identified as orphaned.",
         "status": "done",
         "dependencies": [
-          7,
-          10,
-          15
+          "7",
+          "10",
+          "15"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 44,
+        "id": "44",
         "title": "Implement Lease Expiration Notifications for macOS/Linux",
         "description": "Implement desktop notifications for lease expirations on macOS and Linux. The daemon should detect the operating system and use the appropriate native notification command (`osascript` for macOS, `notify-send` for Linux) to inform the user when a lease has been revoked due to expiration. The notification message should clearly identify which lease has expired.",
         "details": "",
@@ -1261,52 +1335,52 @@
         "subtasks": []
       },
       {
-        "id": 45,
+        "id": "45",
         "title": "Clear Environment Variable Value in .envrc on Automatic Revocation",
         "description": "Enhance the daemon's automatic lease revocation process to clear the value of the corresponding environment variable in the user's .envrc file, ensuring secrets are removed upon expiration while preserving the variable declaration and any associated comments.",
         "details": "This task modifies the daemon's core revocation logic, triggered when a lease expires. Instead of deleting the line from the .envrc file, the logic will now set the environment variable's value to an empty string. The implementation should be located within the daemon's main loop where expired leases are processed (established in Task 8). The process involves reading the target .envrc file, identifying the specific line for the expired secret's variable, and replacing it. A regular expression should be used to match lines like `export VAR_NAME=...`, capturing the variable name and any trailing comments. The replacement line will be formatted as `export VAR_NAME=\"\"`, preserving the captured comment. This ensures that user-managed comments and the structure of the .envrc file remain intact. The file write operation should be atomic to prevent data corruption in case of an interruption.",
         "testStrategy": "Testing will be divided into unit and integration tests. For unit tests, create a dedicated function that takes a string representing the content of an .envrc file and the name of a variable to clear. Test this function with various inputs: a standard variable assignment, a variable with a trailing comment, a variable with complex quoting, and a file where the variable is not present. Assert that the returned string has the correct line modified to `export VAR_NAME=\"\"` while all other lines and comments are unchanged. For integration testing, start the daemon with a mock clock. Grant a lease with a short TTL (e.g., 1 second). Advance the mock clock to trigger the expiration. Read the content of the test .envrc file from disk and verify that the secret variable's value has been set to an empty string and that any associated comment on that line was preserved.",
         "status": "done",
         "dependencies": [
-          8,
-          14
+          "8",
+          "14"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 46,
+        "id": "46",
         "title": "Investigate and Optimize `grant` Command Performance",
         "description": "Profile the `env-lease grant` command to identify and resolve significant latency issues, particularly when fetching multiple secrets from providers like 1Password.",
         "details": "The `grant` command exhibits slow performance (~25s for a single lease), far exceeding the execution time of a direct `op read` command. The primary hypothesis is that secrets are being fetched sequentially within the daemon, with each call incurring the full startup overhead of the underlying provider's CLI (e.g., `op`). The investigation will start by using Go's `pprof` to profile the daemon's handling of a grant request to confirm the bottleneck. Based on the findings, the daemon's secret fetching logic will be refactored to process multiple secret requests in parallel using goroutines and a `sync.WaitGroup`. This change must preserve the existing transactional behavior: if any secret fetch fails, the entire grant operation should be rolled back unless the `--continue-on-error` flag is used. Error aggregation from the concurrent operations will be a key part of the implementation.",
         "testStrategy": "First, establish a performance baseline by creating a test configuration with at least five 1Password leases and measuring the execution time of the `grant` command. After implementing optimizations, re-run the benchmark and verify a significant reduction in execution time, expecting it to be closer to the time of a single `op` call rather than the sum of all calls. Second, create a new integration test with a mock `SecretProvider` that simulates a fixed delay. When granting multiple leases, assert that the total execution time is approximately equal to the single delay, not the sum of all delays, confirming parallel execution. Finally, ensure all existing integration tests for `grant`, especially those covering error handling and transactional behavior, continue to pass.",
         "status": "done",
         "dependencies": [
-          4,
-          11
+          "4",
+          "11"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 47,
+        "id": "47",
         "title": "Enhance Daemon Startup Logging for Better Visibility",
         "description": "Add detailed logging messages to the daemon's startup sequence to confirm successful initialization, state loading, and IPC server status, providing clear feedback that the daemon is running correctly.",
         "details": "Modify the daemon's main startup function (invoked by `env-lease daemon start`). After the initial 'Starting daemon...' message, add new log lines using the standard `log` package established in Task 25. The new logs should report on the outcome of key initialization steps:\n1. **State Loading (Task 7):** After attempting to load `state.json`, log either `INFO: Loaded state with N active leases.` or `INFO: No state file found, initializing new state.`\n2. **Expired Lease Check (Task 8):** After the initial scan for leases that expired while the daemon was offline, log `INFO: Revoked M expired leases on startup.`\n3. **IPC Server (Task 9):** After successfully creating and starting the listener on the Unix Domain Socket, log `INFO: IPC server listening at [socket_path].`\n4. **Final Confirmation:** Once all initialization is complete and the main timer loop is about to begin, log a final summary message like `INFO: Daemon startup successful. Ready to manage leases.`",
         "testStrategy": "Testing will be done via integration tests that capture the daemon's standard output. \n1. **Test Case: Clean Start:** Ensure no `state.json` file exists. Start the daemon using `env-lease daemon start`. Verify that stdout contains the expected sequence of logs: 'No state file found', 'IPC server listening', and 'Daemon startup successful'.\n2. **Test Case: Resuming with State:** Create a `state.json` file containing several leases, including at least one that is already expired. Start the daemon. Verify that stdout contains logs confirming the state was loaded (e.g., 'Loaded state with N active leases'), that expired leases were revoked ('Revoked M expired leases on startup'), and the final success message.",
         "status": "done",
         "dependencies": [
-          7,
-          8,
-          9,
-          25,
-          32
+          "7",
+          "8",
+          "9",
+          "25",
+          "32"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 48,
+        "id": "48",
         "title": "Add op_account field to lease configuration",
         "description": "Add an optional 'op_account' field to the lease configuration for 1Password secrets. Update the documentation to explain that this field specifies the 1Password account, taking precedence over the OP_ACCOUNT environment variable and the CLI's default. Also, investigate and implement a non-interactive mode for the 'op' command to ensure it errors out instead of hanging when an account prompt is required.",
         "details": "",
@@ -1317,68 +1391,68 @@
         "subtasks": []
       },
       {
-        "id": 49,
+        "id": "49",
         "title": "Implement Automatic Revocation for Leases Removed from Configuration",
         "description": "Enhance the daemon to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file, ensuring the system state stays synchronized with the declared configuration.",
         "details": "The daemon's main processing loop, which currently checks for expired leases, needs to be extended. On each cycle, for every project it manages, the daemon should re-read and parse the corresponding `env-lease.toml` file. It will then compare its list of active leases for that project against the leases currently defined in the configuration. If an active lease from the daemon's state does not have a corresponding definition in the configuration file, it should be treated as orphaned and immediately revoked. The revocation process must use the same logic established in Task 45, which involves clearing the environment variable's value in the target `.envrc` file rather than deleting the line. A log message should be generated to indicate that a lease was revoked due to its removal from the configuration.",
         "testStrategy": "1. Set up a project with an `env-lease.toml` file containing two distinct lease definitions (e.g., for `API_KEY_A` and `API_KEY_B`). 2. Run `env-lease grant` to acquire both leases. 3. Verify using `env-lease status` that both leases are active and check the `.envrc` file to confirm both variables are set. 4. Manually edit the `env-lease.toml` file to remove the configuration block for `API_KEY_B`. 5. Wait for the daemon's next periodic check to occur. 6. Run `env-lease status` again and assert that only the lease for `API_KEY_A` is active. 7. Inspect the `.envrc` file and confirm that the line for `API_KEY_B` has been modified to have an empty value (e.g., `export API_KEY_B=`). 8. Check the daemon's logs for a message confirming the revocation of the lease for `API_KEY_B` due to a configuration change.",
         "status": "done",
         "dependencies": [
-          8,
-          37,
-          45
+          "8",
+          "37",
+          "45"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 50,
+        "id": "50",
         "title": "Refactor CLI Error Handling to Use `slog` and Exit Codes",
         "description": "Standardize error handling across all client-side commands (`status`, `grant`, `revoke`) to use the `slog` library for structured logging and ensure failures, especially daemon connection errors, result in a clean, single error message and a non-zero exit code.",
         "details": "The current error handling for client commands can produce redundant messages and does not use a standardized logging or exit code mechanism. This task involves refactoring the IPC client logic used by the `grant`, `revoke`, and `status` commands. A centralized helper function should be created to handle the connection to the daemon's Unix socket. If a connection fails, this function will be responsible for logging a structured error message using `slog.Error()` with relevant attributes like the socket path. It will then print a single, user-friendly error message to stderr (e.g., \"Error: could not connect to the env-lease daemon. Is it running?\") and terminate the process with `os.Exit(1)`.",
         "testStrategy": "Testing will focus on verifying the command's behavior when the daemon is not running. For each of the `grant`, `revoke`, and `status` commands: 1. Ensure the env-lease daemon process is not active. 2. Execute the command (e.g., `./bin/env-lease status`). 3. Verify that the command's exit code is non-zero (specifically `1`). 4. Capture the standard error stream and assert that it contains a single, clean, and user-friendly error message, and that the original redundant error is no longer present. 5. Start the daemon and run the commands again to ensure they still function correctly in the success case.",
         "status": "done",
         "dependencies": [
-          11,
-          12,
-          13,
-          32
+          "11",
+          "12",
+          "13",
+          "32"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 51,
+        "id": "51",
         "title": "Refactor Daemon to Manage Lease Metadata Only, Not Secrets",
         "description": "Perform a security-focused refactoring to ensure the daemon process never handles raw secret values. The daemon will be responsible only for managing lease metadata, while the client will handle fetching and writing the secrets.",
         "details": "To enhance security, the daemon's role must be limited to orchestration and lifecycle management. The `env-lease grant` client command will be updated to perform the secret fetching and writing. The new workflow will be: 1. The client (`env-lease grant`) fetches the secret from the provider. 2. The client writes the secret directly to the target `.env` file. 3. The client communicates with the daemon via IPC, sending only the lease metadata (e.g., variable name, file path, expiration timestamp). 4. The daemon will update its state file (`state.json` from Task 7) to track this new lease using only the metadata. The state file must be scrubbed of any secret values. 5. The daemon's core loop (Task 8) will continue to monitor for expirations. Upon expiration, it will use the stored file path and variable name to remove the correct line from the `.env` file, performing revocation without ever needing to know the secret's value.",
         "testStrategy": "1. **State Verification:** After running `env-lease grant`, inspect the `~/.config/env-lease/state.json` file. Confirm that it contains entries with the correct variable name, file path, and expiration, but strictly no secret values. 2. **End-to-End Grant:** Execute a `grant` command. Verify the secret is correctly appended to the target `.env` file and that the daemon logs the registration of the new lease metadata. 3. **End-to-End Expiration:** Allow a granted lease to expire. Verify the daemon's core loop identifies the expired lease and successfully removes the corresponding line from the `.env` file. 4. **Process Inspection:** In a test environment, inspect the daemon's logs and standard output during a grant operation to ensure no secret values are ever printed. 5. **Unit Tests:** Update unit tests for the daemon's state management and IPC handling to assert that secret payloads are neither expected nor processed.",
         "status": "done",
         "dependencies": [
-          7,
-          8,
-          26
+          "7",
+          "8",
+          "26"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 52,
+        "id": "52",
         "title": "Implement Configurable Logging with ENVLEASE_LOG_LEVEL",
         "description": "Introduce an environment variable `ENVLEASE_LOG_LEVEL` to control the application's logging verbosity, with 'warning' as the default. Update the systemd service template to explicitly set the log level to 'info' for the daemon process.",
         "details": "This task builds upon the structured logging implemented in Task 50. The core objective is to make the log level configurable at runtime.\n\n1.  **Environment Variable Handling:** In the application's main initialization logic, read the `ENVLEASE_LOG_LEVEL` environment variable. The value should be parsed case-insensitively.\n2.  **Log Level Mapping:** Support standard log levels: `debug`, `info`, `warn` (or `warning`), and `error`. Map these string values to the corresponding `slog.Level` constants (e.g., `slog.LevelDebug`, `slog.LevelInfo`, `slog.LevelWarn`, `slog.LevelError`).\n3.  **Default Level:** If `ENVLEASE_LOG_LEVEL` is not set or contains an unrecognized value, the logging level must default to `warn` (`slog.LevelWarn`).\n4.  **Logger Initialization:** The global `slog` logger should be initialized using `slog.HandlerOptions` with the `Level` field set based on the logic above.\n5.  **Systemd Template Update:** Modify the systemd service template (updated in Task 33) to include a new directive in the `[Service]` section: `Environment=\"ENVLEASE_LOG_LEVEL=info\"`. This ensures that when the daemon runs as a background service, it provides more detailed logs for easier debugging via `journalctl`, overriding the `warn` default.\n6.  **macOS Template Update (Optional but Recommended):** For consistency, update the `launchd` plist template (from Task 16) to include a similar configuration. Add a key-value pair to the `EnvironmentVariables` dictionary: `<key>ENVLEASE_LOG_LEVEL</key><string>info</string>`.",
         "testStrategy": "Testing will be divided into CLI behavior and service integration.\n\n1.  **CLI Log Level Verification:**\n    *   **Default (Warn):** Run a command like `env-lease status` with the daemon stopped and `ENVLEASE_LOG_LEVEL` unset. Verify that only the warning/error message about the connection failure is printed.\n    *   **Info Level:** Run `ENVLEASE_LOG_LEVEL=info env-lease status`. Verify that any informational logs (if present) are displayed in addition to warnings/errors.\n    *   **Debug Level:** Add a temporary debug log message. Run `ENVLEASE_LOG_LEVEL=debug env-lease status`. Verify the debug message is visible.\n    *   **Invalid Level:** Run `ENVLEASE_LOG_LEVEL=foo env-lease status`. Verify the behavior is identical to the default 'warn' level.\n\n2.  **Systemd Service Verification:**\n    *   Run `env-lease daemon install` on a Linux system.\n    *   Inspect the contents of `~/.config/systemd/user/env-lease.service` and confirm the line `Environment=\"ENVLEASE_LOG_LEVEL=info\"` exists.\n    *   Start the service with `systemctl --user start env-lease.service`.\n    *   Check the service logs using `journalctl --user -u env-lease.service`. Verify that the informational startup logs from Task 47 (e.g., 'Loaded state...', 'IPC server listening...') are visible, confirming the `info` log level was correctly applied.",
         "status": "done",
         "dependencies": [
-          50,
-          47,
-          33
+          "50",
+          "47",
+          "33"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 53,
+        "id": "53",
         "title": "Daemon: Periodically Revoke Leases Removed from Configuration",
         "description": "Enhance the daemon's periodic check to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file. On each cycle, the daemon should re-read the configuration file for each project it manages, compare the active leases against the configuration, and revoke any that are no longer present.",
         "details": "",
@@ -1389,7 +1463,7 @@
         "subtasks": []
       },
       {
-        "id": 55,
+        "id": "55",
         "title": "Implement op+file:// scheme and preserve newlines for 1Password provider",
         "description": "Implement a new `op+file://<item-name>/<file-name>` URI scheme for 1Password documents. This scheme should perform an `op item get` lookup under the hood to find the canonical `op://<vault-id>/<item-id>/<file-id>` URI. The provider should handle potential ambiguities if item names are not unique. Ensure the `lease_type` ('file' or 'env') is decoupled from the `source` URI scheme. For `lease_type = 'env'`, the provider must return the raw, unmodified secret content, including newlines. The `TrimSpace` function should be removed from the secret fetching logic to ensure multi-line environment variables are handled correctly when no encoding is specified. If `encoding` (e.g., 'base64') is used, the standard encoding process applies.",
         "details": "",
@@ -1400,37 +1474,37 @@
         "subtasks": []
       },
       {
-        "id": 56,
+        "id": "56",
         "title": "Improve User Feedback for Daemon Install and Uninstall Commands",
         "description": "Enhance the `daemon install` and `daemon uninstall` commands to provide clear, informative messages upon successful completion, including the path to the created service file on installation.",
         "details": "Modify the `env-lease daemon install` and `env-lease daemon uninstall` Cobra commands to improve user experience by providing explicit confirmation messages.\n\n1.  **`daemon install` Command:**\n    *   After the platform-specific service manager file (e.g., systemd `.service` or launchd `.plist`) is successfully created and the service is enabled, the command should print a confirmation message to standard output.\n    *   This message must include the full path to the service file that was just created. For example: `Successfully installed env-lease daemon service. Configuration file created at: /etc/systemd/system/env-leased.service`.\n    *   This new messaging logic must NOT execute when the `--print` flag (from Task 40) is used, preserving the existing behavior of only printing the file content to stdout.\n\n2.  **`daemon uninstall` Command:**\n    *   After the service has been successfully stopped, disabled, and its corresponding service file has been removed, the command should print a simple confirmation message to standard output.\n    *   For example: `Successfully uninstalled env-lease daemon service.`",
         "testStrategy": "Testing will be performed by executing the CLI commands on each supported OS and asserting the content of standard output.\n\n1.  **Install Test (Linux):**\n    *   Run `sudo env-lease daemon install`.\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the message `Successfully installed env-lease daemon service. Configuration file created at: [path]`, where `[path]` is the correct systemd service file path.\n    *   Verify the service file exists at the reported path.\n\n2.  **Install Test (macOS):**\n    *   Run `env-lease daemon install`.\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the message `Successfully installed env-lease daemon service. Configuration file created at: [path]`, where `[path]` is the correct launchd plist path in the user's home directory.\n    *   Verify the plist file exists at the reported path.\n\n3.  **Uninstall Test:**\n    *   On a system with the daemon installed, run `env-lease daemon uninstall` (with `sudo` if required).\n    *   Assert that the command exits with code 0.\n    *   Capture stdout and verify it contains the exact message: `Successfully uninstalled env-lease daemon service.`\n    *   Verify the service file has been deleted.\n\n4.  **`--print` Flag Compatibility Test:**\n    *   Run `env-lease daemon install --print`.\n    *   Assert that stdout contains only the service file content and does NOT contain the new \"Successfully installed...\" message.",
         "status": "done",
         "dependencies": [
-          32,
-          40
+          "32",
+          "40"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 57,
+        "id": "57",
         "title": "Make Lease Revocation Resilient to Missing Files",
         "description": "Modify the lease revocation logic to gracefully handle cases where a leased file has already been deleted by the user. Instead of failing, the revocation process will log the event and successfully remove the lease from the daemon's state.",
         "details": "The core lease revocation function, likely within the daemon, needs to be updated. This function is triggered by both the `env-lease revoke` command and the periodic cleanup of stale leases (Task 53). When revoking a file-based lease, the logic must first check for the existence of the target file before attempting deletion.\n1. In the revocation handler, before calling `os.Remove()`, use `os.Stat()` to check if the file path exists.\n2. If the check returns an error satisfying `os.IsNotExist(err)`, the function should not propagate this as a failure. Instead, it should log an informational message using `slog` (e.g., `slog.Info(\"Lease target file not found, proceeding with revocation\", \"path\", filePath)`).\n3. If the file exists, attempt deletion as usual. Any errors from `os.Remove()` (e.g., permission denied) should still be treated as fatal errors for that specific lease revocation.\n4. In either case (file deleted successfully or file was already missing), the process should continue to remove the lease's metadata from the daemon's state file, ensuring the revocation is completed from a logical standpoint.",
         "testStrategy": "An integration test will be created to validate the new behavior.\n1. **Setup:** Grant a new file-based lease using `env-lease grant`, which creates a file (e.g., `test-secret.txt`).\n2. **Verification 1:** Confirm the file `test-secret.txt` exists and the lease is listed in `env-lease status`.\n3. **Action:** Manually delete the file using `rm test-secret.txt`.\n4. **Test Execution:** Run `env-lease revoke` for the project.\n5. **Verification 2:** Assert that the `revoke` command exits with code 0.\n6. **Verification 3:** Run `env-lease status` again and assert that the lease is no longer listed.\n7. **Verification 4:** Inspect the daemon's logs and confirm the presence of an `info` level log message indicating the file was not found, and the absence of any `error` level logs for this revocation.\n8. **Regression Test:** Repeat the entire process, but skip step 3 (do not manually delete the file), and verify that `revoke` still works correctly by deleting the file itself.",
         "status": "done",
         "dependencies": [
-          12,
-          37,
-          53,
-          55
+          "12",
+          "37",
+          "53",
+          "55"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 58,
+        "id": "58",
         "title": "Improve Error Reporting for `grant --continue-on-error`",
         "description": "Refactor the error reporting for the `grant` command when the `--continue-on-error` flag is used. The current format is cluttered and redundant. The new format should be more structured and readable, like this:\n\n    Failed to grant 2 leases:\n\n    Lease: <lease-source-uri>\n    └─ Error: <error-message>\n\n    Lease: <another-lease-source-uri>\n    └─ Error: <another-error-message>\n\n    This involves creating a custom error structure to associate each error with its lease source, modifying the error aggregation logic in `cmd/grant.go`, and updating the final error message formatting. The tests in `cmd/grant_test.go` should also be updated to reflect the new error format.",
         "details": "",
@@ -1441,7 +1515,7 @@
         "subtasks": []
       },
       {
-        "id": 59,
+        "id": "59",
         "title": "Implement `daemon reload` Command",
         "description": "Create a new `env-lease daemon reload` command to safely restart the service after upgrades. The command must exit with a success code (0) if the service is not installed or running. For macOS, it will use `launchctl unload` (ignoring errors) and `launchctl load`. For Linux, it will use `systemctl --user restart` after checking if the service file exists. Finally, update the `.goreleaser.yml` to add a `post_install` hook that runs `env-lease daemon reload`, ensuring it works with the existing quarantine hook.",
         "details": "",
@@ -1452,7 +1526,7 @@
         "subtasks": []
       },
       {
-        "id": 60,
+        "id": "60",
         "title": "Add Debug Logging to Grant and Revoke Processes",
         "description": "Add debug-level logging to the grant and revoke processes to improve traceability. This includes adding `slog.Debug` messages to the daemon handlers (`handlers.go`) for incoming requests and `slog.Debug` messages to the revoker (`revoker.go`) for file deletions and environment variable clearing. Crucially, add a `slog.Info` message in the revoker to explicitly log when a lease is revoked for a file that was already missing, confirming the event was handled gracefully.",
         "details": "",
@@ -1463,101 +1537,101 @@
         "subtasks": []
       },
       {
-        "id": 61,
+        "id": "61",
         "title": "Bugfix: `--no-direnv` Flag is Ignored by `grant` and `revoke` Commands",
         "description": "The `--no-direnv` flag for the `grant` and `revoke` commands is not being respected, causing `direnv allow` to be executed unconditionally. This task will correct the command logic to ensure the flag properly disables the automatic `direnv` execution.",
         "details": "The client-side logic for the `grant` and `revoke` commands needs to be updated. Currently, the check for the `--no-direnv` flag is either missing or incorrect, leading to the `direnv allow` command being called even when the user explicitly opts out. The fix involves modifying the conditional logic that triggers the `direnv` integration. The execution flow should be: 1. After a successful grant or revoke operation modifying an `.envrc` file. 2. Before checking for the `direnv` executable, first evaluate the `--no-direnv` flag. 3. If the flag is present and set to `true`, the program must skip all `direnv`-related actions and instead print the suggestion message to the console. 4. If the flag is `false` (the default), the existing logic of checking for the `direnv` executable and running `direnv allow` should proceed.",
         "testStrategy": "The existing integration test suite for `direnv` integration must be updated to cover this bugfix. 1. **Test `--no-direnv` Behavior:** Create a new test case for both `grant` and `revoke`. Configure the test with a mock `direnv` executable in the `PATH` and target an `.envrc` file. Execute the command with the `--no-direnv` flag. Assert that the mock `direnv` executable was **not** called. Assert that the command's standard output contains the expected suggestion message (e.g., 'Run `direnv allow` to load the new environment.'). 2. **Regression Test Default Behavior:** Verify that the existing test case for the default behavior (without the flag) still passes. This test should run `grant`/`revoke` without the flag and assert that the mock `direnv allow` command **is** executed.",
         "status": "done",
         "dependencies": [
-          42
+          "42"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 62,
+        "id": "62",
         "title": "Implement XDG Base Directory Specification for Runtime Files",
         "description": "Relocate the daemon's IPC socket and persisted state file to the XDG Data Home directory (`$XDG_DATA_HOME`). This moves runtime data out of the configuration directory and aligns the application with platform standards.",
         "details": "The current implementation hardcodes paths within `~/.config/env-lease`, which is intended for user configuration, not runtime data. This task will refactor the path management to adhere to the XDG Base Directory Specification.\n1. **Integrate an XDG Library:** Add a dependency like `github.com/adrg/xdg` to handle path resolution reliably across different operating systems.\n2. **Update Path Generation:** All logic that generates paths for the IPC socket and the state persistence file must be updated. The new base directory should be resolved using `xdg.DataHome`. The application should create a subdirectory within it, e.g., `$XDG_DATA_HOME/env-lease/`.\n3. **New Paths:** The socket path will become `$XDG_DATA_HOME/env-lease/env-lease.sock` and the state file will be `$XDG_DATA_HOME/env-lease/state.json`.\n4. **Update Daemon and Client:** The daemon must be updated to create and listen on the socket in the new location and write its state file there. All client commands (`grant`, `revoke`, `status`, etc.) must be updated to look for the socket in the new location. This change will likely involve modifying a shared IPC client or configuration module.",
         "testStrategy": "Testing must cover both the new path logic and the end-to-end functionality of the client-daemon communication.\n1. **Unit Tests:** Create unit tests for the path resolution logic. Mock the `XDG_DATA_HOME` environment variable to verify that the correct path is returned when it is set and when it is unset (testing the fallback to the OS default).\n2. **Integration Tests:** Modify the existing integration test suite. The test setup should ensure the mock daemon starts and creates its socket and state file in the expected XDG data directory. All tests for `grant`, `revoke`, and `status` must be run to confirm they can successfully communicate with the daemon at its new location.\n3. **Persistence Test:** Re-run the test scenario from Task 26. Start the daemon, grant a lease, terminate the daemon with `kill -9`, and verify the state file exists with the correct content in the new `$XDG_DATA_HOME/env-lease/` directory. Restart the daemon and confirm it correctly loads the state from the new location.",
         "status": "done",
         "dependencies": [
-          11,
-          12,
-          13,
-          26
+          "11",
+          "12",
+          "13",
+          "26"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 63,
+        "id": "63",
         "title": "Add Infisical Secret Provider",
         "description": "Implement a new secret provider for Infisical. The implementation will follow the established pattern of other providers, using the Infisical CLI ('infisical') to fetch secrets.",
         "details": "Create a new provider in the `/internal/provider` package that implements the `SecretProvider` interface for Infisical. The provider should be named `InfisicalCLI`. The `Fetch` method will use the `os/exec` package to call `infisical secrets get <SECRET_NAME> --env=<ENVIRONMENT> --project-id=<PROJECT_ID> --raw`. The source URI should be parsed to extract these parameters. A suggested URI format is `infisical://<project-id>/<environment>/<secret-name>`. The implementation must include robust error handling for scenarios such as the `infisical` command not being in the PATH, the user not being logged in, the specified secret not being found, or network issues. Custom error types should be created for Infisical-specific failures to provide clear feedback to the user.",
         "testStrategy": "Unit tests must be created for the Infisical provider. These tests should use a mocked `os/exec` interface to simulate the Infisical CLI's behavior without requiring an actual installation. Test cases should cover: 1. Successful retrieval of a secret. 2. The `infisical` executable not being found in the system's PATH. 3. The CLI returning a non-zero exit code for a non-existent secret. 4. The CLI returning an error due to authentication failure. An optional integration test can be added that runs only when the `infisical` CLI is properly configured in the test environment.",
         "status": "pending",
         "dependencies": [
-          3
+          "3"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 64,
+        "id": "64",
         "title": "Add Bitwarden Secret Provider",
         "description": "Implement a new secret provider for Bitwarden. The implementation will follow the established pattern of other providers, using the Bitwarden CLI ('bw') to fetch secrets.",
         "details": "Create a new provider in the `/internal/provider` package that implements the `SecretProvider` interface for Bitwarden. The provider struct should be named `BitwardenCLI`. The `Fetch` method will use the `os/exec` package to call `bw get password <ITEM_ID>`. The source URI should be parsed to extract the item ID. A suggested URI format is `bitwarden://<item_id>`. The implementation must include robust error handling for scenarios such as the `bw` executable not being found in the PATH, the user's vault being locked, the specified item ID not being found, or other CLI errors. Custom error types should be created for Bitwarden-specific failures to provide clear feedback to the user.",
         "testStrategy": "Unit tests must be created for the Bitwarden provider. These tests should use a mocked `os/exec` interface to simulate the Bitwarden CLI's behavior without requiring an actual installation or logged-in session. Test cases should cover: 1. Successful retrieval of a secret. 2. The `bw` executable not being found in the PATH. 3. The `bw` CLI returning an error for a locked vault. 4. The `bw` CLI returning an error for an invalid item ID. 5. A malformed `bitwarden://` source URI.",
         "status": "pending",
         "dependencies": [
-          3
+          "3"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 65,
+        "id": "65",
         "title": "Refactor `encoding` to a Flexible `transform` Pipeline",
         "description": "Replace the simple `encoding` field in the configuration with a more powerful `transform` array, enabling a multi-step pipeline for processing secrets, such as parsing JSON and selecting a specific key.",
         "details": "This task involves a significant refactoring of the secret processing logic. The existing `encoding` string field in `env-lease.toml` will be deprecated in favor of a new `transform` array of strings.\n\n**Implementation Steps:**\n\n1.  **Update Configuration Structs:** Modify the Go structs responsible for parsing `env-lease.toml` (from Task 2). Replace the `Encoding string` field with `Transform []string`.\n\n2.  **Ensure Backward Compatibility:** In the configuration loading logic, after unmarshalling the TOML, check if the `Transform` slice is empty and the legacy `Encoding` field is set to `\"base64\"`. If so, programmatically set `Transform` to `[\"base64-encode\"]` to maintain old behavior.\n\n3.  **Create Transformation Engine:** Implement a new package, e.g., `pkg/transform`, to manage the pipeline. This engine will take an initial value (the raw secret string) and the `[]string` of transformations. It must manage the intermediate state of the data, which can be either a string or a structured data type (e.g., `map[string]interface{}`).\n\n4.  **Implement Transformers:**\n    *   `base64-encode`: Implements `base64.StdEncoding.EncodeToString`.\n    *   `base64-decode`: Implements `base64.StdEncoding.DecodeString`.\n    *   `json`, `toml`, `yaml`: These transformers will parse an input string into a generic structured data format. They should return an error if the input is not valid for the given format.\n    *   `select '<path>'`: This transformer is stateful; it requires the previous step to have produced structured data. It will parse its argument to extract the path (e.g., `credentials.api_key`). It will then traverse the structured data to find the value at that path. The result should be coerced to a string. A library like `github.com/tidwall/gjson` could be suitable for JSON, or a custom dot-notation walker for a generic `map[string]interface{}`.\n\n5.  **Integrate into `grant` Command:** The `env-lease grant` command's logic (client-side, as per Task 51) must be updated. After fetching a secret from a provider, it should pass the secret and its corresponding `transform` array to the new transformation engine. The final string output from the engine is what gets written to the destination file or environment.\n\n6.  **Error Handling:** Each transformer must handle and return errors gracefully (e.g., invalid input format, path not found in `select`). The pipeline engine must stop processing and propagate the error, which the `grant` command should then report to the user.",
         "testStrategy": "Testing should be multi-layered to cover configuration parsing, individual transformers, and the end-to-end workflow.\n\n1.  **Unit Tests (Configuration):**\n    *   Verify that a `env-lease.toml` with `transform = [\"json\", \"select 'key'\"]` is parsed correctly.\n    *   Verify that a legacy config with `encoding = \"base64\"` is correctly interpreted as `transform = [\"base64-encode\"]`.\n    *   Test that if both `encoding` and `transform` are present, `transform` takes precedence.\n\n2.  **Unit Tests (Transformers):**\n    *   For each transformer (`base64-encode`, `base64-decode`, `json`, `toml`, `yaml`), provide valid input and assert the correct output.\n    *   Provide invalid input to each transformer (e.g., non-base64 string to `base64-decode`, malformed JSON to `json`) and assert that an appropriate error is returned.\n    *   For the `select` transformer, test with valid nested paths, non-existent paths, and on non-structured data to ensure it returns correct values and errors.\n\n3.  **Integration Tests (Pipeline Engine):**\n    *   Test a complete, valid pipeline, e.g., `[\"base64-decode\", \"json\", \"select 'credentials.api_key'\"]`. Provide a base64-encoded JSON string as input and verify the final extracted string value.\n    *   Test a pipeline that should fail mid-way (e.g., a `select` step following a `base64-encode` step without a parser in between) and verify a descriptive error is returned.\n\n4.  **End-to-End Tests:**\n    *   Modify the `grant` command's integration tests. Use a mock secret provider to return various secret formats (plain text, base64, JSON, TOML).\n    *   Run `env-lease grant` with corresponding `transform` configurations and verify that the final, correctly transformed value is written to the target `.env` file.",
         "status": "done",
         "dependencies": [
-          2
+          "2"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 66,
+        "id": "66",
         "title": "Update USAGE.md with Pre-Upgrade Revocation Warning",
         "description": "Add a section to the `USAGE.md` documentation file warning users to revoke all active secrets before upgrading to a new version, particularly while the software is in an unstable, pre-release state.",
         "details": "Locate the `USAGE.md` file in the project root. Add a new section, possibly titled 'Upgrading Between Versions' or as a prominent note. This section should clearly state that due to the unstable nature of the software during active development, breaking changes to the daemon's state management or IPC protocol may occur between versions. Instruct users to run `env-lease revoke --all` to clear all active leases *before* stopping the daemon and replacing the application binary. Explain that this step is crucial to prevent orphaned leases or unexpected behavior after an upgrade.",
         "testStrategy": "Review the changes in a Markdown previewer. 1. Confirm that a new section regarding upgrades has been added to `USAGE.md`. 2. Verify the text clearly explains the reason for revoking secrets (potential breaking changes in an unstable application). 3. Ensure the recommended command is exactly `env-lease revoke --all` and is formatted correctly as a code block. 4. Check for any grammatical errors, typos, or formatting issues.",
         "status": "done",
         "dependencies": [
-          37
+          "37"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 67,
+        "id": "67",
         "title": "Implement 'explode' Transform for Multi-Secret Expansion",
         "description": "Create a new 'explode' transform that processes a structured secret (like JSON or TOML) and expands its top-level key-value pairs into multiple individual secrets managed by the daemon.",
         "details": "This task introduces an 'explode' transform to be used within the transform pipeline. It is designed to operate on the output of a parser transform like 'json'. When applied, it will take a map-like structure and create a separate secret for each key-value pair. The names of the new secrets will be generated by combining the original secret alias with the key from the data, separated by an underscore (e.g., original alias 'API_CREDS' with key 'key' becomes 'API_CREDS_KEY'). This will require modifying the core secret processing logic to handle a single grant request that results in multiple secrets being stored and managed by the daemon. The transform should convert all values to strings. Initially, this transform will only operate on flat, single-level objects; nested objects are out of scope for this task.",
         "testStrategy": "1. Unit test the 'explode' transformer in isolation, providing it with a `map[string]interface{}` input and verifying it produces the correct map of new secret names and string values. Test cases should include non-string values (booleans, numbers) to ensure they are correctly converted to strings. 2. Create an integration test using a mock provider that returns a JSON string (e.g., `{\"username\": \"admin\", \"password\": \"secret123\"}`). Configure a secret in `env-lease.toml` with `transform = [\"json\", \"explode\"]`. 3. Run `env-lease grant` for the configured secret and verify that two distinct environment variables are created (e.g., `SECRET_NAME_USERNAME` and `SECRET_NAME_PASSWORD`). 4. Check the daemon's state to confirm that both derived secrets are being tracked under the original lease. 5. Run `env-lease revoke` on the original secret alias and confirm that all derived secrets are revoked and their environment variables are unset.",
         "status": "done",
         "dependencies": [
-          65
+          "65"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 68,
+        "id": "68",
         "title": "Implement `to_json`, `to_yaml`, and `to_toml` Stringifying Transformers",
         "description": "Enhance the secret transformation pipeline by adding `to_json`, `to_yaml`, and `to_toml` transformers to convert structured data back into their respective string formats.",
         "details": "This task involves implementing three new transformers that perform the inverse operation of the existing `json`, `yaml`, and `toml` parsers. These new transformers will take the internal structured data representation (e.g., `map[string]interface{}`) and serialize it into a formatted string.\n\n**Implementation Steps:**\n\n1.  **Locate Transformer Logic:** Identify the package where existing transformers (like `select`, `json`, `yaml`) are defined and registered.\n\n2.  **`to_json` Transformer:**\n    *   Create a function that accepts an `interface{}` representing the structured data.\n    *   Use the `encoding/json` package, specifically `json.MarshalIndent`, to serialize the data into a human-readable JSON string. Use a standard indentation (e.g., two spaces).\n    *   The function should return the resulting string and handle any potential marshaling errors.\n\n3.  **`to_yaml` Transformer:**\n    *   Create a function that accepts an `interface{}`.\n    *   Use a standard YAML library (e.g., `gopkg.in/yaml.v3`) and its `yaml.Marshal` function to serialize the data into a YAML string.\n    *   Return the resulting string and handle marshaling errors.\n\n4.  **`to_toml` Transformer:**\n    *   Create a function that accepts an `interface{}`.\n    *   Use a TOML library (e.g., `github.com/BurntSushi/toml`) to serialize the data. This may involve using `toml.NewEncoder` with a `bytes.Buffer`.\n    *   Return the resulting TOML string and handle any encoding errors.\n\n5.  **Register Transformers:** Add the new `to_json`, `to_yaml`, and `to_toml` functions to the application's central transformer registry so they can be invoked from the `transform` array in `env-lease.toml`.\n\n6.  **Update Documentation:** Edit `docs/USAGE.md` and add entries for the three new transformers to the \"Transformer Reference\" table. For each, describe its function (converts structured data to a string format) and provide a clear example, similar to the one in the task request.",
@@ -1568,20 +1642,20 @@
         "subtasks": []
       },
       {
-        "id": 69,
+        "id": "69",
         "title": "Investigate Automatic Lease Revocation on macOS via Idle Timer",
         "description": "Research and prototype a mechanism on macOS to automatically trigger `env-lease revoke --all` after a user has been idle for a specified duration, such as one hour.",
         "details": "This task is to explore a security enhancement for macOS users by automatically revoking all active leases when the system is left unattended. The primary goal is to produce a proof-of-concept script and documentation on the recommended setup.\n\n**Implementation Steps:**\n\n1.  **Research Idle Time Detection:** Investigate the most reliable method to query user idle time on macOS. The primary candidate is the `ioreg` command-line tool. A common approach is `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'`. This method's consistency across different macOS versions should be verified.\n\n2.  **Explore Execution Schedulers:** Compare different methods for periodically running a check script:\n    *   **`launchd` Agent:** This is the preferred macOS native approach. Research how to create a user-level `launchd` agent (`.plist` file in `~/Library/LaunchAgents`) that runs a script at a regular interval (e.g., every 5 minutes) using the `StartInterval` key.\n    *   **AppleScript:** Evaluate if an AppleScript application or script offers any advantages over `launchd`, such as easier interaction with system events, though it's likely more complex for this use case.\n    *   **Cron/Shell Loop:** A simple cron job or a backgrounded shell script with a `sleep` loop can be used for prototyping but is generally less robust and efficient than `launchd`.\n\n3.  **Develop Proof-of-Concept (PoC) Script:** Create a shell script that performs the core logic:\n    *   It must be executable and should find the `env-lease` binary (either by assuming it's in the PATH or by accepting a path as an argument).\n    *   It will call `ioreg` to get the idle time in seconds.\n    *   It will compare the idle time against a configurable threshold (e.g., 3600 seconds).\n    *   If the idle time exceeds the threshold, it will execute `env-lease revoke --all`.\n    *   The script should include basic logging (e.g., to `stdout` or a log file) to aid in debugging.\n\n4.  **Create `launchd` Configuration:** Based on the research, create a sample `.plist` file that is configured to run the PoC script. This file should be well-commented to explain the different keys and their purposes.\n\n5.  **Document Findings:** The final deliverable is a Markdown document outlining the findings. It should include the recommended approach (`launchd`), the complete PoC shell script, the sample `.plist` configuration, and clear, step-by-step instructions for a user to set it up on their machine.",
         "testStrategy": "Verification will focus on the PoC script and its integration with the system scheduler.\n\n1.  **Manual Script Test:** Execute the PoC script directly from the terminal. Manually verify that it correctly reads the idle time and does *not* trigger a revoke when the idle time is below the threshold. Then, wait for the idle time to exceed the threshold (or temporarily set the threshold to a very low value like 5 seconds) and confirm that `env-lease revoke --all` is executed. Check the daemon's state or logs to confirm revocation.\n\n2.  **`launchd` Integration Test:**\n    *   Place the `.plist` file in `~/Library/LaunchAgents` and load it using `launchctl load <path_to_plist>`.\n    *   Let the machine remain idle for longer than the configured threshold.\n    *   After becoming active again, use `env-lease status` to verify that all leases have been revoked.\n    *   Check the script's log output to confirm it was run by `launchd`.\n\n3.  **Activity Reset Test:** Ensure that user activity (e.g., moving the mouse) correctly resets the system's idle timer, preventing the script from revoking leases while the user is active.\n\n4.  **Documentation Review:** The final documentation must be reviewed for clarity, accuracy, and completeness. Another team member should be able to follow the instructions to successfully set up the auto-revocation mechanism.",
         "status": "done",
         "dependencies": [
-          37
+          "37"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 70,
+        "id": "70",
         "title": "Create `convert` Command to Generate `env-lease.toml` from `.env` File",
         "description": "Implement a new `env-lease convert` command that parses a `.env` or `.envrc` file to scaffold a corresponding `env-lease.toml` configuration, printing the result to standard output.",
         "status": "done",
@@ -1592,34 +1666,34 @@
         "subtasks": []
       },
       {
-        "id": 71,
+        "id": "71",
         "title": "Implement Interactive Mode for `grant` and `revoke` Commands",
         "description": "Add an `--interactive` / `-i` flag to the `grant` and `revoke` commands to prompt the user for confirmation before processing each individual secret lease.",
         "details": "This feature enhances user control during lease management. The implementation will involve:\n\n1.  **Flag Addition:** Add a new boolean flag `--interactive` with a shorthand `-i` to both the `grant` and `revoke` cobra commands.\n\n2.  **Grant Command Logic:** Modify the `grant` command's execution flow. If the `--interactive` flag is set, iterate through the secrets defined in the configuration. For each secret, print a prompt to `stderr` (e.g., `Grant lease for 'API_KEY'? [y/N] `) and wait for user input from `stdin`.\n\n3.  **Revoke Command Logic:** Similarly, update the `revoke` command. When run with `--interactive`, it should list the currently active leases for the project and prompt for confirmation before revoking each one (e.g., `Revoke lease for 'API_KEY'? [y/N] `).\n\n4.  **Input Handling:** Create a shared utility function to handle the user prompt. This function should read a single line from `stdin`. The action should only proceed if the input is 'y' or 'Y'. Any other input (including an empty line by pressing Enter) should be treated as 'No', and the specific secret should be skipped.\n\n5.  **Default Behavior:** The default behavior of both commands (when the flag is not present) must remain unchanged, processing all applicable secrets without user interaction.",
         "testStrategy": "Testing will be conducted through a combination of unit and integration tests.\n\n1.  **Unit Tests:** Create a unit test for the new user input prompting utility. This test will mock `stdin` and `stderr` to verify:\n    - The prompt is correctly formatted and written to `stderr`.\n    - Input 'y' and 'Y' return `true`.\n    - Input 'n', 'N', an empty string (Enter), and any other text return `false`.\n\n2.  **CLI Integration Tests:** Implement end-to-end tests using a test harness that can control the command's `stdin`.\n    - **Grant Interactive:** Set up a config with three secrets. Run `env-lease grant -i` and pipe the input sequence `y\\nfoo\\nY\\n` to `stdin`. Verify that only the first and third secrets are granted a lease by checking the daemon's state.\n    - **Revoke Interactive:** Grant leases for all three secrets. Run `env-lease revoke -i` and pipe the input sequence `n\\ny\\n\\n` to `stdin`. Verify that only the second secret's lease is revoked.\n    - **Backward Compatibility:** Run both `grant` and `revoke` without the `-i` flag to ensure they still process all secrets by default without any prompting.",
         "status": "done",
         "dependencies": [
-          37
+          "37"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 72,
+        "id": "72",
         "title": "Optimize Interactive Grant by Prompting Before Secret Lookup",
         "description": "Fix a bug in the interactive grant command (`-i`) where secrets are fetched before the user is prompted for confirmation, causing unnecessary delays. This task will reverse the order of operations to improve performance and user experience.",
         "details": "The current implementation of `env-lease grant -i`, introduced in Task #71, iterates through the list of secrets, fetches the secret value using the configured `SecretProvider`, and then asks the user for confirmation. This results in a noticeable delay before each prompt, even if the user intends to skip the secret.\n\nThe logic within the `grant` command's interactive mode needs to be refactored. The new execution flow for each secret in the configuration should be:\n1. Display the confirmation prompt to the user (e.g., `Grant lease for 'SECRET_NAME'? [y/N] `).\n2. Wait for and read the user's input.\n3. If the user confirms (e.g., inputs 'y'), then proceed to call the `Fetch` method of the corresponding `SecretProvider` to retrieve the secret's value.\n4. If the user denies or provides no input, skip the secret fetch entirely and move to the next secret in the list.\n\nThis change will be isolated to the `grant` command's execution logic and should not require any modifications to the `SecretProvider` interface or its various implementations.",
         "testStrategy": "The fix will be verified through both manual and automated testing.\n\n1.  **Manual Verification:**\n    *   Configure `env-lease.toml` with multiple secrets from a provider that has a noticeable lookup latency (e.g., a cloud provider like AWS or Google Secret Manager).\n    *   Run `env-lease grant -i`.\n    *   Observe that the confirmation prompt for the first secret appears almost instantly, without a delay.\n    *   Enter 'y' and confirm that the delay now occurs *after* the input, during the secret fetch.\n    *   For the next secret, enter 'n' and confirm that the prompt for the subsequent secret appears immediately, with no fetch delay.\n\n2.  **Unit/Integration Testing:**\n    *   Modify the existing test suite for the interactive grant command.\n    *   Utilize a mocked `SecretProvider` that includes a counter or flag to track invocations of its `Fetch` method.\n    *   Create a test case that simulates a user denying a grant (e.g., inputting 'n'). Assert that the mock provider's `Fetch` method was **not** called.\n    *   Create another test case that simulates a user approving a grant (e.g., inputting 'y'). Assert that the mock provider's `Fetch` method **was** called exactly once.",
         "status": "done",
         "dependencies": [
-          71,
-          11
+          "71",
+          "11"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 73,
+        "id": "73",
         "title": "Ensure Leases are Revoked Correctly After System Wake-up",
         "description": "Fix a bug where leases that expire while a computer is asleep or powered off are not revoked upon system wake-up. This task will implement a mechanism to check for and revoke expired leases when the system becomes active again.",
         "details": "The current lease expiration mechanism fails if the system is not running when a lease's expiration time is reached. This task will introduce a robust check that triggers on system startup or wake-up from sleep/hibernate.\n\n**Implementation Plan:**\n\n1.  **Create a New Internal Command:**\n    *   Implement a new, non-interactive command, e.g., `env-lease internal --check-expired`.\n    *   This command will read the application's lease state file.\n    *   It will iterate through all active leases and compare their expiration timestamp with the current time.\n    *   For each lease that has expired, it will trigger the standard revocation logic.\n    *   The command should execute silently on success and only log errors (e.g., network failure during revocation).\n\n2.  **Platform-Specific Wake-up Triggers:**\n    *   The core of the solution is to run the new command automatically after the system wakes up. This requires platform-specific configuration.\n    *   **macOS:** Use `launchd`. A `.plist` file will be created to run the command. It can be triggered by the `RunAtLoad` key (for startup) and by listening for wake notifications. Documentation should be provided for users to place this file in `~/Library/LaunchAgents`.\n    *   **Linux:** Use `systemd`. A user service unit file (`.service`) will be created. The service will be configured to run after targets like `suspend.target` and `hibernate.target` by using `After=suspend.target hibernate.target` and `WantedBy=suspend.target hibernate.target`.\n    *   **Windows:** Use the Task Scheduler. A task can be configured to run the command on specific system events, such as Event ID 1 from the `Power-Troubleshooter` source, which indicates the system has resumed from a low-power state.\n\n3.  **Documentation:**\n    *   Update the project documentation with clear instructions on how to set up these platform-specific triggers for the new functionality.",
@@ -1630,7 +1704,7 @@
         "subtasks": []
       },
       {
-        "id": 74,
+        "id": "74",
         "title": "Create example of --interactive",
         "description": "The --interactive argument does not seem to be documented",
         "details": "",
@@ -1641,7 +1715,7 @@
         "subtasks": []
       },
       {
-        "id": 75,
+        "id": "75",
         "title": "Integrate beeep library for notifications",
         "description": "Use the beeep library for cross-platform notifications. More info at github.com/gen2brain/beeep",
         "details": "",
@@ -1652,7 +1726,7 @@
         "subtasks": []
       },
       {
-        "id": 76,
+        "id": "76",
         "title": "Add daemon status command",
         "description": "Create an `env-lease daemon status` command. This command should be similar to the existing `idle status` command, focusing on checking if the OS-specific service (e.g., plist on macOS) is installed.",
         "status": "done",
@@ -1663,14 +1737,14 @@
         "subtasks": []
       },
       {
-        "id": 77,
+        "id": "77",
         "title": "Make 'destination' optional for file-based leases",
         "description": "Update the configuration parsing logic to make the 'destination' field optional for leases with 'lease_type = file'. When omitted, the destination filename will be automatically derived from the 'source' field. This task is tracked by GitHub issue #11.",
         "status": "done",
         "dependencies": [
-          2,
-          4,
-          6
+          "2",
+          "4",
+          "6"
         ],
         "priority": "medium",
         "details": "The current implementation requires a 'destination' for all file-based leases. This change will improve user experience by inferring the filename from the source URI when the destination is not specified. The modification should be made in the configuration parsing module. After parsing the 'env-lease.toml' file, iterate through the leases. For any lease where 'lease_type' is 'file' and the 'destination' field is empty, populate the destination by taking the base name of the source path. For example, a source of 'op+file://app-iac container env/container_env.json' should result in a destination of 'container_env.json'. Similarly, 'op://devops/app/db_pass' should result in 'db_pass'. The standard library's 'path.Base()' function should be suitable for this extraction. This logic must only apply to file leases and should not affect leases where the destination is explicitly provided.\n\n**Issue Tracking:**\nThis task is tracked by GitHub issue #11. When committing your changes, please include 'Closes #11' in your commit message.",
@@ -1678,13 +1752,13 @@
         "subtasks": []
       },
       {
-        "id": 78,
+        "id": "78",
         "title": "Restrict File Lease Destination to Project Root Directory",
         "description": "Implement a security check to ensure that for file-based leases, the destination path is within the project's root directory where `env-lease.toml` resides. Add a flag to allow overriding this behavior. This task is tracked by GitHub issue #12.",
         "status": "done",
         "dependencies": [
-          2,
-          11
+          "2",
+          "11"
         ],
         "priority": "medium",
         "details": "This task enhances security by default, preventing file-based leases from writing to arbitrary locations on the filesystem. The 'project root' is defined as the directory containing the `env-lease.toml` file being processed. The validation logic must be integrated into the `env-lease grant` command. A new boolean flag, `--destination-outside-root`, will be added to the `grant` command to bypass this check when explicitly required. When the `grant` command is executed, it will first determine the absolute path of the configuration file's directory. Then, for each lease of `lease_type = \"file\"`, it will resolve the absolute path of the `destination`. If the destination path is not a subpath of the project root directory and the `--destination-outside-root` flag is not set, the command must exit with a non-zero status code and print an informative error message.\n\nWhen committing changes for this task, please include 'Closes #12' in the commit message.",
@@ -1697,7 +1771,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -1706,7 +1781,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -1715,7 +1791,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -1724,7 +1801,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -1733,7 +1811,8 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -1742,91 +1821,157 @@
             "status": "done",
             "dependencies": [],
             "details": "",
-            "testStrategy": ""
+            "testStrategy": "",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": 79,
+        "id": "79",
         "title": "Fix `revoke --interactive` to Work with `--all` Flag",
         "description": "Modify the `revoke` command to correctly handle the `--interactive` flag when used in conjunction with the `--all` flag, allowing users to selectively revoke leases from a global list.",
         "details": "Currently, when `env-lease revoke --all --interactive` is executed, the `--all` flag takes precedence and revokes all active leases non-interactively, ignoring the `--interactive` flag. This task involves modifying the command's logic to combine these flags correctly. The command should first fetch the complete list of all active leases (the same list used by `--all`). This list should then be presented to the user in an interactive selection prompt. Based on the user's selection, a `RevokeRequest` should be sent to the daemon containing only the leases the user chose to revoke. If the user cancels or selects no leases, no revocation should occur.",
         "testStrategy": "Testing requires a setup with at least two separate projects with distinct leases. First, grant leases for both projects to create a global lease state. 1. Run `env-lease revoke --all --interactive`. Verify the interactive prompt lists leases from *both* projects. Select one lease from each project and confirm. Use `env-lease status` to verify that only the selected leases were revoked. 2. Run `env-lease revoke --all --interactive` again, but this time cancel the operation or select no leases. Use `env-lease status` to confirm that no leases were revoked. 3. Perform a regression test by running `env-lease revoke --interactive` (without `--all`) inside one project directory and confirm it only shows leases for that project. 4. Perform another regression test by running `env-lease revoke --all` (without `--interactive`) and confirm it revokes all remaining leases without a prompt.",
         "status": "done",
         "dependencies": [
-          12,
-          37
+          "12",
+          "37"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 80,
+        "id": "80",
         "title": "Correctly Set Project Root from --config Flag Path",
         "description": "Fix a bug where commands using the --config flag incorrectly use the current working directory as the project root instead of the directory containing the specified configuration file.",
         "details": "When a user runs a command like `env-lease grant --config /path/to/project/env-lease.toml` from a different directory, the application currently uses the present working directory (PWD) to resolve relative paths and identify the project. The correct behavior is to use the directory of the specified config file (`/path/to/project/`) as the project root. This change requires modifying the initial configuration loading logic shared by commands like `grant`, `revoke`, and `status`. The logic must resolve the absolute path of the file provided to the `--config` flag and then use its parent directory as the authoritative project root for all subsequent operations, including resolving relative paths for file leases.",
         "testStrategy": "Create an automated integration test. The test should set up a directory structure like `/tmp/test-project/` with a config file at `/tmp/test-project/env-lease.toml`. This config file should define a file-based lease with a relative destination, e.g., `destination = \"output.txt\"`. The test will then change the current directory to `/tmp` and execute `env-lease grant --config /tmp/test-project/env-lease.toml`. Verify that the lease file `output.txt` is created at `/tmp/test-project/output.txt`, not `/tmp/output.txt`. Similarly, run `env-lease status --config /tmp/test-project/env-lease.toml` from `/tmp` and confirm it correctly reports the status for that project.",
         "status": "done",
         "dependencies": [
-          2,
-          11,
-          12,
-          13
+          "2",
+          "11",
+          "12",
+          "13"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 82,
+        "id": "82",
         "title": "Support Configuration via ENV_LEASE_NAME and ENV_LEASE_CONFIG",
         "description": "Implement support for two new environment variables, `ENV_LEASE_CONFIG` and `ENV_LEASE_NAME`, to provide more flexible ways of specifying the configuration file location and name.",
         "details": "This task introduces two environment variables to control how the application finds its configuration file. The logic must be implemented in the shared configuration loading module to ensure all commands (grant, revoke, status, etc.) inherit this behavior. A clear order of precedence must be established: 1. The `--config` command-line flag (as implemented in Task 81) takes highest priority. 2. If `--config` is not used, the `ENV_LEASE_CONFIG` variable is checked. If set, it is treated as the absolute or relative path to the configuration file. 3. If `ENV_LEASE_CONFIG` is not set, the `ENV_LEASE_NAME` variable is checked. If set, the application will look for a file with this name in the current directory. 4. If none of the above are provided, the application falls back to the default behavior of looking for `env-lease.toml` in the current directory. The logic must also correctly integrate with the project root detection from Task 80, meaning if `ENV_LEASE_CONFIG` is used, the directory containing that file becomes the project root.",
         "testStrategy": "A comprehensive integration test suite is required to verify the precedence logic. 1. Test `ENV_LEASE_CONFIG`: Set `ENV_LEASE_CONFIG` to `/tmp/test-config.toml`. Create this file and a default `env-lease.toml` in the CWD. Run `env-lease status` and verify it loads `/tmp/test-config.toml`. 2. Test `ENV_LEASE_NAME`: Unset `ENV_LEASE_CONFIG` and set `ENV_LEASE_NAME=custom.toml`. Create `custom.toml` in the CWD. Run `env-lease status` and verify `custom.toml` is loaded. 3. Test Precedence (ENV_LEASE_CONFIG over ENV_LEASE_NAME): Set both variables pointing to different files. Verify that the file specified by `ENV_LEASE_CONFIG` is used. 4. Test Precedence (`--config` over ENV): Set `ENV_LEASE_CONFIG` and also provide a `--config` flag pointing to a third file. Verify the file from the `--config` flag is used. 5. Test Project Root Integration: Use `ENV_LEASE_CONFIG` to point to a config file in a subdirectory that defines a relative file lease. Run `env-lease grant` and verify the secret file is created relative to the config file's location, not the CWD.",
         "status": "done",
         "dependencies": [
-          2,
-          80
+          "2",
+          "80"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 83,
+        "id": "83",
         "title": "Add `revoke_format` Configuration Option for Leases",
         "description": "Introduce a new `revoke_format` configuration option for file-based leases. This will allow users to specify the exact format of a variable in the destination file after it has been revoked, such as setting it to an empty string.",
         "details": "This task involves adding a new optional field, `revoke_format`, to the `[[lease]]` configuration block in `env-lease.toml`. When a lease is revoked, the system will check for this field. If `revoke_format` is present, its value (a template string like `\"{{ .Name }}=\"`) will be used to render the output in the destination file. If the field is absent, the system will revert to the default behavior of removing the corresponding line from the file entirely. This logic must be implemented within the daemon's lease revocation handler. The change needs to be compatible with all existing revoke mechanisms, including project-scoped revocation, `revoke --all`, and interactive revocation.",
         "testStrategy": "Testing should cover both the new functionality and the preservation of existing behavior. 1. **New Behavior:** Configure a lease with `revoke_format = \"{{ .Name }}=REVOKED\"`. Grant the lease and verify the file content. Then, run `env-lease revoke` and assert that the destination file now contains the line `VAR_NAME=REVOKED`. 2. **Default Behavior:** Configure a lease without the `revoke_format` field. Grant the lease, then revoke it. Verify that the corresponding line is completely removed from the destination file. 3. **Multi-Project Test:** Create two projects, one with `revoke_format` and one without. Grant leases for both. Run `env-lease revoke --all` and verify that each destination file is updated according to its respective configuration.",
         "status": "pending",
         "dependencies": [
-          12,
-          37,
-          79,
-          80,
-          82
+          "12",
+          "37",
+          "79",
+          "80",
+          "82"
         ],
         "priority": "medium",
         "subtasks": []
       },
       {
-        "id": 84,
+        "id": "84",
         "title": "Support Local Override Configuration File (`env-lease.local.toml`)",
         "description": "Implement support for a local override file, `env-lease.local.toml`, to supplement and override configurations from the primary `env-lease.toml`. This allows users to maintain local-specific settings without modifying the main, potentially version-controlled, configuration file.",
         "details": "The core configuration loading logic needs to be updated to automatically detect and merge a local override file. After successfully locating and parsing the primary configuration file (e.g., `env-lease.toml`), the system should check for a corresponding local file. The local file's name will be derived from the primary file's name by inserting `.local` before the extension (e.g., `env-lease.local.toml` for `env-lease.toml`, or `custom.local.toml` for `custom.toml`).\n\nIf a local file is found, its contents should be merged with the primary configuration. The merge strategy should be as follows: simple key-value pairs in the local file will override those from the primary file. For lists of tables, such as `[[secret]]` or `[[lease]]`, the list from the local file should be appended to the list from the primary file. This allows users to both add new secrets/leases and override global settings locally.\n\nThis feature should integrate seamlessly with existing configuration discovery methods:\n- If `--config /path/to/my-config.toml` is used, the system will look for `/path/to/my-config.local.toml`.\n- If `ENV_LEASE_CONFIG` is set, the same naming logic applies to the specified file path.\n\nFor this initial implementation, no new command-line flags (`--local-config`) or environment variables (`ENV_LEASE_LOCAL_CONFIG`) will be introduced; the discovery is purely conventional and automatic.",
         "testStrategy": "A suite of integration tests should be created to validate the merging logic and its interaction with existing configuration flags. \n1. **Basic Override**: Create an `env-lease.toml` with a global setting (e.g., a default duration) and a `[[secret]]`. Create an `env-lease.local.toml` that overrides the global setting and adds a new `[[secret]]`. Load the configuration and verify that the global setting is overridden and that the final list of secrets contains entries from both files.\n2. **No Local File**: Run a command like `env-lease status` in a project with only an `env-lease.toml`. Verify that the application functions correctly without any errors.\n3. **Interaction with `--config`**: Create a directory `/tmp/test-project/` containing `custom.toml` and `custom.local.toml`. From a different directory, run `env-lease status --config /tmp/test-project/custom.toml` and verify that the configurations from both files are correctly merged.\n4. **Interaction with `ENV_LEASE_CONFIG`**: Repeat the test from step 3, but instead of using the `--config` flag, set the `ENV_LEASE_CONFIG` environment variable to point to `/tmp/test-project/custom.toml` and verify the same outcome.\n5. **Empty Local File**: Test the behavior when an empty `env-lease.local.toml` exists. The application should run without error and load only the configuration from the primary file.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          2,
-          80,
-          82
+          "2",
+          "80",
+          "82"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2025-10-13T10:07:33.156Z"
+      },
+      {
+        "id": "85",
+        "title": "Implement Bulk Secret Fetching with `op inject` for 1Password Provider",
+        "description": "Refactor the 1Password provider to use the `op inject` command for fetching multiple `op://` secrets in a single operation, improving performance. The implementation must handle `op+file://` secrets separately, as they are not supported by `op inject` and require individual fetching.",
+        "status": "pending",
+        "dependencies": [
+          "11"
+        ],
+        "priority": "medium",
+        "details": "The current 1Password provider fetches secrets individually. This task will introduce a hybrid approach. The grant logic will be updated to partition 1Password secrets into two groups: standard `op://` references and custom `op+file://` references. A new `FetchBulk` method will be implemented for the 1Password provider to handle the `op://` secrets. This method will generate a template for `op inject`, execute the command once, and parse the output. The `op+file://` secrets will continue to be fetched individually using the existing mechanism. The results from both methods will be merged before being returned. Providers that do not support bulk fetching will continue to use the single-fetch mechanism as a fallback.",
+        "testStrategy": "1. Create unit tests for the new `FetchBulk` method, ensuring it correctly processes only `op://` URIs and ignores others. Use a mocked `os/exec` interface to simulate `op inject`'s output. 2. Write an integration test for the `grant` command using a configuration file with a mix of `op://` and `op+file://` 1Password secrets. 3. Assert that all secrets, regardless of their URI scheme, are correctly fetched and populated. 4. Add a test case with a mix of 1Password secrets and another provider's secrets to ensure the provider-grouping and fallback logic functions correctly.",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Partition 1Password Secrets by URI Scheme",
+            "description": "Update the grant logic to differentiate between `op://` and `op+file://` secrets for the 1Password provider.",
+            "dependencies": [],
+            "details": "In the main grant processing loop, before fetching secrets for the 1Password provider, iterate through the list of requested secrets. Create two separate lists: one for secrets with the `op://` scheme and another for those with the `op+file://` scheme. This partitioning is essential for routing them to the correct fetching mechanism.",
+            "status": "pending",
+            "testStrategy": "Unit test the partitioning logic with various inputs, including lists with only one type of secret, a mix of both, and an empty list.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 2,
+            "title": "Implement `FetchBulk` Method for `op://` Secrets",
+            "description": "Create the `FetchBulk` method on the 1Password provider that uses `op inject` to fetch multiple secrets.",
+            "dependencies": [
+              1
+            ],
+            "details": "This method will accept a list of `op://` secret URIs. It will dynamically generate a template string for the `op inject` command (e.g., `SECRET_1=\"{{ op://... }}\"\nSECRET_2=\"{{ op://... }}\"`). It will then execute `op inject`, parse the resulting environment variable-style output, and return a map of secret aliases to their values.",
+            "status": "pending",
+            "testStrategy": "Unit test this method extensively using a mocked `os/exec` interface. Test correct template generation, successful output parsing, and handling of errors from the `op inject` command.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 3,
+            "title": "Integrate Bulk and Individual Fetching",
+            "description": "Combine the results from the new `FetchBulk` method and the existing individual fetch method for `op+file://` secrets.",
+            "dependencies": [
+              2
+            ],
+            "details": "After partitioning the secrets in the grant logic, call the new `FetchBulk` method with the `op://` list. Then, loop through the `op+file://` list and call the existing single-fetch method for each. Finally, merge the two resulting maps of secrets into a single map to be returned by the grant function.",
+            "status": "pending",
+            "testStrategy": "This will be primarily tested via integration tests. Unit tests can be added to verify the map merging logic specifically.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 4,
+            "title": "Update Integration Tests for `grant` Command",
+            "description": "Modify existing integration tests or create new ones to validate the hybrid fetching approach.",
+            "dependencies": [
+              3
+            ],
+            "details": "Create a test configuration file that defines multiple 1Password secrets, including at least two `op://` secrets and one `op+file://` secret. The integration test should run the `grant` command against this configuration and verify that all secrets are correctly resolved and available in the environment.",
+            "status": "pending",
+            "testStrategy": "The test will execute the `grant` command as a subprocess and inspect its output or the resulting environment to confirm the presence and correctness of all secrets defined in the test configuration.",
+            "parentId": "undefined"
+          }
+        ]
       }
     ],
     "metadata": {
-      "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-13T05:41:54.581Z",
-      "description": "Tasks for master context"
+      "version": "1.0.0",
+      "lastModified": "2025-10-13T10:07:33.157Z",
+      "taskCount": 83,
+      "completedCount": 75,
+      "tags": [
+        "master"
+      ]
     }
   }
 }

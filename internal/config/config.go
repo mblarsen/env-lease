@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -37,22 +38,18 @@ type Lease struct {
 
 // Load reads a TOML file from the given path, validates it, and returns a Config struct.
 func Load(path string) (*Config, error) {
-	var rawConfig struct {
-		Lease []struct {
-			Source      string   `toml:"source"`
-			Destination string   `toml:"destination"`
-			Duration    string   `toml:"duration"`
-			LeaseType   string   `toml:"lease_type"`
-			Variable    string   `toml:"variable"`
-			Format      string   `toml:"format"`
-			Transform   []string `toml:"transform"`
-			Encoding    string   `toml:"encoding"` // Keep for backward compatibility
-			FileMode    string   `toml:"file_mode"`
-			OpAccount   string   `toml:"op_account"`
-		} `toml:"lease"`
+	return loadAndMerge(path, 0)
+}
+
+func loadAndMerge(path string, depth int) (*Config, error) {
+	if depth > 10 {
+		return nil, fmt.Errorf("max include depth exceeded")
 	}
 
-	var err error
+	var rawConfig struct {
+		Lease []Lease `toml:"lease"`
+	}
+
 	absPath, err := filepath.Abs(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not get absolute path for config: %w", err)
@@ -68,57 +65,47 @@ func Load(path string) (*Config, error) {
 	}
 
 	if _, err := toml.DecodeFile(absPath, &rawConfig); err != nil {
+		// Ignore file not found errors for local overrides, which are optional
+		if os.IsNotExist(err) && depth > 0 {
+			return nil, nil
+		}
 		return nil, err
 	}
 
-	var config Config
-	config.Lease = make([]Lease, len(rawConfig.Lease))
-	config.Root = filepath.Dir(absPath)
+	config := Config{
+		Lease: rawConfig.Lease,
+		Root:  filepath.Dir(absPath),
+	}
 
-	for i, rawLease := range rawConfig.Lease {
-		expandedDest, err := fileutil.ExpandPath(rawLease.Destination)
+	for i := range config.Lease {
+		lease := &config.Lease[i]
+		expandedDest, err := fileutil.ExpandPath(lease.Destination)
 		if err != nil {
 			return nil, fmt.Errorf("lease %d: could not expand destination path: %w", i, err)
 		}
-
-		config.Lease[i] = Lease{
-			Source:      rawLease.Source,
-			Destination: expandedDest,
-			Duration:    rawLease.Duration,
-			LeaseType:   rawLease.LeaseType,
-			Variable:    rawLease.Variable,
-			Format:      rawLease.Format,
-			Transform:   rawLease.Transform,
-			FileMode:    rawLease.FileMode,
-			OpAccount:   rawLease.OpAccount,
-		}
+		lease.Destination = expandedDest
 
 		// Backward compatibility for encoding
-		if len(config.Lease[i].Transform) == 0 && rawLease.Encoding == "base64" {
-			config.Lease[i].Transform = []string{"base64-encode"}
+		if len(lease.Transform) == 0 && lease.Format == "base64" {
+			lease.Transform = []string{"base64-encode"}
 		}
 
 		// Set default lease type
-		if config.Lease[i].LeaseType == "" {
-			config.Lease[i].LeaseType = "env"
+		if lease.LeaseType == "" {
+			lease.LeaseType = "env"
 		}
 
 		// Validate required fields
-		lease := &config.Lease[i]
 		if lease.Source == "" {
 			return nil, fmt.Errorf("lease %d: source is required", i)
 		}
 
-		if lease.LeaseType == "env" {
-			if lease.Destination == "" {
-				return nil, fmt.Errorf("lease %d: destination is required for lease_type '%s'", i, lease.LeaseType)
-			}
+		if lease.LeaseType == "env" && lease.Destination == "" {
+			return nil, fmt.Errorf("lease %d: destination is required for lease_type '%s'", i, lease.LeaseType)
 		}
 
-		if lease.LeaseType == "file" {
-			if lease.Destination == "" {
-				lease.Destination = filepath.Base(lease.Source)
-			}
+		if lease.LeaseType == "file" && lease.Destination == "" {
+			lease.Destination = filepath.Base(lease.Source)
 		}
 
 		isExplode := false
@@ -134,7 +121,72 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
-	return &config, nil
+	// Load local override file
+	localPath := localOverridePath(absPath)
+	localConfig, err := loadAndMerge(localPath, depth+1)
+	if err != nil {
+		return nil, fmt.Errorf("could not load local config: %w", err)
+	}
+	mergedConfig := mergeConfigs(&config, localConfig)
+	return &mergedConfig, nil
+}
+
+func mergeConfigs(base, override *Config) Config {
+	if override == nil {
+		return *base
+	}
+
+	merged := *base
+
+	// Merge simple fields by overriding
+	valBase := reflect.ValueOf(&merged).Elem()
+	valOverride := reflect.ValueOf(override).Elem()
+
+	for i := 0; i < valOverride.NumField(); i++ {
+		field := valOverride.Type().Field(i)
+		if field.Name == "Lease" || field.Name == "Root" {
+			continue
+		}
+
+		valOverrideField := valOverride.Field(i)
+		if valOverrideField.IsValid() && !isZero(valOverrideField) {
+			valBase.FieldByName(field.Name).Set(valOverrideField)
+		}
+	}
+
+	// Append leases
+	merged.Lease = append(merged.Lease, override.Lease...)
+
+	return merged
+}
+
+func isZero(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.Func, reflect.Map, reflect.Slice:
+		return v.IsNil()
+	case reflect.Array:
+		z := true
+		for i := 0; i < v.Len(); i++ {
+			z = z && isZero(v.Index(i))
+		}
+		return z
+	case reflect.Struct:
+		z := true
+		for i := 0; i < v.NumField(); i++ {
+			z = z && isZero(v.Field(i))
+		}
+		return z
+	}
+	// Compare other types directly:
+	z := reflect.Zero(v.Type())
+	return v.Interface() == z.Interface()
+}
+
+func localOverridePath(basePath string) string {
+	dir := filepath.Dir(basePath)
+	ext := filepath.Ext(basePath)
+	baseName := strings.TrimSuffix(filepath.Base(basePath), ext)
+	return filepath.Join(dir, fmt.Sprintf("%s.local%s", baseName, ext))
 }
 
 // ResolveConfigFile determines the configuration file path based on a predefined
