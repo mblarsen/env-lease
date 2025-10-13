@@ -1789,11 +1789,43 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 83,
+        "title": "Add `revoke_format` Configuration Option for Leases",
+        "description": "Introduce a new `revoke_format` configuration option for file-based leases. This will allow users to specify the exact format of a variable in the destination file after it has been revoked, such as setting it to an empty string.",
+        "details": "This task involves adding a new optional field, `revoke_format`, to the `[[lease]]` configuration block in `env-lease.toml`. When a lease is revoked, the system will check for this field. If `revoke_format` is present, its value (a template string like `\"{{ .Name }}=\"`) will be used to render the output in the destination file. If the field is absent, the system will revert to the default behavior of removing the corresponding line from the file entirely. This logic must be implemented within the daemon's lease revocation handler. The change needs to be compatible with all existing revoke mechanisms, including project-scoped revocation, `revoke --all`, and interactive revocation.",
+        "testStrategy": "Testing should cover both the new functionality and the preservation of existing behavior. 1. **New Behavior:** Configure a lease with `revoke_format = \"{{ .Name }}=REVOKED\"`. Grant the lease and verify the file content. Then, run `env-lease revoke` and assert that the destination file now contains the line `VAR_NAME=REVOKED`. 2. **Default Behavior:** Configure a lease without the `revoke_format` field. Grant the lease, then revoke it. Verify that the corresponding line is completely removed from the destination file. 3. **Multi-Project Test:** Create two projects, one with `revoke_format` and one without. Grant leases for both. Run `env-lease revoke --all` and verify that each destination file is updated according to its respective configuration.",
+        "status": "pending",
+        "dependencies": [
+          12,
+          37,
+          79,
+          80,
+          82
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 84,
+        "title": "Support Local Override Configuration File (`env-lease.local.toml`)",
+        "description": "Implement support for a local override file, `env-lease.local.toml`, to supplement and override configurations from the primary `env-lease.toml`. This allows users to maintain local-specific settings without modifying the main, potentially version-controlled, configuration file.",
+        "details": "The core configuration loading logic needs to be updated to automatically detect and merge a local override file. After successfully locating and parsing the primary configuration file (e.g., `env-lease.toml`), the system should check for a corresponding local file. The local file's name will be derived from the primary file's name by inserting `.local` before the extension (e.g., `env-lease.local.toml` for `env-lease.toml`, or `custom.local.toml` for `custom.toml`).\n\nIf a local file is found, its contents should be merged with the primary configuration. The merge strategy should be as follows: simple key-value pairs in the local file will override those from the primary file. For lists of tables, such as `[[secret]]` or `[[lease]]`, the list from the local file should be appended to the list from the primary file. This allows users to both add new secrets/leases and override global settings locally.\n\nThis feature should integrate seamlessly with existing configuration discovery methods:\n- If `--config /path/to/my-config.toml` is used, the system will look for `/path/to/my-config.local.toml`.\n- If `ENV_LEASE_CONFIG` is set, the same naming logic applies to the specified file path.\n\nFor this initial implementation, no new command-line flags (`--local-config`) or environment variables (`ENV_LEASE_LOCAL_CONFIG`) will be introduced; the discovery is purely conventional and automatic.",
+        "testStrategy": "A suite of integration tests should be created to validate the merging logic and its interaction with existing configuration flags. \n1. **Basic Override**: Create an `env-lease.toml` with a global setting (e.g., a default duration) and a `[[secret]]`. Create an `env-lease.local.toml` that overrides the global setting and adds a new `[[secret]]`. Load the configuration and verify that the global setting is overridden and that the final list of secrets contains entries from both files.\n2. **No Local File**: Run a command like `env-lease status` in a project with only an `env-lease.toml`. Verify that the application functions correctly without any errors.\n3. **Interaction with `--config`**: Create a directory `/tmp/test-project/` containing `custom.toml` and `custom.local.toml`. From a different directory, run `env-lease status --config /tmp/test-project/custom.toml` and verify that the configurations from both files are correctly merged.\n4. **Interaction with `ENV_LEASE_CONFIG`**: Repeat the test from step 3, but instead of using the `--config` flag, set the `ENV_LEASE_CONFIG` environment variable to point to `/tmp/test-project/custom.toml` and verify the same outcome.\n5. **Empty Local File**: Test the behavior when an empty `env-lease.local.toml` exists. The application should run without error and load only the configuration from the primary file.",
+        "status": "pending",
+        "dependencies": [
+          2,
+          80,
+          82
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-09-21T13:04:46.205Z",
-      "updated": "2025-10-10T06:50:39.403Z",
+      "updated": "2025-10-13T05:41:54.581Z",
       "description": "Tasks for master context"
     }
   }
