@@ -45,6 +45,132 @@ func (e *GrantErrors) Error() string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
+func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, projectRoot string, absConfigFile string, interactive bool, errs *[]grantError, continueOnError bool) ([]ipc.Lease, []string, error) {
+	// Duration validation
+	duration, err := time.ParseDuration(l.Duration)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
+	}
+	if duration > 12*time.Hour {
+		slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
+	}
+
+	// Set default format
+	if l.Format == "" {
+		switch filepath.Base(l.Destination) {
+		case ".envrc":
+			l.Format = "export %s=%q"
+		case ".env":
+			l.Format = "%s=%q"
+		default:
+			if l.LeaseType == "env" {
+				return nil, nil, fmt.Errorf("lease for '%s' has no format specified", l.Destination)
+			}
+		}
+	}
+
+	// Handle result: could be a single string or exploded data
+	var approvedLeases []ipc.Lease
+	var approvedShellCommands []string
+
+	// Pre-determine the prompt string
+	isExplode := false
+	for _, t := range l.Transform {
+		if strings.HasPrefix(t, "explode") {
+			isExplode = true
+			break
+		}
+	}
+
+	var prompt string
+	if isExplode {
+		prompt = fmt.Sprintf("Grant leases from '%s'?", l.Source)
+	} else if l.Variable == "" {
+		prompt = fmt.Sprintf("Grant lease for '%s'?", l.Source)
+	} else {
+		prompt = fmt.Sprintf("Grant lease for '%s'?", l.Variable)
+	}
+
+	if !interactive || confirm(prompt) {
+		// Fetch secret if not already fetched
+		if secretVal == "" {
+			slog.Info("Fetching secret", "source", l.Source)
+			var p provider.SecretProvider
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: l.OpAccount}
+			}
+			secretVal, err = p.Fetch(l.Source)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to fetch secret: %w", err)
+			}
+			slog.Info("Fetched secret", "source", l.Source)
+		}
+
+		// Run transform pipeline
+		var transformResult interface{} = secretVal
+		if len(l.Transform) > 0 {
+			pipeline, err := transform.NewPipeline(l.Transform)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create transform pipeline: %w", err)
+			}
+			transformResult, err = pipeline.Run(secretVal)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to transform secret: %w", err)
+			}
+		}
+
+		switch result := transformResult.(type) {
+		case string:
+			// SINGLE LEASE CASE
+			finalLeases, sc, err := processLease(cmd, l, result, projectRoot, absConfigFile)
+			if err != nil {
+				return nil, nil, err
+			}
+			approvedLeases = append(approvedLeases, finalLeases...)
+			approvedShellCommands = append(approvedShellCommands, sc...)
+
+		case transform.ExplodedData:
+			// EXPLODED LEASE CASE
+			if l.LeaseType == "file" {
+				return nil, nil, fmt.Errorf("'explode' transform cannot be used with lease_type 'file'")
+			}
+
+			// Add a parent/container lease for the status command to find
+			parentLeaseConfig := l
+			parentLeaseConfig.Variable = "" // No single variable for the parent
+			parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", projectRoot, absConfigFile)
+			if err != nil {
+				return nil, nil, err
+			}
+			approvedLeases = append(approvedLeases, parentLeases...)
+			uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
+
+			// Process all the child leases
+			for key, value := range result {
+				if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", key)) {
+					explodedLeaseConfig := l
+					explodedLeaseConfig.Variable = key
+					explodedLeaseConfig.ParentSource = uniqueParentID
+
+					finalLeases, sc, err := processLease(cmd, explodedLeaseConfig, value, projectRoot, absConfigFile)
+					if err != nil {
+						*errs = append(*errs, grantError{Source: key, Err: err})
+						if !continueOnError {
+							return nil, nil, err
+						}
+						continue
+					}
+					approvedLeases = append(approvedLeases, finalLeases...)
+					approvedShellCommands = append(approvedShellCommands, sc...)
+				}
+			}
+		}
+	}
+	return approvedLeases, approvedShellCommands, nil
+}
+
 var grantCmd = &cobra.Command{
 	Use:   "grant",
 	Short: "Grant all leases defined in env-lease.toml.",
@@ -94,167 +220,103 @@ This can be overridden with the --destination-outside-root flag.`,
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 		var errs []grantError
 		var shellCommands []string
-		var p provider.SecretProvider
 		leases := make([]ipc.Lease, 0, len(cfg.Lease))
-		var finalLeases []ipc.Lease
-		var sc []string
 
+		// Group leases by provider
+		leasesByProvider := make(map[string][]config.Lease)
 		for _, l := range cfg.Lease {
-			// Provider setup
+			leasesByProvider[l.Provider] = append(leasesByProvider[l.Provider], l)
+		}
+
+		for providerName, providerLeases := range leasesByProvider {
+			var p provider.SecretProvider
 			if os.Getenv("ENV_LEASE_TEST") == "1" {
 				p = &provider.MockProvider{}
 			} else {
-				p = &provider.OnePasswordCLI{Account: l.OpAccount}
+				// This assumes all leases for a provider share the same account config.
+				// A more robust implementation might handle account variations.
+				p = &provider.OnePasswordCLI{Account: providerLeases[0].OpAccount}
 			}
 
-			// Duration validation
-			duration, err := time.ParseDuration(l.Duration)
-			if err != nil {
-				errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("invalid duration '%s': %w", l.Duration, err)})
-				if !continueOnError {
-					break
-				}
-				continue
-			}
-			if duration > 12*time.Hour {
-				slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
-			}
+			// Bulk fetching logic
+			if bulkProvider, ok := p.(provider.BulkSecretProvider); ok {
+				opSources := make(map[string]string)
+				opFileSources := make(map[string]config.Lease)
 
-			// Set default format
-			if l.Format == "" {
-				switch filepath.Base(l.Destination) {
-				case ".envrc":
-					l.Format = "export %s=%q"
-				case ".env":
-					l.Format = "%s=%q"
-				default:
-					if l.LeaseType == "env" {
-						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("lease for '%s' has no format specified", l.Destination)})
-						if !continueOnError {
-							break
-						}
-						continue
+				for _, l := range providerLeases {
+					if strings.HasPrefix(l.Source, "op://") {
+						opSources[l.Variable] = l.Source
+					} else {
+						opFileSources[l.Variable] = l
 					}
 				}
-			}
 
-			// Handle result: could be a single string or exploded data
-			var approvedLeases []ipc.Lease
-			var approvedShellCommands []string
-
-			// Pre-determine the prompt string
-			isExplode := false
-			for _, t := range l.Transform {
-				if strings.HasPrefix(t, "explode") {
-					isExplode = true
-					break
-				}
-			}
-
-			var prompt string
-			if isExplode {
-				prompt = fmt.Sprintf("Grant leases from '%s'?", l.Source)
-			} else if l.Variable == "" {
-				prompt = fmt.Sprintf("Grant lease for '%s'?", l.Source)
-			} else {
-				prompt = fmt.Sprintf("Grant lease for '%s'?", l.Variable)
-			}
-
-			if !interactive || confirm(prompt) {
-				// Fetch secret
-				slog.Info("Fetching secret", "source", l.Source)
-				secretVal, err := p.Fetch(l.Source)
-				if err != nil {
-					errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to fetch secret: %w", err)})
-					if !continueOnError {
-						break
-					}
-					continue
-				}
-				slog.Info("Fetched secret", "source", l.Source)
-				// Run transform pipeline
-				var transformResult interface{} = secretVal
-				if len(l.Transform) > 0 {
-					pipeline, err := transform.NewPipeline(l.Transform)
+				// Fetch op:// secrets in bulk
+				if len(opSources) > 0 {
+					slog.Info("Fetching secrets in bulk", "provider", providerName, "count", len(opSources))
+					bulkSecrets, err := bulkProvider.FetchBulk(opSources)
 					if err != nil {
-						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to create transform pipeline: %w", err)})
+						errs = append(errs, grantError{Source: "bulk fetch", Err: err})
 						if !continueOnError {
-							break
+							return &GrantErrors{errs: errs}
 						}
-						continue
 					}
-					transformResult, err = pipeline.Run(secretVal)
-					if err != nil {
-						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("failed to transform secret: %w", err)})
-						if !continueOnError {
-							break
-						}
-						continue
-					}
-				}
+					slog.Info("Fetched secrets in bulk", "provider", providerName, "count", len(bulkSecrets))
 
-				switch result := transformResult.(type) {
-				case string:
-					// SINGLE LEASE CASE
-					finalLeases, sc, err = processLease(cmd, l, result, cfg.Root, absConfigFile)
-					if err != nil {
-						errs = append(errs, grantError{Source: l.Source, Err: err})
-						if !continueOnError {
-							break
-						}
-						continue
-					}
-					approvedLeases = append(approvedLeases, finalLeases...)
-					approvedShellCommands = append(approvedShellCommands, sc...)
-
-				case transform.ExplodedData:
-					// EXPLODED LEASE CASE
-					if l.LeaseType == "file" {
-						errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("'explode' transform cannot be used with lease_type 'file'")})
-						if !continueOnError {
-							break
-						}
-						continue
-					}
-
-					// Add a parent/container lease for the status command to find
-					parentLeaseConfig := l
-					parentLeaseConfig.Variable = "" // No single variable for the parent
-					parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", cfg.Root, absConfigFile)
-					if err != nil {
-						errs = append(errs, grantError{Source: l.Source, Err: err})
-						if !continueOnError {
-							break
-						}
-						continue
-					}
-					approvedLeases = append(approvedLeases, parentLeases...)
-					uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
-
-					// Process all the child leases
-					for key, value := range result {
-						if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", key)) {
-							explodedLeaseConfig := l
-							explodedLeaseConfig.Variable = key
-							explodedLeaseConfig.ParentSource = uniqueParentID
-
-							finalLeases, sc, err = processLease(cmd, explodedLeaseConfig, value, cfg.Root, absConfigFile)
-							if err != nil {
-								errs = append(errs, grantError{Source: key, Err: err})
-								if !continueOnError {
-									break
-								}
-								continue
+					for variable, secretVal := range bulkSecrets {
+						// Find the original lease config for this variable
+						var l config.Lease
+						for _, lease := range providerLeases {
+							if lease.Variable == variable {
+								l = lease
+								break
 							}
-							approvedLeases = append(approvedLeases, finalLeases...)
-							approvedShellCommands = append(approvedShellCommands, sc...)
 						}
+						// ... process lease ...
+						finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, interactive, &errs, continueOnError)
+						if err != nil {
+							errs = append(errs, grantError{Source: l.Source, Err: err})
+							if !continueOnError {
+								return &GrantErrors{errs: errs}
+							}
+							continue
+						}
+						leases = append(leases, finalLeases...)
+						shellCommands = append(shellCommands, sc...)
 					}
 				}
+
+				// Fetch op+file:// secrets individually
+				for _, l := range opFileSources {
+					finalLeases, sc, err := processSingleLease(cmd, l, "", cfg.Root, absConfigFile, interactive, &errs, continueOnError)
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: err})
+						if !continueOnError {
+							return &GrantErrors{errs: errs}
+						}
+						continue
+					}
+					leases = append(leases, finalLeases...)
+					shellCommands = append(shellCommands, sc...)
+				}
+
+			} else {
+				// Fallback to individual fetching for other providers
+				for _, l := range providerLeases {
+					finalLeases, sc, err := processSingleLease(cmd, l, "", cfg.Root, absConfigFile, interactive, &errs, continueOnError)
+					if err != nil {
+						errs = append(errs, grantError{Source: l.Source, Err: err})
+						if !continueOnError {
+							return &GrantErrors{errs: errs}
+						}
+						continue
+					}
+					leases = append(leases, finalLeases...)
+					shellCommands = append(shellCommands, sc...)
+				}
 			}
-			leases = append(leases, approvedLeases...)
-			shellCommands = append(shellCommands, approvedShellCommands...)
 		}
+
 		if len(errs) > 0 {
 			return &GrantErrors{errs: errs}
 		}
@@ -269,6 +331,9 @@ This can be overridden with the --destination-outside-root flag.`,
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
 			fmt.Fprintln(os.Stderr, "Grant request (test mode) processed successfully.")
+			if len(errs) > 0 {
+				return &GrantErrors{errs: errs}
+			}
 			return nil
 		}
 

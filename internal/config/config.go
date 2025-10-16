@@ -21,6 +21,7 @@ type Config struct {
 
 // Lease represents a single lease block in the config.
 type Lease struct {
+	Provider      string     `toml:"provider"`
 	Source        string     `toml:"source"`
 	Destination   string     `toml:"destination"`
 	Duration      string     `toml:"duration"`
@@ -93,6 +94,11 @@ func loadAndMerge(path, localPath string, depth int) (*Config, error) {
 		// Set default lease type
 		if lease.LeaseType == "" {
 			lease.LeaseType = "env"
+		}
+
+		// Set default provider
+		if lease.Provider == "" {
+			lease.Provider = "1password"
 		}
 
 		// Validate required fields

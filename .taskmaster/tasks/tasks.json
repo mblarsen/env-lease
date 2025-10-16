@@ -1907,7 +1907,7 @@
         "id": "85",
         "title": "Implement Bulk Secret Fetching with `op inject` for 1Password Provider",
         "description": "Refactor the 1Password provider to use the `op inject` command for fetching multiple `op://` secrets in a single operation, improving performance. The implementation must handle `op+file://` secrets separately, as they are not supported by `op inject` and require individual fetching.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "11"
         ],

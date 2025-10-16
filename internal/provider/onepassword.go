@@ -83,6 +83,47 @@ func (p *OnePasswordCLI) Fetch(sourceURI string) (string, error) {
 	return p.fetchWithRead(sourceURI)
 }
 
+// FetchBulk retrieves multiple secrets from 1Password using `op inject`.
+func (p *OnePasswordCLI) FetchBulk(sources map[string]string) (map[string]string, error) {
+	if len(sources) == 0 {
+		return make(map[string]string), nil
+	}
+
+	template := ""
+	for name, uri := range sources {
+		template += fmt.Sprintf("%s=\"{{ %s }}\"\n", name, uri)
+	}
+
+	args := []string{"inject"}
+	if p.Account != "" {
+		args = append(args, "--account", p.Account)
+	}
+	cmd := cmdExecer.Command("op", args...)
+	cmd.Stdin = strings.NewReader(template)
+
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, &OpError{
+				Command:  "inject",
+				ExitCode: exitErr.ExitCode(),
+				Stderr:   string(exitErr.Stderr),
+				Err:      err,
+			}
+		}
+		return nil, fmt.Errorf("failed to execute 'op inject': %w", err)
+	}
+
+	secrets := make(map[string]string)
+	for _, line := range strings.Split(string(output), "\n") {
+		if parts := strings.SplitN(line, "=", 2); len(parts) == 2 {
+			secrets[parts[0]] = strings.Trim(parts[1], "\"")
+		}
+	}
+
+	return secrets, nil
+}
+
 // fetchWithRead retrieves a secret from 1Password using the `op read` command.
 func (p *OnePasswordCLI) fetchWithRead(sourceURI string) (string, error) {
 	args := []string{"read", sourceURI}
