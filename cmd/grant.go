@@ -30,19 +30,21 @@ type GrantErrors struct {
 func (e *GrantErrors) Error() string {
 	var sb strings.Builder
 	if len(e.errs) > 1 {
-		sb.WriteString(fmt.Sprintf("Failed to grant %d leases:\n\n", len(e.errs)))
+		sb.WriteString(fmt.Sprintf("failed to grant %d leases: ", len(e.errs)))
 	} else {
-		sb.WriteString("Failed to grant lease:\n\n")
+		sb.WriteString("failed to grant lease: ")
 	}
-	for _, ge := range e.errs {
-		sb.WriteString(fmt.Sprintf("Lease: %s\n", ge.Source))
-		sb.WriteString(fmt.Sprintf("└─ Error: %s\n\n", ge.Err))
+	for i, ge := range e.errs {
+		sb.WriteString(fmt.Sprintf("lease %s error: %s", ge.Source, ge.Err))
+		if i < len(e.errs)-1 {
+			sb.WriteString(", ")
+		}
 	}
 
 	if len(e.errs) > 1 {
-		sb.WriteString("Note: Other leases may have been granted successfully.\n")
+		sb.WriteString(". Note: Other leases may have been granted successfully.")
 	}
-	return strings.TrimRight(sb.String(), "\n")
+	return sb.String()
 }
 
 func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, projectRoot string, absConfigFile string, interactive bool, errs *[]grantError, continueOnError bool) ([]ipc.Lease, []string, error) {

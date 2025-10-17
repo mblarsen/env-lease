@@ -106,15 +106,11 @@ duration = "1m"
 		if err == nil {
 			t.Fatal("expected an error for missing format, but got none")
 		}
-		expectedErr := "Failed to grant lease:"
+		expectedErr := "failed to grant lease:"
 		if !strings.Contains(err.Error(), expectedErr) {
 			t.Fatalf("expected error to contain %q, got %q", expectedErr, err.Error())
 		}
-		expectedLease := "Lease: mock"
-		if !strings.Contains(err.Error(), expectedLease) {
-			t.Fatalf("expected error to contain %q, got %q", expectedLease, err.Error())
-		}
-		expectedLeaseError := "└─ Error: lease for '" + destFile + "' has no format specified"
+		expectedLeaseError := "lease mock error: lease for '" + destFile + "' has no format specified"
 		if !strings.Contains(err.Error(), expectedLeaseError) {
 			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
@@ -146,11 +142,11 @@ format = "%s=%q"
 		if err == nil {
 			t.Fatal("expected an error, but got none")
 		}
-		expectedErr := "Failed to grant lease:"
+		expectedErr := "failed to grant lease:"
 		if !strings.Contains(err.Error(), expectedErr) {
 			t.Fatalf("expected error to contain %q, got %q", expectedErr, err.Error())
 		}
-		expectedLeaseError := "└─ Error: failed to write lease: variable 'API_KEY_OVERRIDE' already has a value; use --override to replace it"
+		expectedLeaseError := "lease mock error: failed to write lease: variable 'API_KEY_OVERRIDE' already has a value; use --override to replace it"
 		if !strings.Contains(err.Error(), expectedLeaseError) {
 			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
@@ -195,17 +191,9 @@ format = "%s=%q"
 		if err == nil {
 			t.Fatal("expected an error, but got none")
 		}
-		expectedErr := "Failed to grant lease:"
+		expectedErr := "failed to grant lease: lease mock-fail error: failed to fetch mock secret"
 		if !strings.Contains(err.Error(), expectedErr) {
 			t.Fatalf("expected error to contain %q, got %q", expectedErr, err.Error())
-		}
-		expectedLease := "Lease: mock-fail"
-		if !strings.Contains(err.Error(), expectedLease) {
-			t.Fatalf("expected error to contain %q, got %q", expectedLease, err.Error())
-		}
-		expectedLeaseError := "└─ Error: failed to fetch mock secret"
-		if !strings.Contains(err.Error(), expectedLeaseError) {
-			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
 
 		// 2. Test with flag - should continue and aggregate errors
@@ -214,15 +202,8 @@ format = "%s=%q"
 		if err == nil {
 			t.Fatal("expected an error, but got none")
 		}
-		expectedErr = "Failed to grant lease:"
 		if !strings.Contains(err.Error(), expectedErr) {
 			t.Fatalf("expected aggregated error to contain %q, got %q", expectedErr, err.Error())
-		}
-		if !strings.Contains(err.Error(), expectedLease) {
-			t.Fatalf("expected aggregated error to contain %q, got %q", expectedLease, err.Error())
-		}
-		if !strings.Contains(err.Error(), expectedLeaseError) {
-			t.Fatalf("expected aggregated error to contain %q, got %q", expectedLeaseError, err.Error())
 		}
 
 		// Check that the successful lease was still written
