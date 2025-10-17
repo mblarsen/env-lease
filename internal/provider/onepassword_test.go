@@ -3,7 +3,11 @@ package provider
 import (
 	"errors"
 	"os/exec"
+	"strings"
+	"sync"
 	"testing"
+
+	"github.com/mblarsen/env-lease/internal/config"
 )
 
 type mockExecer struct {
@@ -14,6 +18,60 @@ func (m *mockExecer) Command(name string, arg ...string) *exec.Cmd {
 	return m.CommandFunc(name, arg...)
 }
 
+func TestOnePasswordCLI_FetchLeases(t *testing.T) {
+	originalExecer := cmdExecer
+	defer func() { cmdExecer = originalExecer }()
+
+	t.Run("groups leases by account", func(t *testing.T) {
+		var capturedArgs [][]string
+		var mu sync.Mutex
+
+		cmdExecer = &mockExecer{
+			CommandFunc: func(name string, arg ...string) *exec.Cmd {
+				mu.Lock()
+				capturedArgs = append(capturedArgs, arg)
+				mu.Unlock()
+
+				// Simulate the output of `op inject`
+				if len(arg) > 0 && arg[0] == "inject" {
+					return exec.Command("echo", "-n", "VAR1=\"secret1\"\nVAR2=\"secret2\"")
+				}
+				return exec.Command("echo", "-n", "my-secret")
+			},
+		}
+
+		provider := &OnePasswordCLI{}
+		leases := []config.Lease{
+			{Variable: "VAR1", Source: "op://vault/item1", OpAccount: "account1"},
+			{Variable: "VAR2", Source: "op://vault/item2", OpAccount: "account2"},
+		}
+		_, errs := provider.FetchLeases(leases)
+		if len(errs) > 0 {
+			t.Fatalf("unexpected errors: %v", errs)
+		}
+
+		if len(capturedArgs) != 2 {
+			t.Fatalf("expected 2 calls to op, got %d", len(capturedArgs))
+		}
+
+		var foundAccount1, foundAccount2 bool
+		for _, args := range capturedArgs {
+			if strings.Contains(strings.Join(args, " "), "--account account1") {
+				foundAccount1 = true
+			}
+			if strings.Contains(strings.Join(args, " "), "--account account2") {
+				foundAccount2 = true
+			}
+		}
+
+		if !foundAccount1 {
+			t.Error("expected a call with --account account1")
+		}
+		if !foundAccount2 {
+			t.Error("expected a call with --account account2")
+		}
+	})
+}
 func TestOnePasswordCLI_Fetch(t *testing.T) {
 	originalExecer := cmdExecer
 	defer func() { cmdExecer = originalExecer }()
