@@ -203,7 +203,7 @@ format = "%s=%q"
 		if !strings.Contains(err.Error(), expectedLease) {
 			t.Fatalf("expected error to contain %q, got %q", expectedLease, err.Error())
 		}
-		expectedLeaseError := "└─ Error: failed to fetch secret: failed to fetch mock secret"
+		expectedLeaseError := "└─ Error: failed to fetch mock secret"
 		if !strings.Contains(err.Error(), expectedLeaseError) {
 			t.Fatalf("expected error to contain %q, got %q", expectedLeaseError, err.Error())
 		}

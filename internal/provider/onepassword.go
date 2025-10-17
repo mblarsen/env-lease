@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/mblarsen/env-lease/internal/config"
 )
 
 // OnePasswordCLI is a SecretProvider that fetches secrets using the 1Password CLI.
@@ -149,6 +151,50 @@ func (p *OnePasswordCLI) fetchWithRead(sourceURI string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// FetchLeases fetches secrets for a slice of leases, using `op inject` for op://
+// URIs and falling back to individual `op read` calls for op+file:// URIs.
+func (p *OnePasswordCLI) FetchLeases(leases []config.Lease) (map[string]string, []ProviderError) {
+	secrets := make(map[string]string)
+	var errors []ProviderError
+
+	opSources := make(map[string]string)
+	opFileLeases := make([]config.Lease, 0)
+
+	for _, l := range leases {
+		if strings.HasPrefix(l.Source, "op://") {
+			opSources[l.Variable] = l.Source
+		} else {
+			opFileLeases = append(opFileLeases, l)
+		}
+	}
+
+	if len(opSources) > 0 {
+		bulkSecrets, err := p.FetchBulk(opSources)
+		if err != nil {
+			// Find the lease associated with the error and append it
+			for _, l := range leases {
+				if _, ok := opSources[l.Variable]; ok {
+					errors = append(errors, ProviderError{Lease: l, Err: err})
+				}
+			}
+		}
+		for variable, secret := range bulkSecrets {
+			secrets[variable] = secret
+		}
+	}
+
+	for _, l := range opFileLeases {
+		secret, err := p.Fetch(l.Source)
+		if err != nil {
+			errors = append(errors, ProviderError{Lease: l, Err: err})
+			continue
+		}
+		secrets[l.Variable] = secret
+	}
+
+	return secrets, errors
 }
 
 // OpError is a custom error for 1Password CLI errors.

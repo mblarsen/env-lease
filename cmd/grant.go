@@ -111,6 +111,7 @@ func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, pr
 		// Run transform pipeline
 		var transformResult interface{} = secretVal
 		if len(l.Transform) > 0 {
+
 			pipeline, err := transform.NewPipeline(l.Transform)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to create transform pipeline: %w", err)
@@ -234,86 +235,39 @@ This can be overridden with the --destination-outside-root flag.`,
 				p = &provider.MockProvider{}
 			} else {
 				// This assumes all leases for a provider share the same account config.
-				// A more robust implementation might handle account variations.
 				p = &provider.OnePasswordCLI{Account: providerLeases[0].OpAccount}
 			}
 
-			// Bulk fetching logic
-			if bulkProvider, ok := p.(provider.BulkSecretProvider); ok {
-				opSources := make(map[string]string)
-				opFileSources := make(map[string]config.Lease)
+			slog.Info("Fetching secrets", "provider", providerName, "count", len(providerLeases))
+			secrets, providerErrors := p.FetchLeases(providerLeases)
+			if len(providerErrors) > 0 {
+				for _, pe := range providerErrors {
+					errs = append(errs, grantError{Source: pe.Lease.Source, Err: pe.Err})
+				}
+				if !continueOnError {
+					return &GrantErrors{errs: errs}
+				}
+			}
+			slog.Info("Fetched secrets", "provider", providerName, "count", len(secrets))
 
-				for _, l := range providerLeases {
-					if strings.HasPrefix(l.Source, "op://") {
-						opSources[l.Variable] = l.Source
-					} else {
-						opFileSources[l.Variable] = l
+			for variable, secretVal := range secrets {
+				var l config.Lease
+				for _, lease := range providerLeases {
+					if lease.Variable == variable {
+						l = lease
+						break
 					}
 				}
-
-				// Fetch op:// secrets in bulk
-				if len(opSources) > 0 {
-					slog.Info("Fetching secrets in bulk", "provider", providerName, "count", len(opSources))
-					bulkSecrets, err := bulkProvider.FetchBulk(opSources)
-					if err != nil {
-						errs = append(errs, grantError{Source: "bulk fetch", Err: err})
-						if !continueOnError {
-							return &GrantErrors{errs: errs}
-						}
+				finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, interactive, &errs, continueOnError)
+				if err != nil {
+					errs = append(errs, grantError{Source: l.Source, Err: err})
+					if !continueOnError {
+						return &GrantErrors{errs: errs}
 					}
-					slog.Info("Fetched secrets in bulk", "provider", providerName, "count", len(bulkSecrets))
-
-					for variable, secretVal := range bulkSecrets {
-						// Find the original lease config for this variable
-						var l config.Lease
-						for _, lease := range providerLeases {
-							if lease.Variable == variable {
-								l = lease
-								break
-							}
-						}
-						// ... process lease ...
-						finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, interactive, &errs, continueOnError)
-						if err != nil {
-							errs = append(errs, grantError{Source: l.Source, Err: err})
-							if !continueOnError {
-								return &GrantErrors{errs: errs}
-							}
-							continue
-						}
-						leases = append(leases, finalLeases...)
-						shellCommands = append(shellCommands, sc...)
-					}
+					continue
 				}
-
-				// Fetch op+file:// secrets individually
-				for _, l := range opFileSources {
-					finalLeases, sc, err := processSingleLease(cmd, l, "", cfg.Root, absConfigFile, interactive, &errs, continueOnError)
-					if err != nil {
-						errs = append(errs, grantError{Source: l.Source, Err: err})
-						if !continueOnError {
-							return &GrantErrors{errs: errs}
-						}
-						continue
-					}
-					leases = append(leases, finalLeases...)
-					shellCommands = append(shellCommands, sc...)
-				}
-
-			} else {
-				// Fallback to individual fetching for other providers
-				for _, l := range providerLeases {
-					finalLeases, sc, err := processSingleLease(cmd, l, "", cfg.Root, absConfigFile, interactive, &errs, continueOnError)
-					if err != nil {
-						errs = append(errs, grantError{Source: l.Source, Err: err})
-						if !continueOnError {
-							return &GrantErrors{errs: errs}
-						}
-						continue
-					}
-					leases = append(leases, finalLeases...)
-					shellCommands = append(shellCommands, sc...)
-				}
+				leases = append(leases, finalLeases...)
+				shellCommands = append(shellCommands, sc...)
 			}
 		}
 
