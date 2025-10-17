@@ -1,15 +1,14 @@
 package cmd
 
 import (
-	"errors"
-	"fmt"
+	"context"
 	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/fang"
 	"github.com/lmittmann/tint"
-	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/spf13/cobra"
 )
 
@@ -41,14 +40,7 @@ them after a specified lease duration.`,
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		// Check if it's a connection error, and if so, print a cleaner message.
-		var connErr *ipc.ConnectionError
-		if errors.As(err, &connErr) {
-			fmt.Fprintf(os.Stderr, "Error: %s\n", connErr)
-		} else {
-			// cobra will print the error, so we don't need to.
-		}
+	if err := fang.Execute(context.Background(), rootCmd); err != nil {
 		os.Exit(1)
 	}
 }
