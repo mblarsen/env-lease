@@ -14,7 +14,7 @@ import (
 
 // Transformer is an interface for transforming data.
 type Transformer interface {
-	Transform(input interface{}) (interface{}, error)
+	Transform(input any) (any, error)
 }
 
 // Pipeline holds a series of transformers.
@@ -27,7 +27,7 @@ type base64DecodeTransformer struct{}
 type jsonTransformer struct{}
 type tomlTransformer struct{}
 type yamlTransformer struct{}
-type toJsonTransformer struct{}
+type toJSONTransformer struct{}
 type toYamlTransformer struct{}
 type toTomlTransformer struct{}
 type selectTransformer struct{ Path string }
@@ -35,7 +35,7 @@ type explodeTransformer struct {
 	args explodeArgs
 }
 
-type structuredData map[string]interface{}
+type structuredData map[string]any
 type ExplodedData map[string]string
 
 var blacklistedVars = map[string]bool{
@@ -113,8 +113,8 @@ func NewPipeline(transformations []string) (*Pipeline, error) {
 	return p, nil
 }
 
-func (p *Pipeline) Run(input string) (interface{}, error) {
-	var current interface{} = input
+func (p *Pipeline) Run(input string) (any, error) {
+	var current any = input
 	var err error
 	for _, t := range p.transformers {
 		current, err = t.Transform(current)
@@ -138,7 +138,7 @@ func newTransformer(name string) (Transformer, error) {
 	case name == "yaml":
 		return &yamlTransformer{}, nil
 	case name == "to_json":
-		return &toJsonTransformer{}, nil
+		return &toJSONTransformer{}, nil
 	case name == "to_yaml":
 		return &toYamlTransformer{}, nil
 	case name == "to_toml":
@@ -166,7 +166,7 @@ func newTransformer(name string) (Transformer, error) {
 	}
 }
 
-func (t *explodeTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *explodeTransformer) Transform(input any) (any, error) {
 	data, ok := input.(structuredData)
 	if !ok {
 		return nil, fmt.Errorf("explode: input must be structured data (e.g., from a 'json' or 'toml' transform)")
@@ -198,10 +198,10 @@ func (t *explodeTransformer) Transform(input interface{}) (interface{}, error) {
 		}
 
 		// Ensure value is not complex
-		if _, isMap := value.(map[string]interface{}); isMap {
+		if _, isMap := value.(map[string]any); isMap {
 			return nil, fmt.Errorf("explode: nested objects are not supported (key: '%s')", key)
 		}
-		if _, isSlice := value.([]interface{}); isSlice {
+		if _, isSlice := value.([]any); isSlice {
 			return nil, fmt.Errorf("explode: arrays are not supported (key: '%s')", key)
 		}
 
@@ -214,8 +214,8 @@ func isValidEnvVar(s string) bool {
 	return !strings.ContainsAny(s, " =")
 }
 
-func (t *toJsonTransformer) Transform(input interface{}) (interface{}, error) {
-	var data interface{}
+func (t *toJSONTransformer) Transform(input any) (any, error) {
+	var data any
 	switch v := input.(type) {
 	case string:
 		if err := json.Unmarshal([]byte(v), &data); err != nil {
@@ -234,8 +234,8 @@ func (t *toJsonTransformer) Transform(input interface{}) (interface{}, error) {
 	return string(jsonBytes), nil
 }
 
-func (t *toYamlTransformer) Transform(input interface{}) (interface{}, error) {
-	var data interface{}
+func (t *toYamlTransformer) Transform(input any) (any, error) {
+	var data any
 	switch v := input.(type) {
 	case string:
 		if err := json.Unmarshal([]byte(v), &data); err != nil {
@@ -254,8 +254,8 @@ func (t *toYamlTransformer) Transform(input interface{}) (interface{}, error) {
 	return string(yamlBytes), nil
 }
 
-func (t *toTomlTransformer) Transform(input interface{}) (interface{}, error) {
-	var data interface{}
+func (t *toTomlTransformer) Transform(input any) (any, error) {
+	var data any
 	switch v := input.(type) {
 	case string:
 		if err := json.Unmarshal([]byte(v), &data); err != nil {
@@ -274,7 +274,7 @@ func (t *toTomlTransformer) Transform(input interface{}) (interface{}, error) {
 	return buf.String(), nil
 }
 
-func (t *base64EncodeTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *base64EncodeTransformer) Transform(input any) (any, error) {
 	s, ok := input.(string)
 	if !ok {
 		return nil, fmt.Errorf("base64-encode: input must be a string")
@@ -282,7 +282,7 @@ func (t *base64EncodeTransformer) Transform(input interface{}) (interface{}, err
 	return base64.StdEncoding.EncodeToString([]byte(s)), nil
 }
 
-func (t *base64DecodeTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *base64DecodeTransformer) Transform(input any) (any, error) {
 	s, ok := input.(string)
 	if !ok {
 		return nil, fmt.Errorf("base64-decode: input must be a string")
@@ -294,7 +294,7 @@ func (t *base64DecodeTransformer) Transform(input interface{}) (interface{}, err
 	return string(decoded), nil
 }
 
-func (t *jsonTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *jsonTransformer) Transform(input any) (any, error) {
 	s, ok := input.(string)
 	if !ok {
 		return nil, fmt.Errorf("json: input must be a string")
@@ -306,7 +306,7 @@ func (t *jsonTransformer) Transform(input interface{}) (interface{}, error) {
 	return data, nil
 }
 
-func (t *tomlTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *tomlTransformer) Transform(input any) (any, error) {
 	s, ok := input.(string)
 	if !ok {
 		return nil, fmt.Errorf("toml: input must be a string")
@@ -318,7 +318,7 @@ func (t *tomlTransformer) Transform(input interface{}) (interface{}, error) {
 	return data, nil
 }
 
-func (t *yamlTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *yamlTransformer) Transform(input any) (any, error) {
 	s, ok := input.(string)
 	if !ok {
 		return nil, fmt.Errorf("yaml: input must be a string")
@@ -330,7 +330,7 @@ func (t *yamlTransformer) Transform(input interface{}) (interface{}, error) {
 	return data, nil
 }
 
-func (t *selectTransformer) Transform(input interface{}) (interface{}, error) {
+func (t *selectTransformer) Transform(input any) (any, error) {
 	data, ok := input.(structuredData)
 	if !ok {
 		return nil, fmt.Errorf("select: input must be structured data")
