@@ -2,7 +2,7 @@
   "master": {
     "tasks": [
       {
-        "id": "1",
+        "id": 1,
         "title": "Project Scaffolding and Initialization",
         "description": "Set up the basic Go project structure, initialize Go modules, and create the initial directory layout for the CLI and daemon components.",
         "details": "Initialize a new Go module using `go mod init github.com/user/env-lease`. Create a standard Go project layout, for example: `/cmd/env-lease`, `/cmd/env-leased`, `/internal/config`, `/internal/daemon`, `/internal/ipc`, `/internal/provider`. Use a CLI framework like `cobra` to structure the commands.",
@@ -48,7 +48,7 @@
         ]
       },
       {
-        "id": "2",
+        "id": 2,
         "title": "Configuration Parsing (`env-lease.toml`)",
         "description": "Implement the logic to parse the `env-lease.toml` configuration file into Go structs. This includes defining the structs for leases and handling different lease types, formats, and encodings.",
         "details": "Use a robust TOML parsing library like `github.com/BurntSushi/toml`. Define Go structs that map directly to the TOML structure. For example: `type Config struct { Leases map[string]Lease }`, `type Lease struct { Type string; Format string; Encoding string; Source string; Destination string; Duration string }`. Implement validation for required fields and default values (e.g., `lease_type` defaults to `\"env\"`).",
@@ -97,7 +97,7 @@
         ]
       },
       {
-        "id": "3",
+        "id": 3,
         "title": "Define SecretProvider Interface",
         "description": "Define a Go interface for abstracting the secret-fetching logic. This will allow for multiple secret backends to be implemented in the future.",
         "details": "In the `/internal/provider` package, define the interface. `type SecretProvider interface { Fetch(source string) (string, error) }`. The `source` string will be the provider-specific identifier for the secret (e.g., a 1Password secret reference URI).",
@@ -110,7 +110,7 @@
         "subtasks": []
       },
       {
-        "id": "4",
+        "id": 4,
         "title": "Implement 1Password CLI Secret Provider",
         "description": "Create the first implementation of the `SecretProvider` interface that uses the 1Password CLI (`op`) to fetch secrets.",
         "details": "Create a `OnePasswordCLI` struct that implements the `SecretProvider` interface. The `Fetch` method will use the `os/exec` package to call `op read <source>`. It must handle potential errors, such as the `op` command not being in the PATH, the user not being logged in (which should result in a clear error message), or the secret not being found.",
@@ -158,7 +158,7 @@
         ]
       },
       {
-        "id": "5",
+        "id": 5,
         "title": "Implement IPC Framework with HMAC Security",
         "description": "Develop the shared communication layer for the CLI and daemon using a Unix Domain Socket. Implement HMAC signatures to ensure message authenticity and integrity.",
         "details": "Create an `/internal/ipc` package. Define message structs for commands (`GrantRequest`, `RevokeRequest`, `StatusRequest`) and responses. Use `net.Listen(\"unix\", socketPath)` for the server and `net.Dial(\"unix\", socketPath)` for the client. For security, generate a shared secret token. Each message should be serialized (e.g., JSON), and sent with an HMAC-SHA256 signature in a header or as part of the message envelope. Use the `crypto/hmac` and `crypto/sha256` standard libraries.",
@@ -219,7 +219,7 @@
         ]
       },
       {
-        "id": "6",
+        "id": 6,
         "title": "Implement Atomic File Writer Utility",
         "description": "Create a utility function for performing atomic file writes. This ensures that destination files like `.envrc` are never left in a corrupted state.",
         "details": "Create a helper function, e.g., `AtomicWriteFile(filename string, data []byte, perm fs.FileMode)`. The logic should be: 1. Create a temporary file in the same directory using `os.CreateTemp`. 2. Write the data to the temporary file. 3. Close the temporary file. 4. Rename the temporary file to the final destination filename using `os.Rename`. This is an atomic operation on POSIX systems.",
@@ -232,7 +232,7 @@
         "subtasks": []
       },
       {
-        "id": "7",
+        "id": 7,
         "title": "Implement Daemon State Management",
         "description": "Implement the daemon's ability to persist the state of active leases to a JSON file, allowing it to resume operations after a restart.",
         "details": "Define a struct for the daemon's state, likely a map of lease identifiers to their expiration times and other metadata. Create `LoadState()` and `SaveState()` methods. The state file should be located at `~/.config/env-lease/state.json`. `LoadState()` should be called on daemon startup. `SaveState()` should be called whenever the set of active leases changes. Use `encoding/json` for serialization.",
@@ -280,7 +280,7 @@
         ]
       },
       {
-        "id": "8",
+        "id": 8,
         "title": "Implement Daemon Core Logic and Timer Loop",
         "description": "Build the main loop of the `env-leased` daemon. This loop will manage lease timers, trigger expirations, and handle the automatic revocation of secrets.",
         "details": "The daemon's main run loop will use a `time.Ticker` for periodic checks (e.g., every second). On each tick, it will iterate through the active leases from its state. If a lease's expiration time has passed, it will trigger the revocation logic (removing the line from the `.env` file or deleting the temp file). Upon startup, it should immediately check for and revoke any leases that expired while it was offline.",
@@ -343,7 +343,7 @@
         ]
       },
       {
-        "id": "9",
+        "id": 9,
         "title": "Implement Daemon IPC Server",
         "description": "Integrate the IPC framework into the daemon, allowing it to listen for and respond to commands from the `env-lease` CLI.",
         "details": "In the daemon's main function, start a goroutine that listens on the Unix Domain Socket defined in the IPC package. It should accept connections, read incoming messages, verify their HMAC signature, and dispatch them to handler functions (e.g., `handleGrant`, `handleRevoke`). The handlers will modify the daemon's state and trigger actions in the core loop.",
@@ -392,7 +392,7 @@
         ]
       },
       {
-        "id": "10",
+        "id": 10,
         "title": "Implement CLI IPC Client",
         "description": "Implement the client-side logic for the `env-lease` CLI to connect to the daemon, sign messages, and send commands.",
         "details": "Create a client struct in the `/internal/ipc` package that encapsulates dialing the socket, serializing a request, signing it with HMAC, sending it, and then reading and verifying the response. This client will be used by all CLI commands that need to interact with the daemon.",
@@ -428,7 +428,7 @@
         ]
       },
       {
-        "id": "11",
+        "id": 11,
         "title": "Implement `env-lease grant` Command",
         "description": "Build the `grant` command. This command will parse the configuration, communicate with the daemon to grant all defined leases, and handle user flags.",
         "details": "Using the `cobra` framework, create the `grant` command. It will first parse `env-lease.toml`. Then, it will use the IPC client to send a `GrantRequest` to the daemon containing the lease definitions. It must implement the `--override` and `--continue-on-error` flags, passing them along in the request. By default, the operation should be transactional ('all or nothing').",
@@ -477,7 +477,7 @@
         ]
       },
       {
-        "id": "12",
+        "id": 12,
         "title": "Implement `env-lease revoke` Command",
         "description": "Build the `revoke` command, which allows a user to immediately revoke all active leases for the current project.",
         "details": "Create the `revoke` command using `cobra`. The command will use the IPC client to send a `RevokeRequest` to the daemon. The daemon will then be responsible for immediately revoking all leases associated with that project's configuration file.",
@@ -513,7 +513,7 @@
         ]
       },
       {
-        "id": "13",
+        "id": 13,
         "title": "Implement `env-lease status` Command",
         "description": "Build the `status` command to display the state and remaining time for all active leases.",
         "details": "Create the `status` command using `cobra`. It will use the IPC client to send a `StatusRequest` to the daemon. The daemon will respond with a list of active leases and their remaining TTLs. The CLI will then format this information and print it to the console in a user-friendly table.",
@@ -561,7 +561,7 @@
         ]
       },
       {
-        "id": "14",
+        "id": 14,
         "title": "Implement Daemon Revocation Failure Handling",
         "description": "Implement the daemon's error handling logic for when a revocation operation fails. This includes periodic retries and creating a persistent failure notification file.",
         "details": "Modify the daemon's revocation logic. If revoking a secret fails (e.g., due to file permissions), the daemon should log the error and schedule a retry (e.g., using an exponential backoff strategy). If the failure persists for more than 5 minutes, the daemon must create a `.envrc.env-lease-REVOCATION-FAILURE` file in the project directory to alert the user.",
@@ -609,7 +609,7 @@
         ]
       },
       {
-        "id": "15",
+        "id": 15,
         "title": "Implement Orphaned Lease Cleanup",
         "description": "Add logic to the daemon to automatically purge leases whose configuration file has been deleted, and add a manual cleanup command.",
         "details": "Add a periodic task to the daemon (e.g., runs daily) that checks if the `env-lease.toml` file for each active lease still exists. If a config file is missing, mark the lease as orphaned. If it remains orphaned for 30 days, revoke and delete it from the state. Also, add a hidden `env-leased --cleanup` command that allows a user to trigger this process manually.",
@@ -657,7 +657,7 @@
         ]
       },
       {
-        "id": "16",
+        "id": 16,
         "title": "System Service Integration (launchd for macOS)",
         "description": "Create a `launchd` service file (`.plist`) and the necessary logic within the CLI to install, uninstall, and manage the daemon as a user agent on macOS.",
         "details": "Create a template for the `com.user.env-leased.plist` file. It should be configured to run as a user agent and keep the daemon running. Add commands like `env-lease daemon install` and `env-lease daemon uninstall` which will place/remove the plist file in `~/Library/LaunchAgents/` and use `launchctl` to load/unload it.",
@@ -705,7 +705,7 @@
         ]
       },
       {
-        "id": "17",
+        "id": 17,
         "title": "System Service Integration (systemd for Linux)",
         "description": "Create a `systemd` service file and the CLI logic to manage the daemon as a user service on Linux.",
         "details": "Create a template for the `env-leased.service` file. It should be a user service (`--user`). Add `env-lease daemon install/uninstall` commands that place/remove the service file in `~/.config/systemd/user/` and use `systemctl --user` to enable, disable, start, and stop the service.",
@@ -753,7 +753,7 @@
         ]
       },
       {
-        "id": "18",
+        "id": 18,
         "title": "Build and Release Automation",
         "description": "Configure GoReleaser to automate the building of binaries for multiple platforms, and set up a Homebrew tap for easy distribution on macOS.",
         "details": "Create a `.goreleaser.yml` file. Configure it to build binaries for macOS (amd64, arm64) and Linux (amd64, arm64). Set up the `brews` section to publish a formula to a new GitHub repository that will serve as the Homebrew tap (e.g., `github.com/user/homebrew-tap`). The formula should include the service definitions.",
@@ -804,7 +804,7 @@
         ]
       },
       {
-        "id": "19",
+        "id": 19,
         "title": "Create Comprehensive User Documentation",
         "description": "Develop comprehensive user documentation that includes usage examples for 1Password with both environment variable and file-based leases, and a detailed security section explaining the IPC model and HMAC token protection.",
         "details": "Create a new `/docs` directory in the project repository. The documentation should be written in Markdown. The main document (e.g., `README.md` or `docs/usage.md`) should cover:\n1. **Getting Started:** A quick-start guide covering installation via Homebrew (from the automated release process) and the basic workflow: `env-lease daemon install`, `env-lease grant`, `env-lease status`.\n2. **Configuration:** Detailed explanation of the `env-lease.toml` file structure.\n3. **1Password Examples:** Provide two clear, copy-pasteable examples for the 1Password provider. The first should demonstrate leasing a secret to an environment variable. The second should show how to lease a secret to a file (e.g., for use with `direnv`), highlighting the safety of atomic file writes.\n4. **Security Model:** A dedicated 'Security' section that explains the client-daemon architecture using a Unix Domain Socket. It must detail the HMAC-SHA256 authentication mechanism, explaining that it protects against other local, non-privileged processes impersonating the CLI. Crucially, it must also state the limitations: it does not protect against a root user or sophisticated attacks that can inspect process memory or environment variables to steal the token.\n5. **Command Reference:** A brief reference for all user-facing commands, including `grant`, `revoke`, `status`, and `daemon install/uninstall`.",
@@ -886,7 +886,7 @@
         ]
       },
       {
-        "id": "20",
+        "id": 20,
         "title": "Create Quick-Start README.md Guide",
         "description": "Develop a `README.md` file to serve as a quick-start guide for new users. It will cover essential installation, configuration, and usage steps to get started with the tool quickly.",
         "details": "The `README.md` file should be placed in the project root. It needs to be concise and focused on the most common user journey. The content should include:\n1. **Introduction:** A brief, one-paragraph summary of what `env-lease` is and the problem it solves.\n2. **Installation:** Provide the specific command for installing via the Homebrew tap, e.g., `brew install user/tap/env-lease`.\n3. **Setup:** A step-by-step guide on how to initialize the daemon for both macOS (`env-lease daemon install`) and Linux, explaining that this is a one-time setup.\n4. **Configuration:** Show a minimal `env-lease.toml` example focused solely on using the 1Password provider. The example should clearly illustrate the `op://` URI format for sourcing secrets.\n5. **Core Commands:** Demonstrate the primary workflow with simple, copy-pasteable examples for `env-lease grant`, `env-lease status`, and `env-lease revoke`.\n6. **Next Steps:** Conclude with a link to the full user documentation (from Task 19) for users seeking advanced configuration or more detailed explanations.",
@@ -940,7 +940,7 @@
         ]
       },
       {
-        "id": "21",
+        "id": 21,
         "title": "Add Go Package Documentation Headers",
         "description": "Implement standard Go documentation comments (godoc) for all public packages, functions, and types to improve code maintainability and enable auto-generated documentation.",
         "details": "Review every package in the project and add Go documentation comments where missing. The documentation should follow the official `godoc` conventions. Each public package should have a package-level comment (e.g., in a `doc.go` file) explaining its role. All exported functions, methods, types, and constants must have a clear, concise comment describing their purpose, parameters, and return values. For example, a function comment should start with the function's name: `// MyFunction does X and Y.`. Pay special attention to packages related to core logic such as IPC, configuration, daemon management, and the specific CLI commands for system service integration.",
@@ -954,7 +954,7 @@
         "subtasks": []
       },
       {
-        "id": "22",
+        "id": 22,
         "title": "Implement Warning for Leases Exceeding 12 Hours",
         "description": "Modify the `env-lease grant` command to display a warning message to the user when they request a lease with a duration longer than 12 hours, promoting security best practices.",
         "details": "The `grant` command logic needs to be updated. After parsing the lease duration provided by the user (e.g., via a `--duration` flag), a check must be added to compare it against a 12-hour threshold (12 * 60 * 60 seconds). If the requested duration is greater than 12 hours, a warning message should be printed to standard error (stderr). The message should be informative, for example: \"Warning: Leases longer than 12 hours are discouraged for security reasons. Please consider a shorter duration.\" The command should then proceed with granting the lease as usual; this is a non-blocking warning, not an error.",
@@ -965,7 +965,7 @@
         "subtasks": []
       },
       {
-        "id": "23",
+        "id": 23,
         "title": "Implement `--override` Logic for `grant` Command",
         "description": "Modify the `grant` command's server-side logic to fail by default if an environment variable already exists, preventing accidental overwrites. The operation should only succeed if the `--override` flag is explicitly provided.",
         "details": "The current implementation of the `grant` command overwrites existing variables in the target `.env` file by default. This task corrects this behavior. The logic should be implemented in the daemon's `handleGrant` function. Before writing any variables, the handler must parse the target `.env` file to check for existing keys. If a variable from the grant request already exists in the file and the `override` flag in the `GrantRequest` is `false`, the entire operation must be aborted, and an error must be returned to the client. The error message should clearly state which variable caused the conflict and instruct the user to use the `--override` flag. If the flag is `true`, the existing variable should be overwritten as intended.",
@@ -979,7 +979,7 @@
         "subtasks": []
       },
       {
-        "id": "24",
+        "id": 24,
         "title": "Improve CLI Error Handling for Daemon Connection Failure",
         "description": "Refine the CLI's error handling to provide a clear, user-friendly message when it fails to connect to the daemon, instead of showing a generic error and stack trace.",
         "details": "Currently, when the CLI attempts to communicate with a non-running daemon, it exits with a generic connection error and a stack trace. This task involves modifying the CLI client's IPC connection logic to specifically catch socket connection errors. When such an error is detected, the CLI should print a formatted, helpful message to stderr, such as 'Error: Could not connect to the env-lease daemon at [socket_path]. Is the daemon running? Try starting it with `env-lease daemon start`.' The application should then exit with a non-zero status code without displaying a stack trace. The socket path should be dynamically retrieved from the application's configuration.",
@@ -992,7 +992,7 @@
         "subtasks": []
       },
       {
-        "id": "25",
+        "id": 25,
         "title": "Implement Minimal Daemon Event Logging",
         "description": "Introduce basic logging to the daemon for key events such as successful grants, manual revocations, and automatic lease expirations to improve operational visibility.",
         "details": "Integrate the standard `log` package into the daemon's main process. Logging should be directed to standard output to be easily captured by service managers like systemd. Add single-line log messages at the following key locations:\n1. In the `handleGrant` function, after all secrets have been successfully fetched and written, log a message like `INFO: Leases granted for project [project_config_path]`.\n2. In the `handleRevoke` function, after all leases for a project have been successfully revoked, log a message like `INFO: Leases manually revoked for project [project_config_path]`.\n3. In the core timer loop that manages lease expiration, after a lease is successfully revoked due to its TTL expiring, log a message like `INFO: Lease [lease_identifier] expired and was revoked.`",
@@ -1007,7 +1007,7 @@
         "subtasks": []
       },
       {
-        "id": "26",
+        "id": 26,
         "title": "Bugfix: Persist Daemon State Immediately After Modification",
         "description": "Fixes a critical bug where daemon state was only saved on graceful shutdown. This change ensures the state is written to disk immediately after any lease is granted, manually revoked, or automatically expired, preventing data loss on unexpected termination.",
         "details": "The current implementation only calls `SaveState()` during a graceful shutdown sequence. This creates a race condition where a `kill -9` or system crash can cause recently granted leases to be lost. To fix this, the `SaveState()` method, defined in Task 7, must be invoked immediately after any operation that modifies the daemon's lease map. Specifically, a call to `this.SaveState()` should be added in the following locations:\n1. In the `handleGrant` function (from Task 9), after a new lease has been successfully added to the state map.\n2. In the `handleRevoke` function (from Task 9), after a lease has been successfully removed from the state map.\n3. In the daemon's core timer loop (from Task 8), immediately after the logic that removes an expired lease from the state map.\nAny error returned by `SaveState()` should be logged as a warning, but should not cause the primary operation (grant/revoke) to fail.",
@@ -1022,7 +1022,7 @@
         "subtasks": []
       },
       {
-        "id": "27",
+        "id": 27,
         "title": "Bugfix: Refine `grant` Override Logic to Ignore Empty Variables",
         "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
         "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted if the key exists, its value is non-empty, and the `override` flag is false.",
@@ -1036,7 +1036,7 @@
         "subtasks": []
       },
       {
-        "id": "28",
+        "id": 28,
         "title": "Bugfix: Refine `grant` Override Logic to Ignore Empty Variables",
         "description": "Modify the `grant` command's override check to permit overwriting environment variables that exist in the destination file but have an empty value, without requiring the `--override` flag. This prevents failures when re-granting expired or cleared leases.",
         "details": "The current override logic in the daemon's `handleGrant` function, introduced in Task #23, blocks any attempt to write a variable that already exists without the `--override` flag. This needs to be refined. The check should be updated to only trigger the failure if the existing variable has a non-empty value. Specifically, when parsing the destination file, if a key exists but its value is an empty string (e.g., `API_KEY=`), it should be considered safe to overwrite. The operation should only be aborted with an error if a grant is attempted for an existing key that has a non-empty value and the `--override` flag is false.",
@@ -1050,7 +1050,7 @@
         "subtasks": []
       },
       {
-        "id": "29",
+        "id": 29,
         "title": "Bugfix: Make `grant` Command Idempotent by Ignoring Same-Value Overrides",
         "description": "Modify the `grant` command's override check to permit overwriting a variable if the exact line to be written already exists in the destination file. This makes the command idempotent and prevents unnecessary failures when re-running.",
         "status": "done",
@@ -1067,7 +1067,7 @@
         "subtasks": []
       },
       {
-        "id": "30",
+        "id": 30,
         "title": "Bugfix: Preserve Unrelated Content in `.env` Files During Grant",
         "description": "Fix a bug where the `grant` command for `env`-type leases overwrites the entire destination file. The logic must be updated to parse the file, modify only the relevant lines, and preserve all other content.",
         "details": "The current implementation for handling `env`-type leases writes the secret directly to the destination file, truncating any existing content. This needs to be changed to a read-modify-write approach. The daemon's `handleGrant` function, when processing a lease for a `.env` file, must first read the entire file into memory. It should then parse the file line-by-line, identifying existing key-value pairs, comments, and empty lines. For each secret to be granted, the logic will check if the key already exists. If it does, the existing line will be replaced with the new `KEY=VALUE` pair. If it does not exist, a new line will be appended to the file content. All other lines, including comments and blank lines, must be preserved in their original order. Finally, the newly constructed content will be written back to the file, completely replacing the old content in an atomic operation (e.g., write to a temp file and rename).",
@@ -1085,7 +1085,7 @@
         "subtasks": []
       },
       {
-        "id": "31",
+        "id": 31,
         "title": "Implement `file_mode` Option for File-Type Leases",
         "description": "Add a `file_mode` option to the `env-lease.toml` configuration for `file`-type leases, allowing users to specify custom file permissions for the created secret files.",
         "details": "1. **Configuration Parsing:** Modify the Go struct representing a lease in the configuration parser (related to Task 2). Add a new optional field, such as `FileMode string`, to capture the `file_mode` setting from the TOML file. 2. **Daemon Logic:** Update the daemon's lease granting logic. When processing a `file`-type lease, check if the `FileMode` field is set. If it is, parse the string (e.g., \"0600\") into an `os.FileMode` (octal integer). Implement validation to ensure the provided string is a valid file mode. 3. **Default Value:** If the `FileMode` field is empty or not present in the configuration, the daemon must use a default file mode of `0644`. 4. **File Writing:** Pass the determined file mode (either the user-specified one or the default) to the `AtomicWriteFile` utility (from Task 6) when writing the secret to the destination file.",
@@ -1103,7 +1103,7 @@
         "subtasks": []
       },
       {
-        "id": "32",
+        "id": 32,
         "title": "Combine CLI and Daemon into a Single Binary",
         "description": "Analyze the feasibility and benefits of merging the `env-lease` CLI and `env-leased` daemon into a single executable. Refactor the Cobra command structure to support both client and daemon subcommands within one binary.",
         "details": "The CLI and daemon currently exist as two separate binaries but share a common Cobra command structure, suggesting an opportunity for consolidation. This task involves refactoring the project to produce a single `env-lease` binary. The daemon's functionality will be moved under a new subcommand, for example, `env-lease daemon start`. All existing CLI commands (`grant`, `revoke`, `status`, etc.) will remain as top-level commands of the unified binary. This will involve merging the `main.go` files, reorganizing the Cobra command definitions, and updating the build process to produce only one artifact. The goal is to simplify distribution, reduce build complexity, and eliminate code duplication.",
@@ -1117,7 +1117,7 @@
         "subtasks": []
       },
       {
-        "id": "33",
+        "id": 33,
         "title": "Update Systemd Service Template for Unified Binary",
         "description": "Modify the systemd service template and the `daemon install` command to support the new single-binary architecture, ensuring the service correctly starts the daemon using the `daemon start` subcommand.",
         "details": "Following the consolidation of the CLI and daemon into a single executable in Task 32, the systemd service integration from Task 17 is now broken. This task involves updating the service file template to execute the daemon via its new subcommand. The `ExecStart` directive in the service template must be changed from pointing to the old `env-leased` binary to invoking `env-lease daemon start`. The `env-lease daemon install` command logic needs to be updated to generate this new configuration. The path to the executable in `ExecStart` should be dynamically determined using a function like `os.Executable()` to ensure it points to the correct location of the running `env-lease` binary. The service file should also be renamed from `env-leased.service` to `env-lease.service` for consistency.",
@@ -1132,7 +1132,7 @@
         "subtasks": []
       },
       {
-        "id": "34",
+        "id": 34,
         "title": "Add HashiCorp Vault Provider",
         "description": "Implement a new secret provider for HashiCorp Vault. The implementation should follow the existing pattern of the 1Password provider, using the Vault CLI ('vault') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (e.g., 'secret/data/my-secret key') and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Vault-specific errors.",
         "details": "",
@@ -1143,7 +1143,7 @@
         "subtasks": []
       },
       {
-        "id": "35",
+        "id": 35,
         "title": "Add AWS Secrets Manager Provider",
         "description": "Implement a new secret provider for AWS Secrets Manager. The implementation should follow the existing pattern of the 1Password provider, using the AWS CLI ('aws') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret ARN) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for AWS-specific errors.",
         "details": "",
@@ -1154,7 +1154,7 @@
         "subtasks": []
       },
       {
-        "id": "36",
+        "id": 36,
         "title": "Implement `--continue-on-error` Flag for `grant` Command",
         "description": "Modify the `grant` command to support a `--continue-on-error` flag. When enabled, the command will attempt to fetch all requested secrets, aggregate any errors encountered, and report them at the end, rather than exiting on the first failure.",
         "details": "This task involves modifying both the CLI and the daemon. On the CLI side, a new `--continue-on-error` boolean flag will be added to the `grant` command. The IPC `GrantRequest` struct must be updated to include a corresponding boolean field to transmit the flag's state to the daemon. On the daemon side, the `handleGrant` function will be updated. If the `ContinueOnError` field is true, the secret fetching loop should not exit on the first error. Instead, it should collect each error encountered into a slice. After iterating through all requested leases, if the error slice is not empty, the daemon should return a single, aggregated error message to the client detailing all the failures. Successfully fetched secrets should still be written to the environment file.",
@@ -1169,7 +1169,7 @@
         "subtasks": []
       },
       {
-        "id": "37",
+        "id": 37,
         "title": "Modify `revoke` Command for Project-Scoped Revocation with `--all` Flag",
         "description": "Update the `revoke` command to only revoke leases for the current project by default, based on the `env-lease.toml` configuration. Introduce an `--all` flag to preserve the original global revocation behavior.",
         "details": "The current `revoke` command is too broad, clearing all active leases regardless of their origin. This task refactors it to be project-aware. The default behavior will be to revoke only the leases associated with the current project's `env-lease.toml` file. This includes leases that are currently active for the project but may have been removed from the configuration file since they were last granted. To support the original functionality, a new `--all` flag will be added to perform a global revocation of all active leases. This will require modifying the CLI command to parse the configuration and updating the IPC message and daemon logic to handle both scoped and global revocation requests.",
@@ -1184,7 +1184,7 @@
         "subtasks": []
       },
       {
-        "id": "38",
+        "id": 38,
         "title": "Add Google Secret Manager Provider",
         "description": "Implement a new secret provider for Google Secret Manager. The implementation should follow the existing pattern of the 1Password provider, using the Google Cloud CLI ('gcloud') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret name and version) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Google Cloud-specific errors.",
         "details": "",
@@ -1195,7 +1195,7 @@
         "subtasks": []
       },
       {
-        "id": "39",
+        "id": 39,
         "title": "Add Azure Key Vault Provider",
         "description": "Implement a new secret provider for Azure Key Vault. The implementation should follow the existing pattern of the 1Password provider, using the Azure CLI ('az') to fetch secrets. The provider should have a `Fetch` method that takes a source URI (the secret name and vault name) and returns the secret value. Error handling should be similar to the 1Password provider, with custom error types for Azure-specific errors.",
         "details": "",
@@ -1206,7 +1206,7 @@
         "subtasks": []
       },
       {
-        "id": "40",
+        "id": 40,
         "title": "Add --print Flag to `daemon install` Command",
         "description": "Implement a `--print` flag for the `daemon install` command. This flag will output the generated service configuration file to stdout and prevent the actual installation, facilitating debugging and manual setup.",
         "details": "Modify the `daemon install` Cobra command, which was established as part of the unified binary in Task 32. Add a new persistent boolean flag named `--print`. The command's execution logic should be updated to check if this flag is present. If `--print` is true, the command must generate the appropriate service configuration content (a `.plist` file for macOS, a `.service` file for Linux) as a string. This string should be printed directly to standard output. Concurrently, a warning message, such as 'WARNING: Service configuration printed but not installed.', should be printed to standard error. The command should then exit without attempting to write any files to system directories or execute service management commands (`launchctl`, `systemctl`). If the `--print` flag is not provided, the command should execute its original installation logic without change.",
@@ -1219,7 +1219,7 @@
         "subtasks": []
       },
       {
-        "id": "41",
+        "id": 41,
         "title": "Refine `grant` Override Logic to Allow Overwriting Empty Variables",
         "description": "Modify the `grant` command's override check to permit overwriting an environment variable if its existing value is empty, without requiring the `--override` flag. This improves usability when re-granting leases for variables that have been cleared.",
         "details": "The current override protection within the daemon's `handleGrant` function is overly strict and incorrectly flags a variable with an empty value as a conflict, contrary to the intent of previous fixes. This task will correct the logic. When the daemon processes a `GrantRequest`, it must parse the target file (e.g., `.env`) and check for existing variables. The check must be refined to differentiate between a variable with a non-empty value and one with an empty value. If a variable exists but its value is an empty string (e.g., `API_KEY=`), the operation should succeed without the `--override` flag, overwriting the line with the new key and secret. The conflict requiring `--override` should only be triggered if the existing variable has a non-empty value (e.g., `API_KEY=\"old_secret\"`).",
@@ -1233,7 +1233,7 @@
         "subtasks": []
       },
       {
-        "id": "42",
+        "id": 42,
         "title": "Implement `direnv` Integration for `grant` Command",
         "description": "Enhance the `grant` and `revoke` commands to automatically execute `direnv allow` when they modify a `.envrc` file. This behavior will be the default if `direnv` is installed. A `--no-direnv` flag will be added to both commands to disable the automatic execution and instead print a suggestion to the user.",
         "status": "done",
@@ -1309,7 +1309,7 @@
         ]
       },
       {
-        "id": "43",
+        "id": 43,
         "title": "Fully Implement Orphaned Lease Cleanup Daemon Logic and Command",
         "description": "Implement the complete daemon logic for detecting, marking, and purging orphaned leases. This includes a periodic background check and updating the `env-lease daemon cleanup` command to trigger the process manually.",
         "details": "This task involves two main components. First, enhance the daemon's core loop to include a periodic background job that runs, for example, every 24 hours. This job will iterate through all active leases managed in the state file (from Task 7). For each lease, it will check for the existence of the source `env-lease.toml` file. If the file does not exist, the lease's entry in the state file should be updated with a new field, such as `orphaned_since`, containing the current timestamp. The job should also check for leases already marked as orphaned. If the current time is more than 30 days past the `orphaned_since` timestamp, the daemon must trigger the internal revocation logic for that lease and remove its entry from the state entirely. Second, the `env-lease daemon cleanup` command must be updated. It will use the IPC client (from Task 10) to send a new `CleanupRequest` to the daemon. A corresponding handler must be added to the daemon's IPC server to receive this request and immediately execute the full orphan detection and purging logic on demand.",
@@ -1324,7 +1324,7 @@
         "subtasks": []
       },
       {
-        "id": "44",
+        "id": 44,
         "title": "Implement Lease Expiration Notifications for macOS/Linux",
         "description": "Implement desktop notifications for lease expirations on macOS and Linux. The daemon should detect the operating system and use the appropriate native notification command (`osascript` for macOS, `notify-send` for Linux) to inform the user when a lease has been revoked due to expiration. The notification message should clearly identify which lease has expired.",
         "details": "",
@@ -1335,7 +1335,7 @@
         "subtasks": []
       },
       {
-        "id": "45",
+        "id": 45,
         "title": "Clear Environment Variable Value in .envrc on Automatic Revocation",
         "description": "Enhance the daemon's automatic lease revocation process to clear the value of the corresponding environment variable in the user's .envrc file, ensuring secrets are removed upon expiration while preserving the variable declaration and any associated comments.",
         "details": "This task modifies the daemon's core revocation logic, triggered when a lease expires. Instead of deleting the line from the .envrc file, the logic will now set the environment variable's value to an empty string. The implementation should be located within the daemon's main loop where expired leases are processed (established in Task 8). The process involves reading the target .envrc file, identifying the specific line for the expired secret's variable, and replacing it. A regular expression should be used to match lines like `export VAR_NAME=...`, capturing the variable name and any trailing comments. The replacement line will be formatted as `export VAR_NAME=\"\"`, preserving the captured comment. This ensures that user-managed comments and the structure of the .envrc file remain intact. The file write operation should be atomic to prevent data corruption in case of an interruption.",
@@ -1349,7 +1349,7 @@
         "subtasks": []
       },
       {
-        "id": "46",
+        "id": 46,
         "title": "Investigate and Optimize `grant` Command Performance",
         "description": "Profile the `env-lease grant` command to identify and resolve significant latency issues, particularly when fetching multiple secrets from providers like 1Password.",
         "details": "The `grant` command exhibits slow performance (~25s for a single lease), far exceeding the execution time of a direct `op read` command. The primary hypothesis is that secrets are being fetched sequentially within the daemon, with each call incurring the full startup overhead of the underlying provider's CLI (e.g., `op`). The investigation will start by using Go's `pprof` to profile the daemon's handling of a grant request to confirm the bottleneck. Based on the findings, the daemon's secret fetching logic will be refactored to process multiple secret requests in parallel using goroutines and a `sync.WaitGroup`. This change must preserve the existing transactional behavior: if any secret fetch fails, the entire grant operation should be rolled back unless the `--continue-on-error` flag is used. Error aggregation from the concurrent operations will be a key part of the implementation.",
@@ -1363,7 +1363,7 @@
         "subtasks": []
       },
       {
-        "id": "47",
+        "id": 47,
         "title": "Enhance Daemon Startup Logging for Better Visibility",
         "description": "Add detailed logging messages to the daemon's startup sequence to confirm successful initialization, state loading, and IPC server status, providing clear feedback that the daemon is running correctly.",
         "details": "Modify the daemon's main startup function (invoked by `env-lease daemon start`). After the initial 'Starting daemon...' message, add new log lines using the standard `log` package established in Task 25. The new logs should report on the outcome of key initialization steps:\n1. **State Loading (Task 7):** After attempting to load `state.json`, log either `INFO: Loaded state with N active leases.` or `INFO: No state file found, initializing new state.`\n2. **Expired Lease Check (Task 8):** After the initial scan for leases that expired while the daemon was offline, log `INFO: Revoked M expired leases on startup.`\n3. **IPC Server (Task 9):** After successfully creating and starting the listener on the Unix Domain Socket, log `INFO: IPC server listening at [socket_path].`\n4. **Final Confirmation:** Once all initialization is complete and the main timer loop is about to begin, log a final summary message like `INFO: Daemon startup successful. Ready to manage leases.`",
@@ -1380,7 +1380,7 @@
         "subtasks": []
       },
       {
-        "id": "48",
+        "id": 48,
         "title": "Add op_account field to lease configuration",
         "description": "Add an optional 'op_account' field to the lease configuration for 1Password secrets. Update the documentation to explain that this field specifies the 1Password account, taking precedence over the OP_ACCOUNT environment variable and the CLI's default. Also, investigate and implement a non-interactive mode for the 'op' command to ensure it errors out instead of hanging when an account prompt is required.",
         "details": "",
@@ -1391,7 +1391,7 @@
         "subtasks": []
       },
       {
-        "id": "49",
+        "id": 49,
         "title": "Implement Automatic Revocation for Leases Removed from Configuration",
         "description": "Enhance the daemon to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file, ensuring the system state stays synchronized with the declared configuration.",
         "details": "The daemon's main processing loop, which currently checks for expired leases, needs to be extended. On each cycle, for every project it manages, the daemon should re-read and parse the corresponding `env-lease.toml` file. It will then compare its list of active leases for that project against the leases currently defined in the configuration. If an active lease from the daemon's state does not have a corresponding definition in the configuration file, it should be treated as orphaned and immediately revoked. The revocation process must use the same logic established in Task 45, which involves clearing the environment variable's value in the target `.envrc` file rather than deleting the line. A log message should be generated to indicate that a lease was revoked due to its removal from the configuration.",
@@ -1406,7 +1406,7 @@
         "subtasks": []
       },
       {
-        "id": "50",
+        "id": 50,
         "title": "Refactor CLI Error Handling to Use `slog` and Exit Codes",
         "description": "Standardize error handling across all client-side commands (`status`, `grant`, `revoke`) to use the `slog` library for structured logging and ensure failures, especially daemon connection errors, result in a clean, single error message and a non-zero exit code.",
         "details": "The current error handling for client commands can produce redundant messages and does not use a standardized logging or exit code mechanism. This task involves refactoring the IPC client logic used by the `grant`, `revoke`, and `status` commands. A centralized helper function should be created to handle the connection to the daemon's Unix socket. If a connection fails, this function will be responsible for logging a structured error message using `slog.Error()` with relevant attributes like the socket path. It will then print a single, user-friendly error message to stderr (e.g., \"Error: could not connect to the env-lease daemon. Is it running?\") and terminate the process with `os.Exit(1)`.",
@@ -1422,7 +1422,7 @@
         "subtasks": []
       },
       {
-        "id": "51",
+        "id": 51,
         "title": "Refactor Daemon to Manage Lease Metadata Only, Not Secrets",
         "description": "Perform a security-focused refactoring to ensure the daemon process never handles raw secret values. The daemon will be responsible only for managing lease metadata, while the client will handle fetching and writing the secrets.",
         "details": "To enhance security, the daemon's role must be limited to orchestration and lifecycle management. The `env-lease grant` client command will be updated to perform the secret fetching and writing. The new workflow will be: 1. The client (`env-lease grant`) fetches the secret from the provider. 2. The client writes the secret directly to the target `.env` file. 3. The client communicates with the daemon via IPC, sending only the lease metadata (e.g., variable name, file path, expiration timestamp). 4. The daemon will update its state file (`state.json` from Task 7) to track this new lease using only the metadata. The state file must be scrubbed of any secret values. 5. The daemon's core loop (Task 8) will continue to monitor for expirations. Upon expiration, it will use the stored file path and variable name to remove the correct line from the `.env` file, performing revocation without ever needing to know the secret's value.",
@@ -1437,7 +1437,7 @@
         "subtasks": []
       },
       {
-        "id": "52",
+        "id": 52,
         "title": "Implement Configurable Logging with ENVLEASE_LOG_LEVEL",
         "description": "Introduce an environment variable `ENVLEASE_LOG_LEVEL` to control the application's logging verbosity, with 'warning' as the default. Update the systemd service template to explicitly set the log level to 'info' for the daemon process.",
         "details": "This task builds upon the structured logging implemented in Task 50. The core objective is to make the log level configurable at runtime.\n\n1.  **Environment Variable Handling:** In the application's main initialization logic, read the `ENVLEASE_LOG_LEVEL` environment variable. The value should be parsed case-insensitively.\n2.  **Log Level Mapping:** Support standard log levels: `debug`, `info`, `warn` (or `warning`), and `error`. Map these string values to the corresponding `slog.Level` constants (e.g., `slog.LevelDebug`, `slog.LevelInfo`, `slog.LevelWarn`, `slog.LevelError`).\n3.  **Default Level:** If `ENVLEASE_LOG_LEVEL` is not set or contains an unrecognized value, the logging level must default to `warn` (`slog.LevelWarn`).\n4.  **Logger Initialization:** The global `slog` logger should be initialized using `slog.HandlerOptions` with the `Level` field set based on the logic above.\n5.  **Systemd Template Update:** Modify the systemd service template (updated in Task 33) to include a new directive in the `[Service]` section: `Environment=\"ENVLEASE_LOG_LEVEL=info\"`. This ensures that when the daemon runs as a background service, it provides more detailed logs for easier debugging via `journalctl`, overriding the `warn` default.\n6.  **macOS Template Update (Optional but Recommended):** For consistency, update the `launchd` plist template (from Task 16) to include a similar configuration. Add a key-value pair to the `EnvironmentVariables` dictionary: `<key>ENVLEASE_LOG_LEVEL</key><string>info</string>`.",
@@ -1452,7 +1452,7 @@
         "subtasks": []
       },
       {
-        "id": "53",
+        "id": 53,
         "title": "Daemon: Periodically Revoke Leases Removed from Configuration",
         "description": "Enhance the daemon's periodic check to automatically revoke active leases that have been removed from the `env-lease.toml` configuration file. On each cycle, the daemon should re-read the configuration file for each project it manages, compare the active leases against the configuration, and revoke any that are no longer present.",
         "details": "",
@@ -1463,7 +1463,7 @@
         "subtasks": []
       },
       {
-        "id": "55",
+        "id": 55,
         "title": "Implement op+file:// scheme and preserve newlines for 1Password provider",
         "description": "Implement a new `op+file://<item-name>/<file-name>` URI scheme for 1Password documents. This scheme should perform an `op item get` lookup under the hood to find the canonical `op://<vault-id>/<item-id>/<file-id>` URI. The provider should handle potential ambiguities if item names are not unique. Ensure the `lease_type` ('file' or 'env') is decoupled from the `source` URI scheme. For `lease_type = 'env'`, the provider must return the raw, unmodified secret content, including newlines. The `TrimSpace` function should be removed from the secret fetching logic to ensure multi-line environment variables are handled correctly when no encoding is specified. If `encoding` (e.g., 'base64') is used, the standard encoding process applies.",
         "details": "",
@@ -1474,7 +1474,7 @@
         "subtasks": []
       },
       {
-        "id": "56",
+        "id": 56,
         "title": "Improve User Feedback for Daemon Install and Uninstall Commands",
         "description": "Enhance the `daemon install` and `daemon uninstall` commands to provide clear, informative messages upon successful completion, including the path to the created service file on installation.",
         "details": "Modify the `env-lease daemon install` and `env-lease daemon uninstall` Cobra commands to improve user experience by providing explicit confirmation messages.\n\n1.  **`daemon install` Command:**\n    *   After the platform-specific service manager file (e.g., systemd `.service` or launchd `.plist`) is successfully created and the service is enabled, the command should print a confirmation message to standard output.\n    *   This message must include the full path to the service file that was just created. For example: `Successfully installed env-lease daemon service. Configuration file created at: /etc/systemd/system/env-leased.service`.\n    *   This new messaging logic must NOT execute when the `--print` flag (from Task 40) is used, preserving the existing behavior of only printing the file content to stdout.\n\n2.  **`daemon uninstall` Command:**\n    *   After the service has been successfully stopped, disabled, and its corresponding service file has been removed, the command should print a simple confirmation message to standard output.\n    *   For example: `Successfully uninstalled env-lease daemon service.`",
@@ -1488,7 +1488,7 @@
         "subtasks": []
       },
       {
-        "id": "57",
+        "id": 57,
         "title": "Make Lease Revocation Resilient to Missing Files",
         "description": "Modify the lease revocation logic to gracefully handle cases where a leased file has already been deleted by the user. Instead of failing, the revocation process will log the event and successfully remove the lease from the daemon's state.",
         "details": "The core lease revocation function, likely within the daemon, needs to be updated. This function is triggered by both the `env-lease revoke` command and the periodic cleanup of stale leases (Task 53). When revoking a file-based lease, the logic must first check for the existence of the target file before attempting deletion.\n1. In the revocation handler, before calling `os.Remove()`, use `os.Stat()` to check if the file path exists.\n2. If the check returns an error satisfying `os.IsNotExist(err)`, the function should not propagate this as a failure. Instead, it should log an informational message using `slog` (e.g., `slog.Info(\"Lease target file not found, proceeding with revocation\", \"path\", filePath)`).\n3. If the file exists, attempt deletion as usual. Any errors from `os.Remove()` (e.g., permission denied) should still be treated as fatal errors for that specific lease revocation.\n4. In either case (file deleted successfully or file was already missing), the process should continue to remove the lease's metadata from the daemon's state file, ensuring the revocation is completed from a logical standpoint.",
@@ -1504,7 +1504,7 @@
         "subtasks": []
       },
       {
-        "id": "58",
+        "id": 58,
         "title": "Improve Error Reporting for `grant --continue-on-error`",
         "description": "Refactor the error reporting for the `grant` command when the `--continue-on-error` flag is used. The current format is cluttered and redundant. The new format should be more structured and readable, like this:\n\n    Failed to grant 2 leases:\n\n    Lease: <lease-source-uri>\n    └─ Error: <error-message>\n\n    Lease: <another-lease-source-uri>\n    └─ Error: <another-error-message>\n\n    This involves creating a custom error structure to associate each error with its lease source, modifying the error aggregation logic in `cmd/grant.go`, and updating the final error message formatting. The tests in `cmd/grant_test.go` should also be updated to reflect the new error format.",
         "details": "",
@@ -1515,7 +1515,7 @@
         "subtasks": []
       },
       {
-        "id": "59",
+        "id": 59,
         "title": "Implement `daemon reload` Command",
         "description": "Create a new `env-lease daemon reload` command to safely restart the service after upgrades. The command must exit with a success code (0) if the service is not installed or running. For macOS, it will use `launchctl unload` (ignoring errors) and `launchctl load`. For Linux, it will use `systemctl --user restart` after checking if the service file exists. Finally, update the `.goreleaser.yml` to add a `post_install` hook that runs `env-lease daemon reload`, ensuring it works with the existing quarantine hook.",
         "details": "",
@@ -1526,7 +1526,7 @@
         "subtasks": []
       },
       {
-        "id": "60",
+        "id": 60,
         "title": "Add Debug Logging to Grant and Revoke Processes",
         "description": "Add debug-level logging to the grant and revoke processes to improve traceability. This includes adding `slog.Debug` messages to the daemon handlers (`handlers.go`) for incoming requests and `slog.Debug` messages to the revoker (`revoker.go`) for file deletions and environment variable clearing. Crucially, add a `slog.Info` message in the revoker to explicitly log when a lease is revoked for a file that was already missing, confirming the event was handled gracefully.",
         "details": "",
@@ -1537,7 +1537,7 @@
         "subtasks": []
       },
       {
-        "id": "61",
+        "id": 61,
         "title": "Bugfix: `--no-direnv` Flag is Ignored by `grant` and `revoke` Commands",
         "description": "The `--no-direnv` flag for the `grant` and `revoke` commands is not being respected, causing `direnv allow` to be executed unconditionally. This task will correct the command logic to ensure the flag properly disables the automatic `direnv` execution.",
         "details": "The client-side logic for the `grant` and `revoke` commands needs to be updated. Currently, the check for the `--no-direnv` flag is either missing or incorrect, leading to the `direnv allow` command being called even when the user explicitly opts out. The fix involves modifying the conditional logic that triggers the `direnv` integration. The execution flow should be: 1. After a successful grant or revoke operation modifying an `.envrc` file. 2. Before checking for the `direnv` executable, first evaluate the `--no-direnv` flag. 3. If the flag is present and set to `true`, the program must skip all `direnv`-related actions and instead print the suggestion message to the console. 4. If the flag is `false` (the default), the existing logic of checking for the `direnv` executable and running `direnv allow` should proceed.",
@@ -1550,7 +1550,7 @@
         "subtasks": []
       },
       {
-        "id": "62",
+        "id": 62,
         "title": "Implement XDG Base Directory Specification for Runtime Files",
         "description": "Relocate the daemon's IPC socket and persisted state file to the XDG Data Home directory (`$XDG_DATA_HOME`). This moves runtime data out of the configuration directory and aligns the application with platform standards.",
         "details": "The current implementation hardcodes paths within `~/.config/env-lease`, which is intended for user configuration, not runtime data. This task will refactor the path management to adhere to the XDG Base Directory Specification.\n1. **Integrate an XDG Library:** Add a dependency like `github.com/adrg/xdg` to handle path resolution reliably across different operating systems.\n2. **Update Path Generation:** All logic that generates paths for the IPC socket and the state persistence file must be updated. The new base directory should be resolved using `xdg.DataHome`. The application should create a subdirectory within it, e.g., `$XDG_DATA_HOME/env-lease/`.\n3. **New Paths:** The socket path will become `$XDG_DATA_HOME/env-lease/env-lease.sock` and the state file will be `$XDG_DATA_HOME/env-lease/state.json`.\n4. **Update Daemon and Client:** The daemon must be updated to create and listen on the socket in the new location and write its state file there. All client commands (`grant`, `revoke`, `status`, etc.) must be updated to look for the socket in the new location. This change will likely involve modifying a shared IPC client or configuration module.",
@@ -1566,7 +1566,7 @@
         "subtasks": []
       },
       {
-        "id": "63",
+        "id": 63,
         "title": "Add Infisical Secret Provider",
         "description": "Implement a new secret provider for Infisical. The implementation will follow the established pattern of other providers, using the Infisical CLI ('infisical') to fetch secrets.",
         "details": "Create a new provider in the `/internal/provider` package that implements the `SecretProvider` interface for Infisical. The provider should be named `InfisicalCLI`. The `Fetch` method will use the `os/exec` package to call `infisical secrets get <SECRET_NAME> --env=<ENVIRONMENT> --project-id=<PROJECT_ID> --raw`. The source URI should be parsed to extract these parameters. A suggested URI format is `infisical://<project-id>/<environment>/<secret-name>`. The implementation must include robust error handling for scenarios such as the `infisical` command not being in the PATH, the user not being logged in, the specified secret not being found, or network issues. Custom error types should be created for Infisical-specific failures to provide clear feedback to the user.",
@@ -1579,7 +1579,7 @@
         "subtasks": []
       },
       {
-        "id": "64",
+        "id": 64,
         "title": "Add Bitwarden Secret Provider",
         "description": "Implement a new secret provider for Bitwarden. The implementation will follow the established pattern of other providers, using the Bitwarden CLI ('bw') to fetch secrets.",
         "details": "Create a new provider in the `/internal/provider` package that implements the `SecretProvider` interface for Bitwarden. The provider struct should be named `BitwardenCLI`. The `Fetch` method will use the `os/exec` package to call `bw get password <ITEM_ID>`. The source URI should be parsed to extract the item ID. A suggested URI format is `bitwarden://<item_id>`. The implementation must include robust error handling for scenarios such as the `bw` executable not being found in the PATH, the user's vault being locked, the specified item ID not being found, or other CLI errors. Custom error types should be created for Bitwarden-specific failures to provide clear feedback to the user.",
@@ -1592,7 +1592,7 @@
         "subtasks": []
       },
       {
-        "id": "65",
+        "id": 65,
         "title": "Refactor `encoding` to a Flexible `transform` Pipeline",
         "description": "Replace the simple `encoding` field in the configuration with a more powerful `transform` array, enabling a multi-step pipeline for processing secrets, such as parsing JSON and selecting a specific key.",
         "details": "This task involves a significant refactoring of the secret processing logic. The existing `encoding` string field in `env-lease.toml` will be deprecated in favor of a new `transform` array of strings.\n\n**Implementation Steps:**\n\n1.  **Update Configuration Structs:** Modify the Go structs responsible for parsing `env-lease.toml` (from Task 2). Replace the `Encoding string` field with `Transform []string`.\n\n2.  **Ensure Backward Compatibility:** In the configuration loading logic, after unmarshalling the TOML, check if the `Transform` slice is empty and the legacy `Encoding` field is set to `\"base64\"`. If so, programmatically set `Transform` to `[\"base64-encode\"]` to maintain old behavior.\n\n3.  **Create Transformation Engine:** Implement a new package, e.g., `pkg/transform`, to manage the pipeline. This engine will take an initial value (the raw secret string) and the `[]string` of transformations. It must manage the intermediate state of the data, which can be either a string or a structured data type (e.g., `map[string]interface{}`).\n\n4.  **Implement Transformers:**\n    *   `base64-encode`: Implements `base64.StdEncoding.EncodeToString`.\n    *   `base64-decode`: Implements `base64.StdEncoding.DecodeString`.\n    *   `json`, `toml`, `yaml`: These transformers will parse an input string into a generic structured data format. They should return an error if the input is not valid for the given format.\n    *   `select '<path>'`: This transformer is stateful; it requires the previous step to have produced structured data. It will parse its argument to extract the path (e.g., `credentials.api_key`). It will then traverse the structured data to find the value at that path. The result should be coerced to a string. A library like `github.com/tidwall/gjson` could be suitable for JSON, or a custom dot-notation walker for a generic `map[string]interface{}`.\n\n5.  **Integrate into `grant` Command:** The `env-lease grant` command's logic (client-side, as per Task 51) must be updated. After fetching a secret from a provider, it should pass the secret and its corresponding `transform` array to the new transformation engine. The final string output from the engine is what gets written to the destination file or environment.\n\n6.  **Error Handling:** Each transformer must handle and return errors gracefully (e.g., invalid input format, path not found in `select`). The pipeline engine must stop processing and propagate the error, which the `grant` command should then report to the user.",
@@ -1605,7 +1605,7 @@
         "subtasks": []
       },
       {
-        "id": "66",
+        "id": 66,
         "title": "Update USAGE.md with Pre-Upgrade Revocation Warning",
         "description": "Add a section to the `USAGE.md` documentation file warning users to revoke all active secrets before upgrading to a new version, particularly while the software is in an unstable, pre-release state.",
         "details": "Locate the `USAGE.md` file in the project root. Add a new section, possibly titled 'Upgrading Between Versions' or as a prominent note. This section should clearly state that due to the unstable nature of the software during active development, breaking changes to the daemon's state management or IPC protocol may occur between versions. Instruct users to run `env-lease revoke --all` to clear all active leases *before* stopping the daemon and replacing the application binary. Explain that this step is crucial to prevent orphaned leases or unexpected behavior after an upgrade.",
@@ -1618,7 +1618,7 @@
         "subtasks": []
       },
       {
-        "id": "67",
+        "id": 67,
         "title": "Implement 'explode' Transform for Multi-Secret Expansion",
         "description": "Create a new 'explode' transform that processes a structured secret (like JSON or TOML) and expands its top-level key-value pairs into multiple individual secrets managed by the daemon.",
         "details": "This task introduces an 'explode' transform to be used within the transform pipeline. It is designed to operate on the output of a parser transform like 'json'. When applied, it will take a map-like structure and create a separate secret for each key-value pair. The names of the new secrets will be generated by combining the original secret alias with the key from the data, separated by an underscore (e.g., original alias 'API_CREDS' with key 'key' becomes 'API_CREDS_KEY'). This will require modifying the core secret processing logic to handle a single grant request that results in multiple secrets being stored and managed by the daemon. The transform should convert all values to strings. Initially, this transform will only operate on flat, single-level objects; nested objects are out of scope for this task.",
@@ -1631,7 +1631,7 @@
         "subtasks": []
       },
       {
-        "id": "68",
+        "id": 68,
         "title": "Implement `to_json`, `to_yaml`, and `to_toml` Stringifying Transformers",
         "description": "Enhance the secret transformation pipeline by adding `to_json`, `to_yaml`, and `to_toml` transformers to convert structured data back into their respective string formats.",
         "details": "This task involves implementing three new transformers that perform the inverse operation of the existing `json`, `yaml`, and `toml` parsers. These new transformers will take the internal structured data representation (e.g., `map[string]interface{}`) and serialize it into a formatted string.\n\n**Implementation Steps:**\n\n1.  **Locate Transformer Logic:** Identify the package where existing transformers (like `select`, `json`, `yaml`) are defined and registered.\n\n2.  **`to_json` Transformer:**\n    *   Create a function that accepts an `interface{}` representing the structured data.\n    *   Use the `encoding/json` package, specifically `json.MarshalIndent`, to serialize the data into a human-readable JSON string. Use a standard indentation (e.g., two spaces).\n    *   The function should return the resulting string and handle any potential marshaling errors.\n\n3.  **`to_yaml` Transformer:**\n    *   Create a function that accepts an `interface{}`.\n    *   Use a standard YAML library (e.g., `gopkg.in/yaml.v3`) and its `yaml.Marshal` function to serialize the data into a YAML string.\n    *   Return the resulting string and handle marshaling errors.\n\n4.  **`to_toml` Transformer:**\n    *   Create a function that accepts an `interface{}`.\n    *   Use a TOML library (e.g., `github.com/BurntSushi/toml`) to serialize the data. This may involve using `toml.NewEncoder` with a `bytes.Buffer`.\n    *   Return the resulting TOML string and handle any encoding errors.\n\n5.  **Register Transformers:** Add the new `to_json`, `to_yaml`, and `to_toml` functions to the application's central transformer registry so they can be invoked from the `transform` array in `env-lease.toml`.\n\n6.  **Update Documentation:** Edit `docs/USAGE.md` and add entries for the three new transformers to the \"Transformer Reference\" table. For each, describe its function (converts structured data to a string format) and provide a clear example, similar to the one in the task request.",
@@ -1642,7 +1642,7 @@
         "subtasks": []
       },
       {
-        "id": "69",
+        "id": 69,
         "title": "Investigate Automatic Lease Revocation on macOS via Idle Timer",
         "description": "Research and prototype a mechanism on macOS to automatically trigger `env-lease revoke --all` after a user has been idle for a specified duration, such as one hour.",
         "details": "This task is to explore a security enhancement for macOS users by automatically revoking all active leases when the system is left unattended. The primary goal is to produce a proof-of-concept script and documentation on the recommended setup.\n\n**Implementation Steps:**\n\n1.  **Research Idle Time Detection:** Investigate the most reliable method to query user idle time on macOS. The primary candidate is the `ioreg` command-line tool. A common approach is `ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'`. This method's consistency across different macOS versions should be verified.\n\n2.  **Explore Execution Schedulers:** Compare different methods for periodically running a check script:\n    *   **`launchd` Agent:** This is the preferred macOS native approach. Research how to create a user-level `launchd` agent (`.plist` file in `~/Library/LaunchAgents`) that runs a script at a regular interval (e.g., every 5 minutes) using the `StartInterval` key.\n    *   **AppleScript:** Evaluate if an AppleScript application or script offers any advantages over `launchd`, such as easier interaction with system events, though it's likely more complex for this use case.\n    *   **Cron/Shell Loop:** A simple cron job or a backgrounded shell script with a `sleep` loop can be used for prototyping but is generally less robust and efficient than `launchd`.\n\n3.  **Develop Proof-of-Concept (PoC) Script:** Create a shell script that performs the core logic:\n    *   It must be executable and should find the `env-lease` binary (either by assuming it's in the PATH or by accepting a path as an argument).\n    *   It will call `ioreg` to get the idle time in seconds.\n    *   It will compare the idle time against a configurable threshold (e.g., 3600 seconds).\n    *   If the idle time exceeds the threshold, it will execute `env-lease revoke --all`.\n    *   The script should include basic logging (e.g., to `stdout` or a log file) to aid in debugging.\n\n4.  **Create `launchd` Configuration:** Based on the research, create a sample `.plist` file that is configured to run the PoC script. This file should be well-commented to explain the different keys and their purposes.\n\n5.  **Document Findings:** The final deliverable is a Markdown document outlining the findings. It should include the recommended approach (`launchd`), the complete PoC shell script, the sample `.plist` configuration, and clear, step-by-step instructions for a user to set it up on their machine.",
@@ -1655,7 +1655,7 @@
         "subtasks": []
       },
       {
-        "id": "70",
+        "id": 70,
         "title": "Create `convert` Command to Generate `env-lease.toml` from `.env` File",
         "description": "Implement a new `env-lease convert` command that parses a `.env` or `.envrc` file to scaffold a corresponding `env-lease.toml` configuration, printing the result to standard output.",
         "status": "done",
@@ -1666,7 +1666,7 @@
         "subtasks": []
       },
       {
-        "id": "71",
+        "id": 71,
         "title": "Implement Interactive Mode for `grant` and `revoke` Commands",
         "description": "Add an `--interactive` / `-i` flag to the `grant` and `revoke` commands to prompt the user for confirmation before processing each individual secret lease.",
         "details": "This feature enhances user control during lease management. The implementation will involve:\n\n1.  **Flag Addition:** Add a new boolean flag `--interactive` with a shorthand `-i` to both the `grant` and `revoke` cobra commands.\n\n2.  **Grant Command Logic:** Modify the `grant` command's execution flow. If the `--interactive` flag is set, iterate through the secrets defined in the configuration. For each secret, print a prompt to `stderr` (e.g., `Grant lease for 'API_KEY'? [y/N] `) and wait for user input from `stdin`.\n\n3.  **Revoke Command Logic:** Similarly, update the `revoke` command. When run with `--interactive`, it should list the currently active leases for the project and prompt for confirmation before revoking each one (e.g., `Revoke lease for 'API_KEY'? [y/N] `).\n\n4.  **Input Handling:** Create a shared utility function to handle the user prompt. This function should read a single line from `stdin`. The action should only proceed if the input is 'y' or 'Y'. Any other input (including an empty line by pressing Enter) should be treated as 'No', and the specific secret should be skipped.\n\n5.  **Default Behavior:** The default behavior of both commands (when the flag is not present) must remain unchanged, processing all applicable secrets without user interaction.",
@@ -1679,7 +1679,7 @@
         "subtasks": []
       },
       {
-        "id": "72",
+        "id": 72,
         "title": "Optimize Interactive Grant by Prompting Before Secret Lookup",
         "description": "Fix a bug in the interactive grant command (`-i`) where secrets are fetched before the user is prompted for confirmation, causing unnecessary delays. This task will reverse the order of operations to improve performance and user experience.",
         "details": "The current implementation of `env-lease grant -i`, introduced in Task #71, iterates through the list of secrets, fetches the secret value using the configured `SecretProvider`, and then asks the user for confirmation. This results in a noticeable delay before each prompt, even if the user intends to skip the secret.\n\nThe logic within the `grant` command's interactive mode needs to be refactored. The new execution flow for each secret in the configuration should be:\n1. Display the confirmation prompt to the user (e.g., `Grant lease for 'SECRET_NAME'? [y/N] `).\n2. Wait for and read the user's input.\n3. If the user confirms (e.g., inputs 'y'), then proceed to call the `Fetch` method of the corresponding `SecretProvider` to retrieve the secret's value.\n4. If the user denies or provides no input, skip the secret fetch entirely and move to the next secret in the list.\n\nThis change will be isolated to the `grant` command's execution logic and should not require any modifications to the `SecretProvider` interface or its various implementations.",
@@ -1693,7 +1693,7 @@
         "subtasks": []
       },
       {
-        "id": "73",
+        "id": 73,
         "title": "Ensure Leases are Revoked Correctly After System Wake-up",
         "description": "Fix a bug where leases that expire while a computer is asleep or powered off are not revoked upon system wake-up. This task will implement a mechanism to check for and revoke expired leases when the system becomes active again.",
         "details": "The current lease expiration mechanism fails if the system is not running when a lease's expiration time is reached. This task will introduce a robust check that triggers on system startup or wake-up from sleep/hibernate.\n\n**Implementation Plan:**\n\n1.  **Create a New Internal Command:**\n    *   Implement a new, non-interactive command, e.g., `env-lease internal --check-expired`.\n    *   This command will read the application's lease state file.\n    *   It will iterate through all active leases and compare their expiration timestamp with the current time.\n    *   For each lease that has expired, it will trigger the standard revocation logic.\n    *   The command should execute silently on success and only log errors (e.g., network failure during revocation).\n\n2.  **Platform-Specific Wake-up Triggers:**\n    *   The core of the solution is to run the new command automatically after the system wakes up. This requires platform-specific configuration.\n    *   **macOS:** Use `launchd`. A `.plist` file will be created to run the command. It can be triggered by the `RunAtLoad` key (for startup) and by listening for wake notifications. Documentation should be provided for users to place this file in `~/Library/LaunchAgents`.\n    *   **Linux:** Use `systemd`. A user service unit file (`.service`) will be created. The service will be configured to run after targets like `suspend.target` and `hibernate.target` by using `After=suspend.target hibernate.target` and `WantedBy=suspend.target hibernate.target`.\n    *   **Windows:** Use the Task Scheduler. A task can be configured to run the command on specific system events, such as Event ID 1 from the `Power-Troubleshooter` source, which indicates the system has resumed from a low-power state.\n\n3.  **Documentation:**\n    *   Update the project documentation with clear instructions on how to set up these platform-specific triggers for the new functionality.",
@@ -1704,7 +1704,7 @@
         "subtasks": []
       },
       {
-        "id": "74",
+        "id": 74,
         "title": "Create example of --interactive",
         "description": "The --interactive argument does not seem to be documented",
         "details": "",
@@ -1715,7 +1715,7 @@
         "subtasks": []
       },
       {
-        "id": "75",
+        "id": 75,
         "title": "Integrate beeep library for notifications",
         "description": "Use the beeep library for cross-platform notifications. More info at github.com/gen2brain/beeep",
         "details": "",
@@ -1726,7 +1726,7 @@
         "subtasks": []
       },
       {
-        "id": "76",
+        "id": 76,
         "title": "Add daemon status command",
         "description": "Create an `env-lease daemon status` command. This command should be similar to the existing `idle status` command, focusing on checking if the OS-specific service (e.g., plist on macOS) is installed.",
         "status": "done",
@@ -1737,7 +1737,7 @@
         "subtasks": []
       },
       {
-        "id": "77",
+        "id": 77,
         "title": "Make 'destination' optional for file-based leases",
         "description": "Update the configuration parsing logic to make the 'destination' field optional for leases with 'lease_type = file'. When omitted, the destination filename will be automatically derived from the 'source' field. This task is tracked by GitHub issue #11.",
         "status": "done",
@@ -1752,7 +1752,7 @@
         "subtasks": []
       },
       {
-        "id": "78",
+        "id": 78,
         "title": "Restrict File Lease Destination to Project Root Directory",
         "description": "Implement a security check to ensure that for file-based leases, the destination path is within the project's root directory where `env-lease.toml` resides. Add a flag to allow overriding this behavior. This task is tracked by GitHub issue #12.",
         "status": "done",
@@ -1827,7 +1827,7 @@
         ]
       },
       {
-        "id": "79",
+        "id": 79,
         "title": "Fix `revoke --interactive` to Work with `--all` Flag",
         "description": "Modify the `revoke` command to correctly handle the `--interactive` flag when used in conjunction with the `--all` flag, allowing users to selectively revoke leases from a global list.",
         "details": "Currently, when `env-lease revoke --all --interactive` is executed, the `--all` flag takes precedence and revokes all active leases non-interactively, ignoring the `--interactive` flag. This task involves modifying the command's logic to combine these flags correctly. The command should first fetch the complete list of all active leases (the same list used by `--all`). This list should then be presented to the user in an interactive selection prompt. Based on the user's selection, a `RevokeRequest` should be sent to the daemon containing only the leases the user chose to revoke. If the user cancels or selects no leases, no revocation should occur.",
@@ -1841,7 +1841,7 @@
         "subtasks": []
       },
       {
-        "id": "80",
+        "id": 80,
         "title": "Correctly Set Project Root from --config Flag Path",
         "description": "Fix a bug where commands using the --config flag incorrectly use the current working directory as the project root instead of the directory containing the specified configuration file.",
         "details": "When a user runs a command like `env-lease grant --config /path/to/project/env-lease.toml` from a different directory, the application currently uses the present working directory (PWD) to resolve relative paths and identify the project. The correct behavior is to use the directory of the specified config file (`/path/to/project/`) as the project root. This change requires modifying the initial configuration loading logic shared by commands like `grant`, `revoke`, and `status`. The logic must resolve the absolute path of the file provided to the `--config` flag and then use its parent directory as the authoritative project root for all subsequent operations, including resolving relative paths for file leases.",
@@ -1857,7 +1857,7 @@
         "subtasks": []
       },
       {
-        "id": "82",
+        "id": 82,
         "title": "Support Configuration via ENV_LEASE_NAME and ENV_LEASE_CONFIG",
         "description": "Implement support for two new environment variables, `ENV_LEASE_CONFIG` and `ENV_LEASE_NAME`, to provide more flexible ways of specifying the configuration file location and name.",
         "details": "This task introduces two environment variables to control how the application finds its configuration file. The logic must be implemented in the shared configuration loading module to ensure all commands (grant, revoke, status, etc.) inherit this behavior. A clear order of precedence must be established: 1. The `--config` command-line flag (as implemented in Task 81) takes highest priority. 2. If `--config` is not used, the `ENV_LEASE_CONFIG` variable is checked. If set, it is treated as the absolute or relative path to the configuration file. 3. If `ENV_LEASE_CONFIG` is not set, the `ENV_LEASE_NAME` variable is checked. If set, the application will look for a file with this name in the current directory. 4. If none of the above are provided, the application falls back to the default behavior of looking for `env-lease.toml` in the current directory. The logic must also correctly integrate with the project root detection from Task 80, meaning if `ENV_LEASE_CONFIG` is used, the directory containing that file becomes the project root.",
@@ -1871,7 +1871,7 @@
         "subtasks": []
       },
       {
-        "id": "83",
+        "id": 83,
         "title": "Add `revoke_format` Configuration Option for Leases",
         "description": "Introduce a new `revoke_format` configuration option for file-based leases. This will allow users to specify the exact format of a variable in the destination file after it has been revoked, such as setting it to an empty string.",
         "details": "This task involves adding a new optional field, `revoke_format`, to the `[[lease]]` configuration block in `env-lease.toml`. When a lease is revoked, the system will check for this field. If `revoke_format` is present, its value (a template string like `\"{{ .Name }}=\"`) will be used to render the output in the destination file. If the field is absent, the system will revert to the default behavior of removing the corresponding line from the file entirely. This logic must be implemented within the daemon's lease revocation handler. The change needs to be compatible with all existing revoke mechanisms, including project-scoped revocation, `revoke --all`, and interactive revocation.",
@@ -1888,7 +1888,7 @@
         "subtasks": []
       },
       {
-        "id": "84",
+        "id": 84,
         "title": "Support Local Override Configuration File (`env-lease.local.toml`)",
         "description": "Implement support for a local override file, `env-lease.local.toml`, to supplement and override configurations from the primary `env-lease.toml`. This allows users to maintain local-specific settings without modifying the main, potentially version-controlled, configuration file.",
         "details": "The core configuration loading logic needs to be updated to automatically detect and merge a local override file. After successfully locating and parsing the primary configuration file (e.g., `env-lease.toml`), the system should check for a corresponding local file. The local file's name will be derived from the primary file's name by inserting `.local` before the extension (e.g., `env-lease.local.toml` for `env-lease.toml`, or `custom.local.toml` for `custom.toml`).\n\nIf a local file is found, its contents should be merged with the primary configuration. The merge strategy should be as follows: simple key-value pairs in the local file will override those from the primary file. For lists of tables, such as `[[secret]]` or `[[lease]]`, the list from the local file should be appended to the list from the primary file. This allows users to both add new secrets/leases and override global settings locally.\n\nThis feature should integrate seamlessly with existing configuration discovery methods:\n- If `--config /path/to/my-config.toml` is used, the system will look for `/path/to/my-config.local.toml`.\n- If `ENV_LEASE_CONFIG` is set, the same naming logic applies to the specified file path.\n\nFor this initial implementation, no new command-line flags (`--local-config`) or environment variables (`ENV_LEASE_LOCAL_CONFIG`) will be introduced; the discovery is purely conventional and automatic.",
@@ -1904,7 +1904,7 @@
         "updatedAt": "2025-10-13T10:07:33.156Z"
       },
       {
-        "id": "85",
+        "id": 85,
         "title": "Implement Bulk Secret Fetching with `op inject` for 1Password Provider",
         "description": "Refactor the 1Password provider to use the `op inject` command for fetching multiple `op://` secrets in a single operation, improving performance. The implementation must handle `op+file://` secrets separately, as they are not supported by `op inject` and require individual fetching.",
         "status": "done",
@@ -1962,6 +1962,20 @@
             "parentId": "undefined"
           }
         ]
+      },
+      {
+        "id": 86,
+        "title": "Refactor Interactive Grant to a Two-Step Secret Query",
+        "description": "Optimize the interactive grant command by implementing a two-step secret fetching process. This change will first fetch secrets required for transformations to populate the selection list, and then fetch the remaining simple secrets only after the user has made their selection.",
+        "details": "The current interactive grant logic, improved by Task 72, still fetches all secrets before prompting if they are part of a transformation pipeline. This refactoring introduces a more intelligent, two-step approach to minimize unnecessary secret lookups and reduce latency. The new workflow will be:\n1. **Partition Leases:** Before displaying the interactive prompt, the grant command will analyze all configured leases and partition them into two groups: 'simple' leases (a direct 1-to-1 mapping from source to environment variable) and 'transform' leases (leases that use the `transform` pipeline from Task 65).\n2. **Pre-fetch for Transforms:** The command will immediately fetch the source secrets for all 'transform' leases. This is necessary because the final set of available environment variables can only be determined after applying the transformation (e.g., parsing a JSON object to expose its keys).\n3. **Display Prompt:** The interactive prompt will be displayed to the user, populated with all 'simple' leases and all the derived variables from the 'transform' leases.\n4. **Post-fetch Selected Secrets:** After the user makes their selection, the command will fetch the source secrets for only the selected 'simple' leases. The values for the selected 'transform' leases are already available from the pre-fetch step.\nThis ensures that secrets are only fetched when absolutely necessary: either to discover the available options for the user or because the user explicitly requested them.",
+        "testStrategy": "Testing will involve both unit and integration tests with a mocked secret provider to assert the exact sequence of operations.\n1. **Unit Tests:** Create unit tests for the logic that partitions leases into 'simple' and 'transform' groups.\n2. **Integration Test:** Create a test configuration (`env-lease.toml`) containing a mix of leases:\n    - A simple secret from a provider.\n    - A secret that uses a `transform` pipeline to parse a JSON object.\n    - A second lease that uses the same JSON source but selects a different key.\n3. **Mock and Verify:** Use a mocked secret provider that logs all calls to its `Fetch` method. Run the `grant --interactive` command against this configuration.\n    - Assert that `Fetch` is called exactly once for the JSON source secret *before* the interactive prompt is shown.\n    - Assert that `Fetch` has *not* been called for the simple secret at this stage.\n    - Simulate user input to select the simple secret and one of the transformed secrets.\n    - Assert that `Fetch` is now called for the simple secret.\n    - Assert that `Fetch` is *not* called a second time for the JSON source secret.\n    - Finally, verify that the output correctly contains only the two selected secrets.",
+        "status": "pending",
+        "dependencies": [
+          65,
+          72
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
@@ -1971,7 +1985,10 @@
       "completedCount": 75,
       "tags": [
         "master"
-      ]
+      ],
+      "created": "2025-10-17T03:17:58.988Z",
+      "description": "Tasks for master context",
+      "updated": "2025-10-17T03:18:23.645Z"
     }
   }
 }
