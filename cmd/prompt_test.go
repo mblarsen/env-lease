@@ -16,49 +16,49 @@ func TestDoConfirm(t *testing.T) {
 	}{
 		{
 			name:       "Yes",
-			inputs:     []string{"y"},
+			inputs:     []string{"y\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{true},
 			finalState: stateAsk,
 		},
 		{
 			name:       "No",
-			inputs:     []string{"n"},
+			inputs:     []string{"n\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{false},
 			finalState: stateAsk,
 		},
 		{
 			name:       "Default to No",
-			inputs:     []string{""},
+			inputs:     []string{"\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{false},
 			finalState: stateAsk,
 		},
 		{
 			name:       "All",
-			inputs:     []string{"a"},
+			inputs:     []string{"a\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{true},
 			finalState: stateAlways,
 		},
 		{
 			name:       "Deny",
-			inputs:     []string{"d"},
+			inputs:     []string{"d\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{false},
 			finalState: stateDeny,
 		},
 		{
 			name:       "Help then Yes",
-			inputs:     []string{"?", "y"},
+			inputs:     []string{"?\n", "y\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{true},
 			finalState: stateAsk,
 		},
 		{
 			name:       "Invalid then No",
-			inputs:     []string{"x", "n"},
+			inputs:     []string{"x\n", "n\n"},
 			prompts:    []string{"Prompt 1?"},
 			expected:   []bool{false},
 			finalState: stateAsk,
@@ -68,7 +68,7 @@ func TestDoConfirm(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetConfirmState()
-			input := strings.Join(tt.inputs, "\n")
+			input := strings.Join(tt.inputs, "")
 			in := bytes.NewBufferString(input)
 
 			for i, prompt := range tt.prompts {

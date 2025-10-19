@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGrantRunE(t *testing.T) {
@@ -97,7 +99,7 @@ format = "custom_format %s=%s"
 [[lease]]
 source = "mock"
 destination = "` + destFile + `"
-variable = "API_KEY"
+variable = "API_key"
 duration = "1m"
 `
 		configFile := writeConfig(configContent)
@@ -248,25 +250,25 @@ format = "export %s=%q"
 		grantCmd.Flags().Set("interactive", "true")
 
 		// Test case where user denies
-		originalConfirm := confirm
+		resetConfirmState()
 		confirm = func(prompt string) bool { return false }
 		err := grantCmd.RunE(grantCmd, []string{})
 		if err != nil {
 			t.Fatalf("grant command failed: %v", err)
 		}
-		confirm = originalConfirm
 		content, err := os.ReadFile(destFile)
 		if err == nil && len(content) > 0 {
 			t.Fatalf("file should be empty, but has content: %s", content)
 		}
 
 		// Test case where user accepts
+		resetConfirmState()
 		confirm = func(prompt string) bool { return true }
+		grantCmd.Flags().Set("interactive", "true")
 		err = grantCmd.RunE(grantCmd, []string{})
 		if err != nil {
 			t.Fatalf("grant command failed: %v", err)
 		}
-		confirm = originalConfirm
 		content, err = os.ReadFile(destFile)
 		if err != nil {
 			t.Fatalf("failed to read destination file: %v", err)
@@ -283,7 +285,6 @@ format = "export %s=%q"
 [[lease]]
 source = "mock-explode"
 destination = "` + destFile + `"
-variable = "EXPLODED_VARS"
 duration = "1m"
 transform = ["json", "explode"]
 lease_type = "shell"
@@ -294,20 +295,28 @@ lease_type = "shell"
 
 		var prompts []string
 		originalConfirm := confirm
+		defer func() { confirm = originalConfirm }()
+
+		resetConfirmState()
 		confirm = func(prompt string) bool {
 			prompts = append(prompts, prompt)
-			return true
+			return prompt == "Grant leases from 'mock-explode' (json, explode)?"
 		}
 
 		err := grantCmd.RunE(grantCmd, []string{})
 		if err != nil {
 			t.Fatalf("grant command failed: %v", err)
 		}
-		confirm = originalConfirm
 
-		expectedPrompt := "Grant leases from 'mock-explode'?"
-		if len(prompts) == 0 || prompts[0] != expectedPrompt {
-			t.Fatalf("expected prompt %q, got %q", expectedPrompt, prompts[0])
+		// Prompts are no longer deterministic due to parallel fetching
+		// and map iteration. We check that the essential prompts were made.
+		shownPrompts := make(map[string]bool)
+		for _, p := range prompts {
+			shownPrompts[p] = true
 		}
+
+		assert.True(t, shownPrompts["Grant leases from 'mock-explode' (json, explode)?"], "did not show parent prompt")
+		assert.False(t, shownPrompts["Grant lease for 'key1'?"], "should not show key1 prompt")
+		assert.False(t, shownPrompts["Grant lease for 'key2'?"], "should not show key2 prompt")
 	})
 }

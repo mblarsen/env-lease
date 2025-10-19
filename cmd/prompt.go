@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -23,7 +24,9 @@ var (
 	// confirmState tracks the user's choice to apply to all subsequent prompts.
 	confirmState = stateAsk
 	// confirm is the function used to prompt the user. Can be swapped for tests.
-	confirm = interactiveConfirm
+	confirm = func(prompt string) bool {
+		return doConfirm(prompt, os.Stdin)
+	}
 )
 
 // resetConfirmState resets the interactive confirmation state. It should be
@@ -38,10 +41,10 @@ func interactiveConfirm(prompt string) bool {
 	return doConfirm(prompt, os.Stdin)
 }
 
-// doConfirm is the underlying implementation of the confirmation prompt.
-// It reads from the provided reader, allowing for testing.
+// doConfirm handles the logic of prompting the user for a yes/no decision.
+// It supports single answers, as well as "all" and "deny" to apply to
+// subsequent prompts. It reads from the provided io.Reader.
 func doConfirm(prompt string, in io.Reader) bool {
-	// If a decision for all subsequent prompts has been made, act on it.
 	if confirmState == stateAlways {
 		return true
 	}
@@ -49,38 +52,42 @@ func doConfirm(prompt string, in io.Reader) bool {
 		return false
 	}
 
-	var writer io.Writer = os.Stdout
-	if shellMode {
-		writer = os.Stderr
-	}
+	reader := bufio.NewReader(in)
 
 	for {
-		fmt.Fprintf(writer, "%s [y/n/a/d/?] ", prompt)
-		var response string
-		fmt.Fscanln(in, &response)
-		response = strings.TrimSpace(strings.ToLower(response))
+		fmt.Printf("%s [y/n/a/d/?]: ", prompt)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			// On EOF, default to "no"
+			if err == io.EOF {
+				fmt.Println()
+				return false
+			}
+			// In tests, this can be triggered by a closed pipe, so we'll
+			// treat it as a "no". In real use, this is unlikely.
+			return false
+		}
+		input = strings.TrimSpace(strings.ToLower(input))
 
-		switch response {
+		switch input {
 		case "y", "yes":
 			return true
 		case "n", "no", "":
 			return false
 		case "a", "all":
 			confirmState = stateAlways
-			return true // 'a' means yes to this and all subsequent prompts
+			return true
 		case "d", "deny":
 			confirmState = stateDeny
-			return false // 'd' means no to this and all subsequent prompts
+			return false
 		case "?", "help":
-			fmt.Fprintln(writer, "y - yes")
-			fmt.Fprintln(writer, "n - no (default)")
-			fmt.Fprintln(writer, "a - yes to current and all remaining")
-			fmt.Fprintln(writer, "d - no to current and all remaining")
-			fmt.Fprintln(writer, "? - show this help")
-			continue
+			fmt.Println("y: yes")
+			fmt.Println("n: no (default)")
+			fmt.Println("a: yes to all subsequent prompts")
+			fmt.Println("d: no to all subsequent prompts")
+			fmt.Println("?: show this help message")
 		default:
-			fmt.Fprintf(writer, "Invalid response: %q\n", response)
-			continue
+			fmt.Printf("Invalid input: %q. Please try again.\n", input)
 		}
 	}
 }

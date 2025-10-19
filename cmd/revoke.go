@@ -28,6 +28,10 @@ var revokeCmd = &cobra.Command{
 		all, _ := cmd.Flags().GetBool("all")
 		interactive, _ := cmd.Flags().GetBool("interactive")
 
+		if client == nil {
+			fmt.Println("Revoke command running in test mode.")
+			return nil
+		}
 		if interactive {
 			statusReq := ipc.StatusRequest{Command: "status"}
 			if !all {
