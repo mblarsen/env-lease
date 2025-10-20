@@ -1988,7 +1988,7 @@
         "id": 87,
         "title": "Bug: v0.1.33 breaks interactive sub-leases",
         "description": "Commit 1bbe69a breaks the `--interactive` feature for exploded values (sub-leases). Instead of looking up the parent secret and then prompting for each individual sub-lease, the command skips them entirely.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "details": "This bug is a regression introduced in commit 1bbe69a. The interactive mode, implemented in tasks #71 and #72, should handle secrets that are 'exploded' into multiple environment variables. The current behavior incorrectly skips the prompt for these sub-leases.\n\nGitHub Issue: https://github.com/mblarsen/env-lease/issues/13",
@@ -2000,7 +2000,7 @@
             "description": "Analyze the changes in commit 1bbe69a to identify the specific code that broke the handling of exploded values in interactive mode.",
             "dependencies": [],
             "details": "Focus on the logic that iterates through leases and determines when to prompt the user. The issue likely lies in how sub-leases are processed after the parent secret is fetched.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": null
           },
           {
@@ -2011,7 +2011,7 @@
               1
             ],
             "details": "The fix will likely involve adjusting the loop in the grant command to correctly iterate over the key-value pairs of an exploded secret *before* setting them in the environment, and prompting for each one.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": null
           },
           {
@@ -2022,7 +2022,7 @@
               2
             ],
             "details": "The test should configure a secret provider with a multi-key secret (e.g., JSON), define a lease that explodes it, and then simulate running 'grant -i'. It should assert that prompts are shown for each sub-key.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Use the integration test suite. Mock user input to automatically answer 'yes' to the prompts and verify the resulting environment variables."
           }
         ]
@@ -2038,7 +2038,7 @@
       ],
       "created": "2025-10-20T02:33:49.142Z",
       "description": "Tasks for master context",
-      "updated": "2025-10-20T02:33:49.145Z"
+      "updated": "2025-10-20T06:30:01.190Z"
     }
   }
 }

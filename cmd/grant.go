@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
@@ -379,7 +378,7 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal, projectRoot, co
 		// For file/env leases, only write if there's a variable,
 		// or if it's a file lease. This prevents writing the
 		// parent/container lease of an explode.
-		if l.LeaseType == "file" || l.Variable != "" {
+		if l.LeaseType == "file" || (l.LeaseType == "env" && l.Variable != "") {
 			override, _ := cmd.Flags().GetBool("override")
 			created, err := writeLease(l, secretVal, projectRoot, override)
 			if err != nil {
@@ -474,245 +473,19 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 	for _, key := range selectedLeaseKeys {
 		selectedLeases = append(selectedLeases, leaseMap[key])
 	}
-
-	// Re-categorize based on selection
-	var selectedFileLeases, selectedExplodeLeases, selectedBatchableLeases []config.Lease
-	slog.Debug("Re-categorizing selected leases", "count", len(selectedLeases))
-	for _, l := range selectedLeases {
-		isExplode := false
-		for _, t := range l.Transform {
-			if strings.HasPrefix(strings.TrimSpace(t), "explode") {
-				isExplode = true
-				break
-			}
-		}
-
-		// If the source is a file, it's always a file lease, regardless of transforms.
-		if strings.HasPrefix(l.Source, "op+file://") {
-			selectedFileLeases = append(selectedFileLeases, l)
-			slog.Debug("Categorized lease as File", "source", l.Source)
-		} else if isExplode {
-			selectedExplodeLeases = append(selectedExplodeLeases, l)
-			slog.Debug("Categorized lease as Explode", "source", l.Source)
-		} else {
-			selectedBatchableLeases = append(selectedBatchableLeases, l)
-			slog.Debug("Categorized lease as Batchable", "source", l.Source)
-		}
-	}
+	slog.Debug("Selected leases", "leases", selectedLeases)
 
 	continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 	var errs []grantError
-	secrets := make(map[string]string)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	// 1. Build helper map of all leases by source URI to handle de-duplication
-	allLeasesForFetching := append(selectedFileLeases, selectedBatchableLeases...)
-	allLeasesForFetching = append(allLeasesForFetching, selectedExplodeLeases...)
-
-	sourceToLeases := make(map[string][]config.Lease)
-	uniqueLeasesBySource := make(map[string]config.Lease)
-	for _, l := range allLeasesForFetching {
-		sourceToLeases[l.Source] = append(sourceToLeases[l.Source], l)
-		if _, exists := uniqueLeasesBySource[l.Source]; !exists {
-			uniqueLeasesBySource[l.Source] = l
-		}
-	}
-
-	// 2. Categorize unique leases for fetching strategy (individual vs. batch)
-	var individualFetchLeases []config.Lease
-	batchableLeasesByAccount := make(map[string][]config.Lease)
-	for _, l := range uniqueLeasesBySource {
-		if strings.HasPrefix(l.Source, "op+file://") {
-			individualFetchLeases = append(individualFetchLeases, l)
-		} else {
-			batchableLeasesByAccount[l.OpAccount] = append(batchableLeasesByAccount[l.OpAccount], l)
-		}
-	}
-
-	// 3. Execute fetches concurrently, de-duplicated by source URI
-
-	// 3a. Individual fetches for file-based sources
-	slog.Debug("Starting individual fetch for unique file-source leases", "count", len(individualFetchLeases))
-	for _, l := range individualFetchLeases {
-		wg.Add(1)
-		go func(l config.Lease) {
-			defer wg.Done()
-			slog.Info("Fetching secret individually", "source", l.Source)
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: l.OpAccount}
-			}
-			secretVal, err := p.Fetch(l.Source)
-
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				errs = append(errs, grantError{Source: l.Source, Err: err})
-				return
-			}
-
-			// Populate secrets map for all leases sharing this source
-			for _, relatedLease := range sourceToLeases[l.Source] {
-				if relatedLease.Variable != "" {
-					secrets[relatedLease.Variable] = secretVal
-				} else {
-					secrets[relatedLease.Source] = secretVal
-				}
-			}
-			slog.Info("Fetched secret individually", "source", l.Source)
-		}(l)
-	}
-
-	// 3b. Batch fetches for other sources, grouped by account
-	slog.Debug("Starting batch fetch for unique op-source leases", "accounts", len(batchableLeasesByAccount))
-	for account, accountLeases := range batchableLeasesByAccount {
-		wg.Add(1)
-		go func(account string, accountLeases []config.Lease) {
-			defer wg.Done()
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: account}
-			}
-
-			slog.Info("Batch fetching secrets for account", "account", account, "count", len(accountLeases))
-			fetchedSecrets, providerErrors := p.FetchLeases(accountLeases)
-
-			mu.Lock()
-			defer mu.Unlock()
-			if len(providerErrors) > 0 {
-				for _, pe := range providerErrors {
-					errs = append(errs, grantError{Source: pe.Lease.Source, Err: pe.Err})
-				}
-			}
-
-			// Map batch results back to all leases that share the source
-			for _, fetchedLease := range accountLeases {
-				var secretVal string
-				var ok bool
-				if fetchedLease.Variable != "" {
-					secretVal, ok = fetchedSecrets[fetchedLease.Variable]
-				} else {
-					secretVal, ok = fetchedSecrets[fetchedLease.Source]
-				}
-
-				if ok {
-					for _, relatedLease := range sourceToLeases[fetchedLease.Source] {
-						if relatedLease.Variable != "" {
-							secrets[relatedLease.Variable] = secretVal
-						} else {
-							secrets[relatedLease.Source] = secretVal
-						}
-					}
-				}
-			}
-			slog.Info("Batch fetched secrets for account", "account", account, "count", len(fetchedSecrets))
-		}(account, accountLeases)
-	}
-
-	wg.Wait()
-
-	if len(errs) > 0 && !continueOnError {
-		return &GrantErrors{errs: errs}
-	}
-
 	finalLeases := make([]ipc.Lease, 0)
 	approvedShellCommands := make([]string, 0)
 
-	for _, l := range selectedExplodeLeases {
-		secretVal, ok := secrets[l.Source]
-		if !ok {
-			continue
-		}
-
-		pipeline, err := transform.NewPipeline(l.Transform)
+	for _, l := range selectedLeases {
+		slog.Debug("Processing selected lease", "source", l.Source)
+		processed, sc, err := processSingleLease(cmd, l, "", cfg.Root, absConfigFile, true, &errs, continueOnError)
 		if err != nil {
-			return fmt.Errorf("failed to create transform pipeline for %s: %w", l.Source, err)
-		}
-		transformResult, err := pipeline.Run(secretVal)
-		if err != nil {
-			return fmt.Errorf("failed to transform secret for %s: %w", l.Source, err)
-		}
-
-		explodedData, ok := transformResult.(transform.ExplodedData)
-		if !ok {
-			return fmt.Errorf("expected exploded data from transform for %s, but got something else", l.Source)
-		}
-
-		var explodedOptions []string
-		for k := range explodedData {
-			explodedOptions = append(explodedOptions, k)
-		}
-
-		var selectedKeys []string
-		fmt.Fprintf(os.Stderr, "Granting sub-leases from '%s'%s:\n", l.Source, getTransformSummary(l.Transform))
-		for _, opt := range explodedOptions {
-			if confirm(fmt.Sprintf("Grant lease for '%s'?", opt)) {
-				selectedKeys = append(selectedKeys, opt)
-			}
-		}
-
-		parentLeaseConfig := l
-		parentLeaseConfig.Variable = "" // No single variable for the parent
-		parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", cfg.Root, absConfigFile)
-		if err != nil {
-			return err
-		}
-		finalLeases = append(finalLeases, parentLeases...)
-		uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
-
-		for _, key := range selectedKeys {
-			value := explodedData[key]
-			explodedLeaseConfig := l
-			explodedLeaseConfig.Variable = key
-			explodedLeaseConfig.ParentSource = uniqueParentID
-
-			processed, sc, err := processLease(cmd, explodedLeaseConfig, value, cfg.Root, absConfigFile)
-			if err != nil {
-				errs = append(errs, grantError{Source: key, Err: err})
-				if !continueOnError {
-					return &GrantErrors{errs: errs}
-				}
-				continue
-			}
-			finalLeases = append(finalLeases, processed...)
-			approvedShellCommands = append(approvedShellCommands, sc...)
-		}
-	}
-
-	// 4. Process non-exploded leases
-	for _, l := range selectedBatchableLeases {
-		secretVal, ok := secrets[l.Variable]
-		if !ok {
-			slog.Debug("Secret not found in fetched map for batchable lease", "variable", l.Variable, "source", l.Source)
-			continue
-		}
-		processed, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, false, &errs, continueOnError)
-		if err != nil {
-			errs = append(errs, grantError{Source: l.Source, Err: err})
 			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-		finalLeases = append(finalLeases, processed...)
-		approvedShellCommands = append(approvedShellCommands, sc...)
-	}
-
-	for _, l := range selectedFileLeases {
-		secretVal, ok := secrets[l.Source]
-		if !ok {
-			continue
-		}
-		processed, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, true, &errs, continueOnError)
-		if err != nil {
-			errs = append(errs, grantError{Source: l.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
+				return err
 			}
 			continue
 		}
