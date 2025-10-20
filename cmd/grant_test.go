@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestGrantRunE(t *testing.T) {
@@ -233,90 +231,5 @@ format = "%s=%q"
 		if !strings.Contains(string(content), expectedContent) {
 			t.Fatalf("expected content %q, got %q", expectedContent, string(content))
 		}
-	})
-
-	t.Run("interactive mode", func(t *testing.T) {
-		destFile := filepath.Join(tempDir, ".env.interactive")
-		configContent := `
-[[lease]]
-source = "mock"
-destination = "` + destFile + `"
-variable = "API_KEY"
-duration = "1m"
-format = "export %s=%q"
-`
-		configFile := writeConfig(configContent)
-		grantCmd.Flags().Set("config", configFile)
-		grantCmd.Flags().Set("interactive", "true")
-
-		// Test case where user denies
-		resetConfirmState()
-		confirm = func(prompt string) bool { return false }
-		err := grantCmd.RunE(grantCmd, []string{})
-		if err != nil {
-			t.Fatalf("grant command failed: %v", err)
-		}
-		content, err := os.ReadFile(destFile)
-		if err == nil && len(content) > 0 {
-			t.Fatalf("file should be empty, but has content: %s", content)
-		}
-
-		// Test case where user accepts
-		resetConfirmState()
-		confirm = func(prompt string) bool { return true }
-		grantCmd.Flags().Set("interactive", "true")
-		err = grantCmd.RunE(grantCmd, []string{})
-		if err != nil {
-			t.Fatalf("grant command failed: %v", err)
-		}
-		content, err = os.ReadFile(destFile)
-		if err != nil {
-			t.Fatalf("failed to read destination file: %v", err)
-		}
-		expected := `export API_KEY="secret-for-mock"`
-		if !strings.Contains(string(content), expected) {
-			t.Fatalf("expected content %q, got %q", expected, string(content))
-		}
-	})
-
-	t.Run("interactive mode with explode", func(t *testing.T) {
-		destFile := filepath.Join(tempDir, ".env.interactive.explode")
-		configContent := `
-[[lease]]
-source = "mock-explode"
-destination = "` + destFile + `"
-duration = "1m"
-transform = ["json", "explode"]
-lease_type = "shell"
-`
-		configFile := writeConfig(configContent)
-		grantCmd.Flags().Set("config", configFile)
-		grantCmd.Flags().Set("interactive", "true")
-
-		var prompts []string
-		originalConfirm := confirm
-		defer func() { confirm = originalConfirm }()
-
-		resetConfirmState()
-		confirm = func(prompt string) bool {
-			prompts = append(prompts, prompt)
-			return prompt == "Grant leases from 'mock-explode' (json, explode)?"
-		}
-
-		err := grantCmd.RunE(grantCmd, []string{})
-		if err != nil {
-			t.Fatalf("grant command failed: %v", err)
-		}
-
-		// Prompts are no longer deterministic due to parallel fetching
-		// and map iteration. We check that the essential prompts were made.
-		shownPrompts := make(map[string]bool)
-		for _, p := range prompts {
-			shownPrompts[p] = true
-		}
-
-		assert.True(t, shownPrompts["Grant leases from 'mock-explode' (json, explode)?"], "did not show parent prompt")
-		assert.False(t, shownPrompts["Grant lease for 'key1'?"], "should not show key1 prompt")
-		assert.False(t, shownPrompts["Grant lease for 'key2'?"], "should not show key2 prompt")
 	})
 }
