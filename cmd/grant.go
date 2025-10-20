@@ -1,3 +1,68 @@
+// Package cmd provides the command-line interface for env-lease. The grant
+// command is the core of the application, responsible for fetching secrets and
+// managing their lifecycle. It supports both a standard, non-interactive mode
+// and a detailed interactive mode for granular control over lease approvals.
+//
+// # Interactive Grant Workflow (`grant --interactive`)
+//
+// The interactive grant process is designed to be secure, efficient, and
+// user-friendly. It follows a strict, multi-phase workflow to ensure a
+// predictable user experience.
+//
+// ## Key Design Principles
+//
+//  1. **Just-in-Time Secret Fetching**: Secrets are only retrieved from the
+//     provider *after* the user approves the corresponding lease. This minimizes
+//     unnecessary access to sensitive data.
+//  2. **Intelligent Batching**: To minimize latency, approved `op://` leases
+//     that share the same `op_account` are fetched together in a single,
+//     batched `op` CLI call.
+//  3. **Efficient Caching**: `op+file://` sources are fetched only once per
+//     run. If multiple leases use the same `op+file://` URI, the content is
+//     fetched for the first approved lease and then reused from an in-memory
+//     cache for all subsequent leases in the same run.
+//  4. **Strictly Ordered Workflow**: The flow is separated into distinct,
+//     predictable phases: a complete pass for approving sources (Round 1), a
+//     parallelized fetching phase, and a final pass for approving individual
+//     secrets from `explode` leases (Round 2).
+//  5. **Descriptive & Multi-Stage Prompting**: For leases with an `explode`
+//     transform, the user is guided through a two-stage approval process. To
+//     avoid ambiguity, prompts for such leases include details from the
+//     transformation pipeline (e.g., `select 'production'`), ensuring the user
+//     knows exactly which configuration they are approving.
+//
+// ## The User Workflow
+//
+// ### Phase 1: Round 1 - Approve Sources
+//
+// The command first makes a complete pass through the `env-lease.toml`
+// configuration, prompting the user to approve or deny each top-level
+// `[[lease]]` block. No secrets are fetched during this phase.
+//
+// ### Phase 2: Fetch Secrets
+//
+// Once Round 1 is complete, the system executes all necessary secret lookups
+// for the approved sources. To maximize speed, these lookups are performed
+// **in parallel**:
+//   - One batched `op` call is made for each group of approved `op://` leases
+//     that share an `op_account`.
+//   - One individual `op` call is made for each unique `op+file://` URI that
+//     was approved.
+//
+// ### Phase 3: Round 2 - Approve Individual Secrets (Optional)
+//
+// This is an optional phase that only runs for `explode` leases that were
+// approved in Round 1. All simple (non-`explode`) leases approved in the first
+// round are now considered final and are ready to be granted without any
+// further prompts.
+//
+// ### Phase 4: Grant Leases
+//
+// Once all approvals are gathered, the final, verified list of leases is sent
+// to the `env-lease` daemon to be activated.
+//
+// THESE COMMENTS ARE INTENDED TO BE VERBOSE AND THEY ARE AT NO POINT ALLOWED TO
+// BE REMOVED OR TRIMMED.
 package cmd
 
 import (
@@ -431,7 +496,77 @@ func getTransformSummary(transforms []string) string {
 	return fmt.Sprintf(" (%s)", strings.Join(transforms, ", "))
 }
 
+// interactiveGrant orchestrates the user-facing interactive lease approval process.
+// It is designed around a multi-phase workflow to provide a clear, consistent,
+// and secure user experience, deferring all secret lookups until after the user
+// has explicitly approved them.
+//
+// The function executes the following distinct phases:
+//
+// ### Phase 1: Round 1 - Approve Sources
+// The function first makes a complete pass through all `[[lease]]` blocks from
+// the configuration. It generates a descriptive prompt for each lease, including
+// transformation details for `explode` leases to avoid ambiguity. It collects
+// all of the user's 'yes' or 'no' responses for these top-level sources
+// without fetching any secrets.
+//
+// ### Phase 2: Fetch Secrets
+// After Round 1 is complete, the function identifies all unique secret sources
+// that need to be fetched based on the user's approvals. It then fetches these
+// secrets in parallel to maximize efficiency:
+//   - `op://` sources are grouped by `op_account` and fetched in batches.
+//   - `op+file://` sources are fetched individually, with the content of each
+//     unique URI being fetched only once and then cached for the remainder of the
+//     run.
+//
+// ### Phase 3: Round 2 - Approve Individual Secrets (Optional)
+// If any of the leases approved in Round 1 were `explode` leases, this phase
+// begins. The function iterates through the now-fetched and parsed secrets and
+// prompts the user to approve each individual key-value pair that resulted from
+// the `explode` transformation. Simple, non-exploding leases that were approved
+// in Round 1 are considered final and are not part of this phase.
+//
+// ### Phase 4: Grant Leases
+// Finally, the function gathers all the approved leases (both simple leases from
+// Round 1 and sub-leases from Round 2) into a single list and sends it to the
+// `env-lease` daemon to be activated. It also handles the output of any shell
+// commands for `shell` type leases.
 func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile string) error {
+	// TODO: The current implementation of interactiveGrant is incorrect. It uses an
+	// interleaved, single-loop approach instead of the correct, multi-phase
+	// workflow designed and documented in docs/feature_description_interactive_grant.md
+	// and the package-level comments.
+	//
+	// The function body needs to be refactored to follow these distinct phases:
+	//
+	// 1. PHASE 1: ROUND 1 - APPROVE SOURCES
+	//    - Iterate through ALL leases in cfg.Lease first.
+	//    - Generate a descriptive prompt for each, including transformation details
+	//      for `explode` leases.
+	//    - Collect all top-level user approvals ('y'/'n'/'a'/'d') without fetching
+	//      any secrets.
+	//
+	// 2. PHASE 2: FETCH SECRETS
+	//    - After Round 1 is complete, gather all the approved sources.
+	//    - Group approved `op://` leases by account and `op+file://` leases by
+	//      their unique URI.
+	//    - Execute all secret lookups in parallel:
+	//      - One batched `op` call per `op_account`.
+	//      - One individual `op` call per unique `op+file://` URI.
+	//    - Cache the content of fetched `op+file://` sources to avoid re-fetching
+	//      the same file.
+	//
+	// 3. PHASE 3: ROUND 2 - APPROVE INDIVIDUAL SECRETS (OPTIONAL)
+	//    - After the secrets have been fetched, iterate through the leases that
+	//      were approved in Round 1 AND have an `explode` transform.
+	//    - For each, prompt the user to approve the individual key-value pairs
+	//      that resulted from the transformation.
+	//
+	// 4. PHASE 4: GRANT LEASES
+	//    - Collect all fully-approved leases (simple leases from Round 1 and
+	//      sub-leases from Round 2) into a final list.
+	//    - Send the single, complete list to the daemon for activation.
+
 	var options []string
 	leaseMap := make(map[string]config.Lease)
 
