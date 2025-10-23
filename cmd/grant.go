@@ -361,7 +361,7 @@ This can be overridden with the --destination-outside-root flag.`,
 			return nil
 		}
 
-		client := newClient()
+		client := newIPCClient()
 		if client != nil {
 			var resp ipc.GrantResponse
 			if err := client.Send(req, &resp); err != nil {
@@ -532,67 +532,29 @@ func getTransformSummary(transforms []string) string {
 // `env-lease` daemon to be activated. It also handles the output of any shell
 // commands for `shell` type leases.
 func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile string) error {
-	// TODO: The current implementation of interactiveGrant is incorrect. It uses an
-	// interleaved, single-loop approach instead of the correct, multi-phase
-	// workflow designed and documented in docs/feature_description_interactive_grant.md
-	// and the package-level comments.
-	//
-	// The function body needs to be refactored to follow these distinct phases:
-	//
-	// 1. PHASE 1: ROUND 1 - APPROVE SOURCES
-	//    - Iterate through ALL leases in cfg.Lease first.
-	//    - Generate a descriptive prompt for each, including transformation details
-	//      for `explode` leases.
-	//    - Collect all top-level user approvals ('y'/'n'/'a'/'d') without fetching
-	//      any secrets.
-	//
-	// 2. PHASE 2: FETCH SECRETS
-	//    - After Round 1 is complete, gather all the approved sources.
-	//    - Group approved `op://` leases by account and `op+file://` leases by
-	//      their unique URI.
-	//    - Execute all secret lookups in parallel:
-	//      - One batched `op` call per `op_account`.
-	//      - One individual `op` call per unique `op+file://` URI.
-	//    - Cache the content of fetched `op+file://` sources to avoid re-fetching
-	//      the same file.
-	//
-	// 3. PHASE 3: ROUND 2 - APPROVE INDIVIDUAL SECRETS (OPTIONAL)
-	//    - After the secrets have been fetched, iterate through the leases that
-	//      were approved in Round 1 AND have an `explode` transform.
-	//    - For each, prompt the user to approve the individual key-value pairs
-	//      that resulted from the transformation.
-	//
-	// 4. PHASE 4: GRANT LEASES
-	//    - Collect all fully-approved leases (simple leases from Round 1 and
-	//      sub-leases from Round 2) into a final list.
-	//    - Send the single, complete list to the daemon for activation.
-
-	var options []string
-	leaseMap := make(map[string]config.Lease)
+	slog.Debug("interactive grant: phase 1 start", "lease_count", len(cfg.Lease))
+	// ------- Phase 1: ROUND 1 – APPROVE SOURCES -------
+	options := make([]string, 0, len(cfg.Lease))
+	leaseMap := make(map[string]config.Lease, len(cfg.Lease))
 
 	for _, l := range cfg.Lease {
-		isExplode := false
-		for _, t := range l.Transform {
-			if strings.HasPrefix(strings.TrimSpace(t), "explode") {
-				isExplode = true
-				break
-			}
-		}
+		isExplode := hasExplode(l.Transform)
 
-		slog.Debug("Categorizing lease for initial prompt", "source", l.Source, "is_explode", isExplode)
 		var key string
 		if isExplode {
+			// Descriptive label with transformation breadcrumbs
 			key = fmt.Sprintf("leases from '%s'%s", l.Source, getTransformSummary(l.Transform))
 		} else if l.Variable != "" {
 			key = fmt.Sprintf("'%s'", l.Variable)
 		} else {
 			key = fmt.Sprintf("'%s'", l.Source)
 		}
+
 		options = append(options, key)
 		leaseMap[key] = l
 	}
 
-	var selectedLeaseKeys []string
+	selectedLeaseKeys := make([]string, 0, len(options))
 	for _, opt := range options {
 		if confirm(fmt.Sprintf("Grant %s?", opt)) {
 			selectedLeaseKeys = append(selectedLeaseKeys, opt)
@@ -604,43 +566,267 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 		return nil
 	}
 
-	var selectedLeases []config.Lease
+	slog.Debug("interactive grant: phase 1 approvals",
+		"selected_count", len(selectedLeaseKeys),
+		"skipped_count", len(cfg.Lease)-len(selectedLeaseKeys))
+
+	selectedLeases := make([]config.Lease, 0, len(selectedLeaseKeys))
 	for _, key := range selectedLeaseKeys {
 		selectedLeases = append(selectedLeases, leaseMap[key])
 	}
-	slog.Debug("Selected leases", "leases", selectedLeases)
 
 	continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
-	var errs []grantError
-	finalLeases := make([]ipc.Lease, 0)
-	approvedShellCommands := make([]string, 0)
+	override, _ := cmd.Flags().GetBool("override")
+	noDirenv, _ := cmd.Flags().GetBool("no-direnv")
 
+	var errs []grantError
+
+	// ------- Phase 2: FETCH (no prompts) -------
+	// Group by scheme and batch op:// by account. Cache op+file:// by URI.
+	type accountGroup struct {
+		account string
+		leases  []config.Lease
+	}
+	opBatches := map[string]*accountGroup{} // grouping key -> leases
+	fileURIs := map[string]struct{}{}
 	for _, l := range selectedLeases {
-		slog.Debug("Processing selected lease", "source", l.Source)
-		processed, sc, err := processSingleLease(cmd, l, "", cfg.Root, absConfigFile, true, &errs, continueOnError)
-		if err != nil {
+		if strings.HasPrefix(l.Source, "op://") {
+			actualAcct := l.OpAccount
+			key := actualAcct
+			if key == "" {
+				key = "default"
+			}
+			group := opBatches[key]
+			if group == nil {
+				group = &accountGroup{account: actualAcct}
+				opBatches[key] = group
+			}
+			group.leases = append(group.leases, l)
+			continue
+		}
+		if strings.HasPrefix(l.Source, "op+file://") {
+			fileURIs[l.Source] = struct{}{}
+		}
+	}
+
+	slog.Debug("interactive grant: phase 2 start",
+		"op_batches", len(opBatches),
+		"file_sources", len(fileURIs))
+
+	fetched := make(map[string]string) // sourceURI -> raw content
+
+	// 2a) Fetch op:// in batches per account (uses provider.FetchLeases which returns map keyed by Source)
+	for key, batch := range opBatches {
+		sources := make([]string, 0, len(batch.leases))
+		for _, lease := range batch.leases {
+			sources = append(sources, lease.Source)
+		}
+		slog.Debug("interactive grant: fetching op batch",
+			"group_key", key,
+			"account", batch.account,
+			"count", len(sources),
+			"sources", sources)
+
+		var p provider.SecretProvider
+		if os.Getenv("ENV_LEASE_TEST") == "1" {
+			p = &provider.MockProvider{}
+		} else {
+			p = &provider.OnePasswordCLI{Account: batch.account}
+		}
+		secrets, perrs := p.FetchLeases(batch.leases)
+		for _, pe := range perrs {
+			errs = append(errs, grantError{Source: pe.Lease.Source, Err: pe.Err})
 			if !continueOnError {
-				return err
+				return &GrantErrors{errs: errs}
+			}
+		}
+		for src, val := range secrets {
+			fetched[src] = val
+		}
+		slog.Debug("interactive grant: fetched op batch",
+			"group_key", key,
+			"account", batch.account,
+			"success_count", len(secrets),
+			"error_count", len(perrs))
+	}
+
+	// 2b) Fetch op+file:// singletons once each
+	for src := range fileURIs {
+		slog.Debug("interactive grant: fetching file source", "source", src)
+		var p provider.SecretProvider
+		lAccount := ""
+		// best effort: find any lease with this source to get account
+		for _, l := range selectedLeases {
+			if l.Source == src {
+				lAccount = l.OpAccount
+				break
+			}
+		}
+		if os.Getenv("ENV_LEASE_TEST") == "1" {
+			p = &provider.MockProvider{}
+		} else {
+			p = &provider.OnePasswordCLI{Account: lAccount}
+		}
+		val, err := p.Fetch(src)
+		if err != nil {
+			errs = append(errs, grantError{Source: src, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
 			}
 			continue
 		}
-		finalLeases = append(finalLeases, processed...)
+		fetched[src] = val
+		slog.Debug("interactive grant: fetched file source", "source", src)
+	}
+
+	// Pre-compute explode expansions without writing or prompting
+	type child struct {
+		lease config.Lease
+		value string
+	}
+	explodedChildren := make([]child, 0)
+	simpleApproved := make([]config.Lease, 0)
+	parentApproved := make([]ipc.Lease, 0)
+
+	slog.Debug("interactive grant: preprocessing transforms",
+		"selected_count", len(selectedLeases))
+
+	for _, l := range selectedLeases {
+		isExplode := hasExplode(l.Transform)
+		raw := fetched[l.Source]
+		formatted := l
+		if err := ensureLeaseFormat(&formatted); err != nil {
+			errs = append(errs, grantError{Source: l.Source, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
+			continue
+		}
+		slog.Debug("interactive grant: preparing lease",
+			"source", formatted.Source,
+			"explode", isExplode,
+			"transform_steps", len(formatted.Transform))
+		if !isExplode {
+			// simple lease; Phase 1 already approved — no more prompts later
+			simpleApproved = append(simpleApproved, formatted)
+			continue
+		}
+		// explode: run pipeline on the fetched raw
+		pipe, err := transform.NewPipeline(formatted.Transform)
+		if err != nil {
+			errs = append(errs, grantError{Source: formatted.Source, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
+			continue
+		}
+		res, err := pipe.Run(raw)
+		if err != nil {
+			errs = append(errs, grantError{Source: formatted.Source, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
+			continue
+		}
+		if data, ok := res.(transform.ExplodedData); ok {
+			slog.Debug("interactive grant: explode result",
+				"source", formatted.Source,
+				"child_count", len(data))
+
+			parentLeaseConfig := formatted
+			parentLeaseConfig.Variable = ""
+
+			parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", cfg.Root, absConfigFile)
+			if err != nil {
+				errs = append(errs, grantError{Source: formatted.Source, Err: err})
+				if !continueOnError {
+					return &GrantErrors{errs: errs}
+				}
+				continue
+			}
+			if len(parentLeases) == 0 {
+				errs = append(errs, grantError{Source: formatted.Source, Err: fmt.Errorf("explode parent produced no leases")})
+				if !continueOnError {
+					return &GrantErrors{errs: errs}
+				}
+				continue
+			}
+
+			uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
+			for i := range parentLeases {
+				parentLeases[i].ParentSource = ""
+			}
+			parentApproved = append(parentApproved, parentLeases...)
+
+			for k, v := range data {
+				childLease := formatted
+				childLease.Variable = k
+				childLease.ParentSource = uniqueParentID
+				explodedChildren = append(explodedChildren, child{
+					lease: childLease,
+					value: v,
+				})
+			}
+		} else if s, ok := res.(string); ok {
+			// pipeline resulted in single value — treat as simple
+			slog.Debug("interactive grant: pipeline produced single value", "source", formatted.Source)
+			formatted.Variable = strings.TrimSpace(formatted.Variable)
+			fetched[formatted.Source] = s
+			simpleApproved = append(simpleApproved, formatted)
+		}
+	}
+
+	// ------- Phase 3: ROUND 2 – APPROVE INDIVIDUAL SECRETS FOR EXPLODE -------
+	slog.Debug("interactive grant: phase 3 start",
+		"simple_count", len(simpleApproved),
+		"explode_children", len(explodedChildren))
+	finalLeases := make([]ipc.Lease, 0)
+	approvedShellCommands := make([]string, 0)
+
+	finalLeases = append(finalLeases, parentApproved...)
+
+	// First, materialize all simple leases (no new prompts)
+	for _, l := range simpleApproved {
+		val := fetched[l.Source]
+		leas, sc, err := processLease(cmd, l, val, cfg.Root, absConfigFile)
+		if err != nil {
+			errs = append(errs, grantError{Source: l.Source, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
+			continue
+		}
+		finalLeases = append(finalLeases, leas...)
 		approvedShellCommands = append(approvedShellCommands, sc...)
 	}
 
-	if len(errs) > 0 {
+	// Then, prompt for exploded keys
+	// Group by parent source only for nice prompts
+	for _, ch := range explodedChildren {
+		prompt := fmt.Sprintf("Grant lease for '%s'?", ch.lease.Variable)
+		if !confirm(prompt) {
+			continue
+		}
+		leas, sc, err := processLease(cmd, ch.lease, ch.value, cfg.Root, absConfigFile)
+		if err != nil {
+			errs = append(errs, grantError{Source: ch.lease.Source, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
+			continue
+		}
+		finalLeases = append(finalLeases, leas...)
+		approvedShellCommands = append(approvedShellCommands, sc...)
+	}
+
+	if len(errs) > 0 && !continueOnError {
 		return &GrantErrors{errs: errs}
 	}
 
-	// 5. Send grant request to daemon
-	override, _ := cmd.Flags().GetBool("override")
-	req := ipc.GrantRequest{
-		Command:    "grant",
-		Leases:     finalLeases,
-		Override:   override,
-		ConfigFile: absConfigFile,
-	}
-	client := newClient()
+	// ------- Phase 4: GRANT (single request) -------
+	slog.Debug("interactive grant: phase 4 start", "final_lease_count", len(finalLeases))
+	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, ConfigFile: absConfigFile}
+	client := newIPCClient()
 	if client != nil {
 		var resp ipc.GrantResponse
 		if err := client.Send(req, &resp); err != nil {
@@ -653,7 +839,6 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 		fmt.Fprintln(os.Stderr, "Grant request processed in test mode.")
 	}
 
-	noDirenv, _ := cmd.Flags().GetBool("no-direnv")
 	for _, l := range finalLeases {
 		if filepath.Base(l.Destination) == ".envrc" {
 			HandleDirenv(noDirenv, os.Stderr)
@@ -663,11 +848,43 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	if shellMode {
 		fmt.Fprintln(os.Stderr, "# When using shell lease types run this command like `eval $(env-lease grant)`")
-		for _, cmd := range approvedShellCommands {
-			fmt.Println(cmd)
+		for _, c := range approvedShellCommands {
+			fmt.Println(c)
 		}
 	}
 
 	fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
+	return nil
+}
+
+// hasExplode reports whether a lease has any explode transformation step.
+func hasExplode(steps []string) bool {
+	for _, t := range steps {
+		if strings.HasPrefix(strings.TrimSpace(t), "explode") {
+			return true
+		}
+	}
+	return false
+}
+
+// ensureLeaseFormat applies default formatting for env leases when no explicit
+// format is provided. It mirrors the non-interactive behaviour so that leases
+// written during the interactive flow produce consistent output.
+func ensureLeaseFormat(l *config.Lease) error {
+	if l.LeaseType != "env" {
+		return nil
+	}
+	if l.Format != "" {
+		return nil
+	}
+
+	switch filepath.Base(l.Destination) {
+	case ".envrc":
+		l.Format = "export %s=%q"
+	case ".env":
+		l.Format = "%s=%q"
+	default:
+		return fmt.Errorf("lease for '%s' has no format specified", l.Destination)
+	}
 	return nil
 }

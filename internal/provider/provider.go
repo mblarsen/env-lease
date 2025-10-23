@@ -13,6 +13,8 @@ type SecretProvider interface {
 	// Fetch retrieves a secret from the given source URI.
 	Fetch(sourceURI string) (string, error)
 	// FetchLeases retrieves secrets for a slice of leases.
+	// RETURN CONTRACT: the returned map MUST be keyed by Lease.Source (the source URI).
+	// This ensures a stable key across simple, file, and explode flows.
 	FetchLeases(leases []config.Lease) (map[string]string, []ProviderError)
 }
 

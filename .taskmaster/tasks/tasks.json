@@ -2026,6 +2026,38 @@
             "testStrategy": "Use the integration test suite. Mock user input to automatically answer 'yes' to the prompts and verify the resulting environment variables."
           }
         ]
+      },
+      {
+        "id": 88,
+        "title": "CLI: Add Pre-Command Daemon Health Check for Grant and Revoke",
+        "description": "Modify the `grant` and `revoke` CLI commands to check if the daemon is running before proceeding. This will provide immediate feedback to the user if the daemon is offline, preventing unnecessary steps like permission prompts.",
+        "details": "Implement a pre-flight check at the beginning of the `grant` and `revoke` command execution flows. This check will attempt to connect to the daemon's IPC socket to verify it is active. If the connection fails, the command should exit immediately with a helpful error message, instructing the user to start the daemon. This logic should be encapsulated in a shared helper function, potentially reusing or adapting the connection logic from the IPC client (Task 10) or the status check mechanism (Task 76). The check must be performed before any user interaction or significant processing occurs within the commands.",
+        "testStrategy": "1. **Daemon Not Running:** Ensure the daemon process is not active. Run `env-lease grant` and `env-lease revoke`. Verify that both commands fail immediately with a clear error message like 'Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.' and return a non-zero exit code. 2. **Daemon Running:** Start the daemon. Run `env-lease grant` and `env-lease revoke` again. Verify that the commands proceed with their normal execution flow without displaying the daemon status error.",
+        "status": "pending",
+        "dependencies": [
+          10,
+          32,
+          76
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 89,
+        "title": "Implement Graceful Daemon Shutdown with Lease Revocation",
+        "description": "Implement a mechanism for the daemon to intercept shutdown signals (SIGINT, SIGTERM) and perform a clean shutdown by revoking all active leases before exiting.",
+        "details": "The daemon's main function needs to be updated to handle OS shutdown signals gracefully. Using the `os/signal` package, create a channel to listen for `syscall.SIGINT` and `syscall.SIGTERM`. When a signal is received, the daemon should initiate a shutdown sequence: 1. Log a message indicating that a graceful shutdown is starting. 2. Stop accepting new IPC connections. 3. Load the current state to get a complete list of all active leases across all projects. 4. Iterate through each active lease and perform a 'best-effort' revocation. Any revocation errors should be logged, but they should not halt the shutdown process. 5. After attempting to revoke all leases, clear the state file and save it. 6. Exit the process with a status code of 0.",
+        "testStrategy": "An integration test is required. The test script should: 1. Start the daemon in a background process and record its PID. 2. Grant at least two distinct leases in separate project directories. 3. Verify the leases are active by checking the daemon's state file. 4. Send a `SIGTERM` signal to the daemon's PID. 5. Monitor the daemon's log output to confirm it received the signal and initiated the revocation process. 6. After the daemon process has terminated, verify that the lease-related environment files have been removed and that the daemon's state file (`state.json`) is empty or non-existent.",
+        "status": "pending",
+        "dependencies": [
+          7,
+          32,
+          37,
+          47,
+          51
+        ],
+        "priority": "medium",
+        "subtasks": []
       }
     ],
     "metadata": {
@@ -2038,7 +2070,7 @@
       ],
       "created": "2025-10-20T02:33:49.142Z",
       "description": "Tasks for master context",
-      "updated": "2025-10-20T06:30:01.190Z"
+      "updated": "2025-10-23T01:16:36.673Z"
     }
   }
 }

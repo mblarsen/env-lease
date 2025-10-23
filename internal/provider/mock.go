@@ -31,7 +31,7 @@ func (p *MockProvider) FetchLeases(leases []config.Lease) (map[string]string, []
 			errors = append(errors, ProviderError{Lease: l, Err: err})
 			continue
 		}
-		secrets[l.Variable] = secret
+		secrets[l.Source] = secret
 	}
 
 	return secrets, errors

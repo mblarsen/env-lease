@@ -7,7 +7,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/ipc"
 )
 
-func newClient() *ipc.Client {
+func newIPCClient() *ipc.Client {
 	if os.Getenv("ENV_LEASE_TEST") == "1" {
 		return nil
 	}
