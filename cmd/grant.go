@@ -71,6 +71,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
@@ -79,6 +80,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 var shellMode bool
@@ -614,69 +616,106 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 		"file_sources", len(fileURIs))
 
 	fetched := make(map[string]string) // sourceURI -> raw content
+	var fetchMu sync.Mutex
+	var fetchGroup errgroup.Group
 
 	// 2a) Fetch op:// in batches per account (uses provider.FetchLeases which returns map keyed by Source)
 	for key, batch := range opBatches {
-		sources := make([]string, 0, len(batch.leases))
-		for _, lease := range batch.leases {
+		batchKey := key
+		b := batch
+		sources := make([]string, 0, len(b.leases))
+		for _, lease := range b.leases {
 			sources = append(sources, lease.Source)
 		}
 		slog.Debug("interactive grant: fetching op batch",
-			"group_key", key,
-			"account", batch.account,
+			"group_key", batchKey,
+			"account", b.account,
 			"count", len(sources),
 			"sources", sources)
 
-		var p provider.SecretProvider
-		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			p = &provider.MockProvider{}
-		} else {
-			p = &provider.OnePasswordCLI{Account: batch.account}
-		}
-		secrets, perrs := p.FetchLeases(batch.leases)
-		for _, pe := range perrs {
-			errs = append(errs, grantError{Source: pe.Lease.Source, Err: pe.Err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
+		fetchGroup.Go(func() error {
+			var p provider.SecretProvider
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: b.account}
 			}
-		}
-		for src, val := range secrets {
-			fetched[src] = val
-		}
-		slog.Debug("interactive grant: fetched op batch",
-			"group_key", key,
-			"account", batch.account,
-			"success_count", len(secrets),
-			"error_count", len(perrs))
+
+			secrets, perrs := p.FetchLeases(b.leases)
+
+			localErrs := make([]grantError, 0, len(perrs))
+			for _, pe := range perrs {
+				localErrs = append(localErrs, grantError{Source: pe.Lease.Source, Err: pe.Err})
+			}
+
+			fetchMu.Lock()
+			for src, val := range secrets {
+				fetched[src] = val
+			}
+			if len(localErrs) > 0 {
+				errs = append(errs, localErrs...)
+			}
+			fetchMu.Unlock()
+
+			slog.Debug("interactive grant: fetched op batch",
+				"group_key", batchKey,
+				"account", b.account,
+				"success_count", len(secrets),
+				"error_count", len(perrs))
+
+			if len(localErrs) > 0 && !continueOnError {
+				return fmt.Errorf("interactive grant: failed to fetch op batch %s", batchKey)
+			}
+			return nil
+		})
 	}
 
 	// 2b) Fetch op+file:// singletons once each
 	for src := range fileURIs {
-		slog.Debug("interactive grant: fetching file source", "source", src)
-		var p provider.SecretProvider
-		lAccount := ""
-		// best effort: find any lease with this source to get account
-		for _, l := range selectedLeases {
-			if l.Source == src {
-				lAccount = l.OpAccount
-				break
+		source := src
+		slog.Debug("interactive grant: fetching file source", "source", source)
+
+		fetchGroup.Go(func() error {
+			var p provider.SecretProvider
+			lAccount := ""
+			// best effort: find any lease with this source to get account
+			for _, l := range selectedLeases {
+				if l.Source == source {
+					lAccount = l.OpAccount
+					break
+				}
 			}
-		}
-		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			p = &provider.MockProvider{}
-		} else {
-			p = &provider.OnePasswordCLI{Account: lAccount}
-		}
-		val, err := p.Fetch(src)
-		if err != nil {
-			errs = append(errs, grantError{Source: src, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: lAccount}
 			}
-			continue
-		}
-		fetched[src] = val
-		slog.Debug("interactive grant: fetched file source", "source", src)
+
+			val, err := p.Fetch(source)
+			if err != nil {
+				fetchMu.Lock()
+				errs = append(errs, grantError{Source: source, Err: err})
+				fetchMu.Unlock()
+				if !continueOnError {
+					return fmt.Errorf("interactive grant: failed to fetch file source %s", source)
+				}
+				return nil
+			}
+
+			fetchMu.Lock()
+			fetched[source] = val
+			fetchMu.Unlock()
+
+			slog.Debug("interactive grant: fetched file source", "source", source)
+			return nil
+		})
+	}
+
+	if err := fetchGroup.Wait(); err != nil && !continueOnError {
+		return &GrantErrors{errs: errs}
+	}
+	if len(errs) > 0 && !continueOnError {
+		return &GrantErrors{errs: errs}
 	}
 
 	// Pre-compute explode expansions without writing or prompting
