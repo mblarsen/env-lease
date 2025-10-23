@@ -462,8 +462,10 @@ This can be overridden with the --destination-outside-root flag.`,
 			}
 		}
 
+		client := ensureDaemonClient()
+
 		if interactive {
-			return interactiveGrant(cmd, cfg, absConfigFile)
+			return interactiveGrant(cmd, cfg, absConfigFile, client)
 		}
 
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
@@ -518,7 +520,6 @@ This can be overridden with the --destination-outside-root flag.`,
 			return nil
 		}
 
-		client := newIPCClient()
 		if client != nil {
 			var resp ipc.GrantResponse
 			if err := client.Send(req, &resp); err != nil {
@@ -688,7 +689,7 @@ func getTransformSummary(transforms []string) string {
 // Round 1 and sub-leases from Round 2) into a single list and sends it to the
 // `env-lease` daemon to be activated. It also handles the output of any shell
 // commands for `shell` type leases.
-func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile string) error {
+func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile string, client *ipc.Client) error {
 	slog.Debug("interactive grant: phase 1 start", "lease_count", len(cfg.Lease))
 	// ------- Phase 1: ROUND 1 – APPROVE SOURCES -------
 	options := make([]string, 0, len(cfg.Lease))
@@ -891,7 +892,6 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 	// ------- Phase 4: GRANT (single request) -------
 	slog.Debug("interactive grant: phase 4 start", "final_lease_count", len(finalLeases))
 	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, ConfigFile: absConfigFile}
-	client := newIPCClient()
 	if client != nil {
 		var resp ipc.GrantResponse
 		if err := client.Send(req, &resp); err != nil {

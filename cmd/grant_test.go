@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -232,4 +233,54 @@ format = "%s=%q"
 			t.Fatalf("expected content %q, got %q", expectedContent, string(content))
 		}
 	})
+}
+
+func TestGrantPreflightDaemonNotRunning(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" {
+		shellMode = false
+		resetConfirmState()
+		_ = os.Unsetenv("ENV_LEASE_TEST")
+
+		tempDir := t.TempDir()
+		configPath := filepath.Join(tempDir, "env-lease.toml")
+		destFile := filepath.Join(tempDir, ".env")
+		configContent := `
+[[lease]]
+source = "mock"
+destination = "` + destFile + `"
+variable = "API_KEY"
+duration = "1m"
+`
+		if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		grantCmd.Flags().Set("config", configPath)
+		grantCmd.Flags().Set("interactive", "false")
+		grantCmd.Flags().Set("continue-on-error", "false")
+		grantCmd.Flags().Set("override", "false")
+		grantCmd.Flags().Set("no-direnv", "false")
+
+		_ = grantCmd.RunE(grantCmd, []string{})
+		t.Fatalf("expected grant command to exit when daemon is unavailable")
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run", "TestGrantPreflightDaemonNotRunning")
+	cmd.Env = append(os.Environ(),
+		"GO_WANT_HELPER_PROCESS=1",
+		"ENV_LEASE_TEST=",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatal("expected grant command to fail when daemon is unavailable")
+	}
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok || exitErr.ExitCode() == 0 {
+		t.Fatalf("expected non-zero exit code, got %v", err)
+	}
+	if !strings.Contains(string(output), "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.") {
+		t.Fatalf("expected daemon offline message, got %q", string(output))
+	}
 }

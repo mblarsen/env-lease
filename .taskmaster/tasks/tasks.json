@@ -2001,7 +2001,8 @@
             "dependencies": [],
             "details": "Focus on the logic that iterates through leases and determines when to prompt the user. The issue likely lies in how sub-leases are processed after the parent secret is fetched.",
             "status": "done",
-            "testStrategy": null
+            "testStrategy": null,
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -2012,7 +2013,8 @@
             ],
             "details": "The fix will likely involve adjusting the loop in the grant command to correctly iterate over the key-value pairs of an exploded secret *before* setting them in the environment, and prompting for each one.",
             "status": "done",
-            "testStrategy": null
+            "testStrategy": null,
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -2023,7 +2025,8 @@
             ],
             "details": "The test should configure a secret provider with a multi-key secret (e.g., JSON), define a lease that explodes it, and then simulate running 'grant -i'. It should assert that prompts are shown for each sub-key.",
             "status": "done",
-            "testStrategy": "Use the integration test suite. Mock user input to automatically answer 'yes' to the prompts and verify the resulting environment variables."
+            "testStrategy": "Use the integration test suite. Mock user input to automatically answer 'yes' to the prompts and verify the resulting environment variables.",
+            "parentId": "undefined"
           }
         ]
       },
@@ -2033,14 +2036,15 @@
         "description": "Modify the `grant` and `revoke` CLI commands to check if the daemon is running before proceeding. This will provide immediate feedback to the user if the daemon is offline, preventing unnecessary steps like permission prompts.",
         "details": "Implement a pre-flight check at the beginning of the `grant` and `revoke` command execution flows. This check will attempt to connect to the daemon's IPC socket to verify it is active. If the connection fails, the command should exit immediately with a helpful error message, instructing the user to start the daemon. This logic should be encapsulated in a shared helper function, potentially reusing or adapting the connection logic from the IPC client (Task 10) or the status check mechanism (Task 76). The check must be performed before any user interaction or significant processing occurs within the commands.",
         "testStrategy": "1. **Daemon Not Running:** Ensure the daemon process is not active. Run `env-lease grant` and `env-lease revoke`. Verify that both commands fail immediately with a clear error message like 'Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.' and return a non-zero exit code. 2. **Daemon Running:** Start the daemon. Run `env-lease grant` and `env-lease revoke` again. Verify that the commands proceed with their normal execution flow without displaying the daemon status error.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
-          10,
-          32,
-          76
+          "10",
+          "32",
+          "76"
         ],
         "priority": "medium",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2025-10-23T02:45:29.684Z"
       },
       {
         "id": 89,
@@ -2050,11 +2054,11 @@
         "testStrategy": "An integration test is required. The test script should: 1. Start the daemon in a background process and record its PID. 2. Grant at least two distinct leases in separate project directories. 3. Verify the leases are active by checking the daemon's state file. 4. Send a `SIGTERM` signal to the daemon's PID. 5. Monitor the daemon's log output to confirm it received the signal and initiated the revocation process. 6. After the daemon process has terminated, verify that the lease-related environment files have been removed and that the daemon's state file (`state.json`) is empty or non-existent.",
         "status": "pending",
         "dependencies": [
-          7,
-          32,
-          37,
-          47,
-          51
+          "7",
+          "32",
+          "37",
+          "47",
+          "51"
         ],
         "priority": "medium",
         "subtasks": []
@@ -2062,15 +2066,15 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2025-10-18T10:43:01.293Z",
-      "taskCount": 84,
-      "completedCount": 77,
+      "lastModified": "2025-10-23T02:45:29.686Z",
+      "taskCount": 87,
+      "completedCount": 78,
       "tags": [
         "master"
       ],
-      "created": "2025-10-20T02:33:49.142Z",
+      "created": "2025-10-23T02:56:18.383Z",
       "description": "Tasks for master context",
-      "updated": "2025-10-23T01:16:36.673Z"
+      "updated": "2025-10-23T02:56:18.385Z"
     }
   }
 }
