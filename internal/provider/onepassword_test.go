@@ -26,6 +26,7 @@ func TestOnePasswordCLI_FetchLeases(t *testing.T) {
 		var capturedArgs [][]string
 		var mu sync.Mutex
 
+		var injectCall int
 		cmdExecer = &mockExecer{
 			CommandFunc: func(name string, arg ...string) *exec.Cmd {
 				mu.Lock()
@@ -34,7 +35,11 @@ func TestOnePasswordCLI_FetchLeases(t *testing.T) {
 
 				// Simulate the output of `op inject`
 				if len(arg) > 0 && arg[0] == "inject" {
-					return exec.Command("echo", "-n", "VAR1=\"secret1\"\nVAR2=\"secret2\"")
+					injectCall++
+					if injectCall == 1 {
+						return exec.Command("echo", "-n", "lease_0=\"secret1\"")
+					}
+					return exec.Command("echo", "-n", "lease_0=\"secret2\"")
 				}
 				return exec.Command("echo", "-n", "my-secret")
 			},

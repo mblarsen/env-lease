@@ -322,13 +322,20 @@ This can be overridden with the --destination-outside-root flag.`,
 			}
 			slog.Info("Fetched secrets", "provider", providerName, "count", len(secrets))
 
-			for variable, secretVal := range secrets {
+			for source, secretVal := range secrets {
 				var l config.Lease
 				for _, lease := range providerLeases {
-					if lease.Variable == variable {
+					if lease.Source == source {
 						l = lease
 						break
 					}
+				}
+				if l.Source == "" {
+					errs = append(errs, grantError{Source: source, Err: fmt.Errorf("provider returned unknown lease source")})
+					if !continueOnError {
+						return &GrantErrors{errs: errs}
+					}
+					continue
 				}
 				finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, interactive, &errs, continueOnError)
 				if err != nil {
@@ -591,6 +598,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 	}
 	opBatches := map[string]*accountGroup{} // grouping key -> leases
 	fileURIs := map[string]struct{}{}
+	var directFetchLeases []config.Lease
 	for _, l := range selectedLeases {
 		if strings.HasPrefix(l.Source, "op://") {
 			actualAcct := l.OpAccount
@@ -608,12 +616,15 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 		}
 		if strings.HasPrefix(l.Source, "op+file://") {
 			fileURIs[l.Source] = struct{}{}
+			continue
 		}
+		directFetchLeases = append(directFetchLeases, l)
 	}
 
 	slog.Debug("interactive grant: phase 2 start",
 		"op_batches", len(opBatches),
-		"file_sources", len(fileURIs))
+		"file_sources", len(fileURIs),
+		"direct_sources", len(directFetchLeases))
 
 	fetched := make(map[string]string) // sourceURI -> raw content
 	var fetchMu sync.Mutex
@@ -707,6 +718,37 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 			fetchMu.Unlock()
 
 			slog.Debug("interactive grant: fetched file source", "source", source)
+			return nil
+		})
+	}
+
+	// 2c) Fetch all other sources individually to keep compatibility with non-op schemes.
+	for _, l := range directFetchLeases {
+		lease := l
+		fetchGroup.Go(func() error {
+			var p provider.SecretProvider
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: lease.OpAccount}
+			}
+
+			val, err := p.Fetch(lease.Source)
+			if err != nil {
+				fetchMu.Lock()
+				errs = append(errs, grantError{Source: lease.Source, Err: err})
+				fetchMu.Unlock()
+				if !continueOnError {
+					return fmt.Errorf("interactive grant: failed to fetch source %s", lease.Source)
+				}
+				return nil
+			}
+
+			fetchMu.Lock()
+			fetched[lease.Source] = val
+			fetchMu.Unlock()
+
+			slog.Debug("interactive grant: fetched direct source", "source", lease.Source)
 			return nil
 		})
 	}

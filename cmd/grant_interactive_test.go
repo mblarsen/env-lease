@@ -136,8 +136,8 @@ format = "%s=%q"
 
 		// Check that the sub-lease prompts for Round 2 came last.
 		round2Prompts := prompts[2:]
-		assert.Contains(t, round2Prompts, "Grant lease for 'key1'?", "Round 2 prompts should contain key1")
-		assert.Contains(t, round2Prompts, "Grant lease for 'key2'?", "Round 2 prompts should contain key2")
+		assert.Contains(t, round2Prompts, "Grant lease for 'KEY1'?", "Round 2 prompts should contain KEY1")
+		assert.Contains(t, round2Prompts, "Grant lease for 'KEY2'?", "Round 2 prompts should contain KEY2")
 
 		// Also verify that the files were written correctly
 		simpleContent, err := os.ReadFile(destFileSimple)
@@ -146,7 +146,7 @@ format = "%s=%q"
 
 		explodeContent, err := os.ReadFile(destFileExplode)
 		assert.NoError(t, err)
-		assert.Contains(t, string(explodeContent), `key1="value1"`)
-		assert.Contains(t, string(explodeContent), `key2="value2"`)
+		assert.Contains(t, string(explodeContent), `KEY1="VALUE1"`)
+		assert.Contains(t, string(explodeContent), `KEY2="VALUE2"`)
 	})
 }
