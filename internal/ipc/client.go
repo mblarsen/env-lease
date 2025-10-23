@@ -2,7 +2,9 @@ package ipc
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -42,7 +44,7 @@ func (c *Client) Send(payload any, responsePayload any) error {
 	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
 		// If the server sends no body, it's a successful fire-and-forget.
 		// We can treat EOF as a success signal in this specific case.
-		if err.Error() == "EOF" {
+		if errors.Is(err, io.EOF) {
 			return nil
 		}
 		return fmt.Errorf("failed to decode response: %w", err)
