@@ -240,6 +240,182 @@ func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, pr
 	return approvedLeases, approvedShellCommands, nil
 }
 
+// fetchSecretsParallel retrieves raw secret material for the provided leases using the
+// same parallelized batching strategy as the interactive flow. The returned map is keyed
+// by source URI. Any encountered errors are returned as grantError entries; when
+// continueOnError is false, the first failure terminates early.
+func fetchSecretsParallel(leases []config.Lease, continueOnError bool, mode string) (map[string]string, []grantError, error) {
+	type accountGroup struct {
+		account string
+		leases  []config.Lease
+	}
+
+	opBatches := map[string]*accountGroup{}
+	fileURIs := map[string]struct{}{}
+	var directFetchLeases []config.Lease
+
+	for _, l := range leases {
+		if strings.HasPrefix(l.Source, "op://") {
+			actualAcct := l.OpAccount
+			key := actualAcct
+			if key == "" {
+				key = "default"
+			}
+			group := opBatches[key]
+			if group == nil {
+				group = &accountGroup{account: actualAcct}
+				opBatches[key] = group
+			}
+			group.leases = append(group.leases, l)
+			continue
+		}
+		if strings.HasPrefix(l.Source, "op+file://") {
+			fileURIs[l.Source] = struct{}{}
+			continue
+		}
+		directFetchLeases = append(directFetchLeases, l)
+	}
+
+	slog.Debug("grant fetch: phase 2 start",
+		"mode", mode,
+		"lease_count", len(leases),
+		"op_batches", len(opBatches),
+		"file_sources", len(fileURIs),
+		"direct_sources", len(directFetchLeases))
+
+	fetched := make(map[string]string, len(leases))
+	var errs []grantError
+
+	var fetchMu sync.Mutex
+	var fetchGroup errgroup.Group
+
+	for key, batch := range opBatches {
+		batchKey := key
+		b := batch
+		sources := make([]string, 0, len(b.leases))
+		for _, lease := range b.leases {
+			sources = append(sources, lease.Source)
+		}
+
+		fetchGroup.Go(func() error {
+			var p provider.SecretProvider
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: b.account}
+			}
+
+			secrets, perrs := p.FetchLeases(b.leases)
+
+			localErrs := make([]grantError, 0, len(perrs))
+			for _, pe := range perrs {
+				localErrs = append(localErrs, grantError{Source: pe.Lease.Source, Err: pe.Err})
+			}
+
+			fetchMu.Lock()
+			for src, val := range secrets {
+				fetched[src] = val
+			}
+			if len(localErrs) > 0 {
+				errs = append(errs, localErrs...)
+			}
+			fetchMu.Unlock()
+
+			slog.Debug("grant fetch: fetched op batch",
+				"mode", mode,
+				"group_key", batchKey,
+				"account", b.account,
+				"count", len(sources),
+				"success_count", len(secrets),
+				"error_count", len(perrs))
+
+			if len(localErrs) > 0 && !continueOnError {
+				return fmt.Errorf("grant fetch: failed op batch %s", batchKey)
+			}
+			return nil
+		})
+	}
+
+	for src := range fileURIs {
+		source := src
+
+		fetchGroup.Go(func() error {
+			var p provider.SecretProvider
+			lAccount := ""
+			for _, l := range leases {
+				if l.Source == source {
+					lAccount = l.OpAccount
+					break
+				}
+			}
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: lAccount}
+			}
+
+			val, err := p.Fetch(source)
+			if err != nil {
+				fetchMu.Lock()
+				errs = append(errs, grantError{Source: source, Err: err})
+				fetchMu.Unlock()
+				if !continueOnError {
+					return fmt.Errorf("grant fetch: failed file source %s", source)
+				}
+				return nil
+			}
+
+			fetchMu.Lock()
+			fetched[source] = val
+			fetchMu.Unlock()
+
+			slog.Debug("grant fetch: fetched file source",
+				"mode", mode,
+				"source", source)
+			return nil
+		})
+	}
+
+	for _, l := range directFetchLeases {
+		lease := l
+
+		fetchGroup.Go(func() error {
+			var p provider.SecretProvider
+			if os.Getenv("ENV_LEASE_TEST") == "1" {
+				p = &provider.MockProvider{}
+			} else {
+				p = &provider.OnePasswordCLI{Account: lease.OpAccount}
+			}
+
+			val, err := p.Fetch(lease.Source)
+			if err != nil {
+				fetchMu.Lock()
+				errs = append(errs, grantError{Source: lease.Source, Err: err})
+				fetchMu.Unlock()
+				if !continueOnError {
+					return fmt.Errorf("grant fetch: failed direct source %s", lease.Source)
+				}
+				return nil
+			}
+
+			fetchMu.Lock()
+			fetched[lease.Source] = val
+			fetchMu.Unlock()
+
+			slog.Debug("grant fetch: fetched direct source",
+				"mode", mode,
+				"source", lease.Source)
+			return nil
+		})
+	}
+
+	waitErr := fetchGroup.Wait()
+	if waitErr != nil && !continueOnError {
+		return fetched, errs, waitErr
+	}
+	return fetched, errs, nil
+}
+
 var grantCmd = &cobra.Command{
 	Use:   "grant",
 	Short: "Grant all leases defined in env-lease.toml.",
@@ -295,59 +471,31 @@ This can be overridden with the --destination-outside-root flag.`,
 		var shellCommands []string
 		leases := make([]ipc.Lease, 0, len(cfg.Lease))
 
-		// Group leases by provider
-		leasesByProvider := make(map[string][]config.Lease)
-		for _, l := range cfg.Lease {
-			leasesByProvider[l.Provider] = append(leasesByProvider[l.Provider], l)
+		fetched, fetchErrs, fetchErr := fetchSecretsParallel(cfg.Lease, continueOnError, "non-interactive")
+		errs = append(errs, fetchErrs...)
+		if fetchErr != nil {
+			return &GrantErrors{errs: errs}
 		}
 
-		for providerName, providerLeases := range leasesByProvider {
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				// This assumes all leases for a provider share the same account config.
-				p = &provider.OnePasswordCLI{Account: providerLeases[0].OpAccount}
-			}
-
-			slog.Info("Fetching secrets", "provider", providerName, "count", len(providerLeases))
-			secrets, providerErrors := p.FetchLeases(providerLeases)
-			if len(providerErrors) > 0 {
-				for _, pe := range providerErrors {
-					errs = append(errs, grantError{Source: pe.Lease.Source, Err: pe.Err})
-				}
+		for _, l := range cfg.Lease {
+			secretVal, ok := fetched[l.Source]
+			if !ok {
+				// Missing secret indicates a prior fetch failure.
 				if !continueOnError {
 					return &GrantErrors{errs: errs}
 				}
+				continue
 			}
-			slog.Info("Fetched secrets", "provider", providerName, "count", len(secrets))
-
-			for source, secretVal := range secrets {
-				var l config.Lease
-				for _, lease := range providerLeases {
-					if lease.Source == source {
-						l = lease
-						break
-					}
+			finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, false, &errs, continueOnError)
+			if err != nil {
+				errs = append(errs, grantError{Source: l.Source, Err: err})
+				if !continueOnError {
+					return &GrantErrors{errs: errs}
 				}
-				if l.Source == "" {
-					errs = append(errs, grantError{Source: source, Err: fmt.Errorf("provider returned unknown lease source")})
-					if !continueOnError {
-						return &GrantErrors{errs: errs}
-					}
-					continue
-				}
-				finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, interactive, &errs, continueOnError)
-				if err != nil {
-					errs = append(errs, grantError{Source: l.Source, Err: err})
-					if !continueOnError {
-						return &GrantErrors{errs: errs}
-					}
-					continue
-				}
-				leases = append(leases, finalLeases...)
-				shellCommands = append(shellCommands, sc...)
+				continue
 			}
+			leases = append(leases, finalLeases...)
+			shellCommands = append(shellCommands, sc...)
 		}
 
 		if len(errs) > 0 {
@@ -590,173 +738,9 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	var errs []grantError
 
-	// ------- Phase 2: FETCH (no prompts) -------
-	// Group by scheme and batch op:// by account. Cache op+file:// by URI.
-	type accountGroup struct {
-		account string
-		leases  []config.Lease
-	}
-	opBatches := map[string]*accountGroup{} // grouping key -> leases
-	fileURIs := map[string]struct{}{}
-	var directFetchLeases []config.Lease
-	for _, l := range selectedLeases {
-		if strings.HasPrefix(l.Source, "op://") {
-			actualAcct := l.OpAccount
-			key := actualAcct
-			if key == "" {
-				key = "default"
-			}
-			group := opBatches[key]
-			if group == nil {
-				group = &accountGroup{account: actualAcct}
-				opBatches[key] = group
-			}
-			group.leases = append(group.leases, l)
-			continue
-		}
-		if strings.HasPrefix(l.Source, "op+file://") {
-			fileURIs[l.Source] = struct{}{}
-			continue
-		}
-		directFetchLeases = append(directFetchLeases, l)
-	}
-
-	slog.Debug("interactive grant: phase 2 start",
-		"op_batches", len(opBatches),
-		"file_sources", len(fileURIs),
-		"direct_sources", len(directFetchLeases))
-
-	fetched := make(map[string]string) // sourceURI -> raw content
-	var fetchMu sync.Mutex
-	var fetchGroup errgroup.Group
-
-	// 2a) Fetch op:// in batches per account (uses provider.FetchLeases which returns map keyed by Source)
-	for key, batch := range opBatches {
-		batchKey := key
-		b := batch
-		sources := make([]string, 0, len(b.leases))
-		for _, lease := range b.leases {
-			sources = append(sources, lease.Source)
-		}
-		slog.Debug("interactive grant: fetching op batch",
-			"group_key", batchKey,
-			"account", b.account,
-			"count", len(sources),
-			"sources", sources)
-
-		fetchGroup.Go(func() error {
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: b.account}
-			}
-
-			secrets, perrs := p.FetchLeases(b.leases)
-
-			localErrs := make([]grantError, 0, len(perrs))
-			for _, pe := range perrs {
-				localErrs = append(localErrs, grantError{Source: pe.Lease.Source, Err: pe.Err})
-			}
-
-			fetchMu.Lock()
-			for src, val := range secrets {
-				fetched[src] = val
-			}
-			if len(localErrs) > 0 {
-				errs = append(errs, localErrs...)
-			}
-			fetchMu.Unlock()
-
-			slog.Debug("interactive grant: fetched op batch",
-				"group_key", batchKey,
-				"account", b.account,
-				"success_count", len(secrets),
-				"error_count", len(perrs))
-
-			if len(localErrs) > 0 && !continueOnError {
-				return fmt.Errorf("interactive grant: failed to fetch op batch %s", batchKey)
-			}
-			return nil
-		})
-	}
-
-	// 2b) Fetch op+file:// singletons once each
-	for src := range fileURIs {
-		source := src
-		slog.Debug("interactive grant: fetching file source", "source", source)
-
-		fetchGroup.Go(func() error {
-			var p provider.SecretProvider
-			lAccount := ""
-			// best effort: find any lease with this source to get account
-			for _, l := range selectedLeases {
-				if l.Source == source {
-					lAccount = l.OpAccount
-					break
-				}
-			}
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: lAccount}
-			}
-
-			val, err := p.Fetch(source)
-			if err != nil {
-				fetchMu.Lock()
-				errs = append(errs, grantError{Source: source, Err: err})
-				fetchMu.Unlock()
-				if !continueOnError {
-					return fmt.Errorf("interactive grant: failed to fetch file source %s", source)
-				}
-				return nil
-			}
-
-			fetchMu.Lock()
-			fetched[source] = val
-			fetchMu.Unlock()
-
-			slog.Debug("interactive grant: fetched file source", "source", source)
-			return nil
-		})
-	}
-
-	// 2c) Fetch all other sources individually to keep compatibility with non-op schemes.
-	for _, l := range directFetchLeases {
-		lease := l
-		fetchGroup.Go(func() error {
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: lease.OpAccount}
-			}
-
-			val, err := p.Fetch(lease.Source)
-			if err != nil {
-				fetchMu.Lock()
-				errs = append(errs, grantError{Source: lease.Source, Err: err})
-				fetchMu.Unlock()
-				if !continueOnError {
-					return fmt.Errorf("interactive grant: failed to fetch source %s", lease.Source)
-				}
-				return nil
-			}
-
-			fetchMu.Lock()
-			fetched[lease.Source] = val
-			fetchMu.Unlock()
-
-			slog.Debug("interactive grant: fetched direct source", "source", lease.Source)
-			return nil
-		})
-	}
-
-	if err := fetchGroup.Wait(); err != nil && !continueOnError {
-		return &GrantErrors{errs: errs}
-	}
-	if len(errs) > 0 && !continueOnError {
+	fetched, fetchErrs, fetchErr := fetchSecretsParallel(selectedLeases, continueOnError, "interactive")
+	errs = append(errs, fetchErrs...)
+	if fetchErr != nil {
 		return &GrantErrors{errs: errs}
 	}
 
