@@ -60,6 +60,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	// Set up a channel to listen for OS signals
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sigs)
 
 	go d.ipcServer.Listen(d.handleIPC)
 
@@ -95,7 +96,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		case <-cleanupTicker.C:
 			d.cleanupOrphanedLeases()
 		case sig := <-sigs:
-			slog.Debug("Received signal, initiating shutdown...", "signal", sig)
+			slog.Info("Received shutdown signal, beginning graceful shutdown", "signal", sig)
 			return d.Shutdown()
 		case <-ctx.Done():
 			slog.Debug("Parent context cancelled, initiating shutdown...")
@@ -186,13 +187,90 @@ func (d *Daemon) revokeOrphanedLeases() {
 }
 
 func (d *Daemon) Shutdown() error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	slog.Info("Daemon shutting down...")
-	if err := d.state.SaveState(d.statePath); err != nil {
-		slog.Error("Failed to save state during shutdown", "err", err)
+	slog.Info("Starting graceful shutdown: revoking active leases and clearing state.")
+
+	if d.ipcServer != nil {
+		if err := d.ipcServer.Close(); err != nil {
+			slog.Error("Failed to close IPC server during shutdown", "err", err)
+		}
+		d.ipcServer = nil
 	}
-	return d.ipcServer.Close()
+
+	d.mu.Lock()
+
+	if d.statePath != "" {
+		if reloaded, err := LoadState(d.statePath); err != nil {
+			slog.Warn("Failed to reload state from disk during shutdown; continuing with in-memory state", "err", err)
+		} else {
+			d.state = reloaded
+		}
+	}
+	if d.state == nil {
+		d.state = NewState()
+	}
+
+	leasesToRevoke := make([]*config.Lease, 0, len(d.state.Leases))
+	for key, lease := range d.state.Leases {
+		if lease == nil {
+			delete(d.state.Leases, key)
+			continue
+		}
+		leasesToRevoke = append(leasesToRevoke, lease)
+		delete(d.state.Leases, key)
+	}
+
+	retryItems := d.state.RetryQueue
+	d.state.RetryQueue = nil
+
+	d.mu.Unlock()
+
+	for _, lease := range leasesToRevoke {
+		if lease.LeaseType == "shell" {
+			slog.Debug("Skipping shell lease during shutdown", "source", lease.Source)
+			continue
+		}
+		if err := d.revoker.Revoke(lease); err != nil {
+			slog.Error("Failed to revoke lease during shutdown", "source", lease.Source, "destination", lease.Destination, "err", err)
+		} else {
+			slog.Info("Revoked lease during shutdown", "source", lease.Source, "destination", lease.Destination)
+		}
+	}
+
+	for _, retry := range retryItems {
+		if retry.Lease == nil {
+			continue
+		}
+		if retry.Lease.LeaseType == "shell" {
+			slog.Debug("Skipping shell lease from retry queue during shutdown", "source", retry.Lease.Source)
+			continue
+		}
+		if err := d.revoker.Revoke(retry.Lease); err != nil {
+			slog.Error("Failed to revoke lease from retry queue during shutdown", "source", retry.Lease.Source, "destination", retry.Lease.Destination, "err", err)
+		} else {
+			slog.Info("Revoked lease from retry queue during shutdown", "source", retry.Lease.Source, "destination", retry.Lease.Destination)
+		}
+	}
+
+	d.mu.Lock()
+	d.state.Leases = make(map[string]*config.Lease)
+	d.state.RetryQueue = nil
+	err := d.state.SaveState(d.statePath)
+	d.mu.Unlock()
+
+	if err != nil {
+		slog.Error("Failed to save cleared state during shutdown", "err", err)
+	} else {
+		if d.statePath != "" {
+			if removeErr := os.Remove(d.statePath); removeErr != nil && !os.IsNotExist(removeErr) {
+				slog.Warn("Failed to remove state file after saving empty state", "err", removeErr)
+			} else {
+				slog.Info("State cleared and state file removed; shutdown complete.")
+			}
+		} else {
+			slog.Info("State cleared; shutdown complete.")
+		}
+	}
+	return nil
 }
 
 func (d *Daemon) cleanupOrphanedLeases() {

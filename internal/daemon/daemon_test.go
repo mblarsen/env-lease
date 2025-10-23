@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -153,4 +155,65 @@ variable = "VAR1"
 	assert.Equal(t, 2, revoker.RevokeCount, "Revoke should be called for the two removed leases")
 	assert.Len(t, state.Leases, 1, "Only one lease should remain in the state")
 	assert.NotNil(t, state.Leases["lease1"], "Lease1 should still be in the state")
+}
+
+func TestDaemon_ShutdownRevokesLeasesAndClearsState(t *testing.T) {
+	tempDir := t.TempDir()
+	socketPath := filepath.Join(os.TempDir(), fmt.Sprintf("env-lease-shutdown-%d.sock", time.Now().UnixNano()))
+	statePath := filepath.Join(tempDir, "state.json")
+
+	state := NewState()
+	state.Leases["env"] = &config.Lease{
+		Source:      "onepassword://vault/item/env",
+		Destination: "/tmp/env",
+		LeaseType:   "env",
+		Variable:    "ENV_VAR",
+	}
+	state.Leases["file"] = &config.Lease{
+		Source:      "onepassword://vault/item/file",
+		Destination: "/tmp/file",
+		LeaseType:   "file",
+	}
+	state.Leases["shell"] = &config.Lease{
+		Source:    "onepassword://vault/item/shell",
+		LeaseType: "shell",
+	}
+	envFile := filepath.Join(tempDir, "shutdown.env")
+	require.NoError(t, os.WriteFile(envFile, []byte("ENV_VAR=value\n"), 0644))
+	fileLease := filepath.Join(tempDir, "shutdown.txt")
+	require.NoError(t, os.WriteFile(fileLease, []byte("secret"), 0644))
+
+	state.Leases["env"].Destination = envFile
+	state.Leases["file"].Destination = fileLease
+
+	require.NoError(t, state.SaveState(statePath))
+
+	server, err := ipc.NewServer(socketPath, []byte("graceful-shutdown-secret"))
+	require.NoError(t, err)
+	t.Cleanup(func() { os.Remove(socketPath) })
+
+	revoker := &FileRevoker{}
+	notifier := &mockNotifier{}
+	d := NewDaemon(state, statePath, &RealClock{}, server, revoker, notifier)
+
+	err = d.Shutdown()
+	require.NoError(t, err)
+
+	if d.state != nil {
+		assert.Empty(t, d.state.Leases, "daemon state should be cleared after shutdown")
+		assert.Empty(t, d.state.RetryQueue, "daemon retry queue should be cleared after shutdown")
+	}
+
+	reloaded, err := LoadState(statePath)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.Leases, "state file should be cleared and persisted")
+	assert.Empty(t, reloaded.RetryQueue, "retry queue should be cleared during shutdown")
+
+	_, err = os.Stat(fileLease)
+	assert.True(t, os.IsNotExist(err), "file lease should be removed during shutdown")
+
+	envContent, err := os.ReadFile(envFile)
+	require.NoError(t, err)
+	assert.Contains(t, string(envContent), "ENV_VAR=")
+	assert.NotContains(t, string(envContent), "value", "env variable should be cleared during shutdown")
 }
