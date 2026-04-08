@@ -105,3 +105,63 @@ func TestHandleGrant_RevokesRemovedLeases(t *testing.T) {
 		t.Fatalf("expected revoked lease to be MY_VAR_2, got %s", revoker.revoked[0].Variable)
 	}
 }
+
+func TestHandleGrant_AppendDoesNotRevokeRemovedLeases(t *testing.T) {
+	state := NewState()
+	clock := &mockClock{now: time.Now()}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+	daemon := NewDaemon(state, "/dev/null", clock, nil, revoker, notifier)
+
+	lease1 := ipc.Lease{
+		Source:      "1password",
+		Destination: "/tmp/foo",
+		LeaseType:   "env",
+		Variable:    "MY_VAR_1",
+		Duration:    "1h",
+	}
+	lease2 := ipc.Lease{
+		Source:      "1password",
+		Destination: "/tmp/foo",
+		LeaseType:   "env",
+		Variable:    "MY_VAR_2",
+		Duration:    "1h",
+	}
+
+	// First grant both leases.
+	req := ipc.GrantRequest{
+		Command:    "grant",
+		Leases:     []ipc.Lease{lease1, lease2},
+		ConfigFile: "/tmp/env-lease.toml",
+	}
+	payload, _ := json.Marshal(req)
+	_, err := daemon.handleGrant(payload)
+	if err != nil {
+		t.Fatalf("initial handleGrant failed: %v", err)
+	}
+
+	// Then submit only lease1 in append mode. lease2 should remain active.
+	req = ipc.GrantRequest{
+		Command:    "grant",
+		Leases:     []ipc.Lease{lease1},
+		Append:     true,
+		ConfigFile: "/tmp/env-lease.toml",
+	}
+	payload, _ = json.Marshal(req)
+	_, err = daemon.handleGrant(payload)
+	if err != nil {
+		t.Fatalf("append handleGrant failed: %v", err)
+	}
+
+	key1 := "1password;/tmp/foo;MY_VAR_1"
+	key2 := "1password;/tmp/foo;MY_VAR_2"
+	if _, ok := daemon.state.Leases[key1]; !ok {
+		t.Fatal("lease 1 not found in state")
+	}
+	if _, ok := daemon.state.Leases[key2]; !ok {
+		t.Fatal("lease 2 should remain in state during append")
+	}
+	if len(revoker.revoked) != 0 {
+		t.Fatalf("expected no revoked leases in append mode, got %d", len(revoker.revoked))
+	}
+}

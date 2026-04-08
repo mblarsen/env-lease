@@ -325,6 +325,7 @@ env-lease idle uninstall
 - `--local-config`: Path to the local override configuration file. This takes precedence over the environment variables.
 - `--continue-on-error`: Continue granting leases even if one fails.
 - `-i`, `--interactive`: Prompt for confirmation before granting each lease.
+- `--append`: Interactive-only additive mode. Keeps existing granted leases and only adds newly approved leases; skipped prompts remain unchanged.
 - `--destination-outside-root`: Allow file-based leases to write outside of the project root.
 
 #### `revoke`
@@ -341,6 +342,8 @@ The `-i` or `--interactive` flag can be used with `grant` and `revoke` to confir
 - `a`: Yes to this and all subsequent actions in this run.
 - `d`: No to this and all subsequent actions in this run.
 - `?`: Show help.
+
+In `env-lease grant -i --append`, `n`/`<Enter>` means **skip and leave existing lease state unchanged** (no revoke/no grant).
 
 **Granting Leases:**
 

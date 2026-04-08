@@ -13,6 +13,7 @@ func TestGrantRunE_Interactive(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 	os.Setenv("ENV_LEASE_TEST", "1")
+	grantCmd.Flags().Set("append", "false")
 
 	// Helper to create a dummy config file
 	writeConfig := func(content string) string {

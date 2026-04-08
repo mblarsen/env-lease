@@ -445,6 +445,10 @@ This can be overridden with the --destination-outside-root flag.`,
 		absConfigFile = filepath.Join(cfg.Root, filepath.Base(configFile))
 
 		interactive, _ := cmd.Flags().GetBool("interactive")
+		appendMode, _ := cmd.Flags().GetBool("append")
+		if appendMode && !interactive {
+			return fmt.Errorf("--append requires --interactive")
+		}
 
 		// Check if stdout is a terminal
 		stat, _ := os.Stdout.Stat()
@@ -509,6 +513,7 @@ This can be overridden with the --destination-outside-root flag.`,
 			Command:    "grant",
 			Leases:     leases,
 			Override:   override,
+			Append:     false,
 			ConfigFile: absConfigFile,
 		}
 		// If in test mode, don't try to send to the daemon.
@@ -642,6 +647,7 @@ func init() {
 	grantCmd.Flags().StringP("config", "c", "env-lease.toml", "Path to config file.")
 	grantCmd.Flags().String("local-config", "", "Path to local override config file.")
 	grantCmd.Flags().BoolP("interactive", "i", false, "Prompt for confirmation before granting each lease.")
+	grantCmd.Flags().Bool("append", false, "In interactive mode, keep existing granted leases and only add newly approved leases. Skipped prompts are left unchanged.")
 	grantCmd.Flags().Bool("destination-outside-root", false, "Allow file-based leases to write outside of the project root.")
 	rootCmd.AddCommand(grantCmd)
 }
@@ -735,7 +741,12 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 	override, _ := cmd.Flags().GetBool("override")
+	appendMode, _ := cmd.Flags().GetBool("append")
 	noDirenv, _ := cmd.Flags().GetBool("no-direnv")
+
+	if appendMode {
+		fmt.Fprintln(os.Stderr, "Append mode enabled: skipped leases will remain unchanged.")
+	}
 
 	var errs []grantError
 
@@ -891,7 +902,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	// ------- Phase 4: GRANT (single request) -------
 	slog.Debug("interactive grant: phase 4 start", "final_lease_count", len(finalLeases))
-	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, ConfigFile: absConfigFile}
+	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, Append: appendMode, ConfigFile: absConfigFile}
 	if client != nil {
 		var resp ipc.GrantResponse
 		if err := client.Send(req, &resp); err != nil {
