@@ -57,24 +57,28 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	}
 	slog.Debug("Received grant request", "leases", len(req.Leases))
 
-	// Revoke any leases that are in the state but not in the request
-	activeLeases := d.state.LeasesForConfigFile(req.ConfigFile)
-	for key, activeLease := range activeLeases {
-		found := false
-		for _, reqLease := range req.Leases {
-			if activeLease.Source == reqLease.Source && activeLease.Destination == reqLease.Destination && activeLease.Variable == reqLease.Variable {
-				found = true
-				break
+	if !req.Append {
+		// Revoke any leases that are in the state but not in the request.
+		activeLeases := d.state.LeasesForConfigFile(req.ConfigFile)
+		for key, activeLease := range activeLeases {
+			found := false
+			for _, reqLease := range req.Leases {
+				if activeLease.Source == reqLease.Source && activeLease.Destination == reqLease.Destination && activeLease.Variable == reqLease.Variable {
+					found = true
+					break
+				}
+			}
+			if !found {
+				slog.Info("Revoking lease removed from config", "key", key)
+				if err := d.revoker.Revoke(activeLease); err != nil {
+					slog.Error("Failed to revoke lease removed from config", "key", key, "err", err)
+					// Continue trying to revoke other leases
+				}
+				delete(d.state.Leases, key)
 			}
 		}
-		if !found {
-			slog.Info("Revoking lease removed from config", "key", key)
-			if err := d.revoker.Revoke(activeLease); err != nil {
-				slog.Error("Failed to revoke lease removed from config", "key", key, "err", err)
-				// Continue trying to revoke other leases
-			}
-			delete(d.state.Leases, key)
-		}
+	} else {
+		slog.Debug("Grant request in append mode; skipping reconciliation revokes", "config_file", req.ConfigFile)
 	}
 
 	for _, l := range req.Leases {

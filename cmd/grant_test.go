@@ -11,6 +11,8 @@ import (
 func TestGrantRunE(t *testing.T) {
 	tempDir := t.TempDir()
 	os.Setenv("ENV_LEASE_TEST", "1")
+	grantCmd.Flags().Set("interactive", "false")
+	grantCmd.Flags().Set("append", "false")
 
 	// Helper to create a dummy config file
 	writeConfig := func(content string) string {
@@ -233,6 +235,30 @@ format = "%s=%q"
 			t.Fatalf("expected content %q, got %q", expectedContent, string(content))
 		}
 	})
+
+	t.Run("append requires interactive", func(t *testing.T) {
+		destFile := filepath.Join(tempDir, ".env.append")
+		configContent := `
+[[lease]]
+source = "mock"
+destination = "` + destFile + `"
+variable = "APPEND_KEY"
+duration = "1m"
+`
+		configFile := writeConfig(configContent)
+		grantCmd.Flags().Set("config", configFile)
+		grantCmd.Flags().Set("interactive", "false")
+		grantCmd.Flags().Set("append", "true")
+		defer grantCmd.Flags().Set("append", "false")
+
+		err := grantCmd.RunE(grantCmd, []string{})
+		if err == nil {
+			t.Fatal("expected an error when --append is used without --interactive")
+		}
+		if !strings.Contains(err.Error(), "--append requires --interactive") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestGrantPreflightDaemonNotRunning(t *testing.T) {
@@ -259,6 +285,7 @@ duration = "1m"
 		grantCmd.Flags().Set("interactive", "false")
 		grantCmd.Flags().Set("continue-on-error", "false")
 		grantCmd.Flags().Set("override", "false")
+		grantCmd.Flags().Set("append", "false")
 		grantCmd.Flags().Set("no-direnv", "false")
 
 		_ = grantCmd.RunE(grantCmd, []string{})
@@ -266,10 +293,14 @@ duration = "1m"
 		return
 	}
 
+	xdgRuntime := t.TempDir()
+	xdgState := t.TempDir()
 	cmd := exec.Command(os.Args[0], "-test.run", "TestGrantPreflightDaemonNotRunning")
 	cmd.Env = append(os.Environ(),
 		"GO_WANT_HELPER_PROCESS=1",
 		"ENV_LEASE_TEST=",
+		"XDG_RUNTIME_DIR="+xdgRuntime,
+		"XDG_STATE_HOME="+xdgState,
 	)
 
 	output, err := cmd.CombinedOutput()

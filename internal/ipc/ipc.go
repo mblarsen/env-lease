@@ -20,6 +20,7 @@ type GrantRequest struct {
 	Command    string
 	Leases     []Lease
 	Override   bool
+	Append     bool
 	ConfigFile string
 }
 

@@ -35,10 +35,14 @@ duration = "1m"
 		return
 	}
 
+	xdgRuntime := t.TempDir()
+	xdgState := t.TempDir()
 	cmd := exec.Command(os.Args[0], "-test.run", "TestRevokePreflightDaemonNotRunning")
 	cmd.Env = append(os.Environ(),
 		"GO_WANT_HELPER_PROCESS_REVOKE=1",
 		"ENV_LEASE_TEST=",
+		"XDG_RUNTIME_DIR="+xdgRuntime,
+		"XDG_STATE_HOME="+xdgState,
 	)
 
 	output, err := cmd.CombinedOutput()
