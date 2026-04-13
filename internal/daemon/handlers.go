@@ -87,7 +87,7 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 			return nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 		}
 
-		key := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
+		key := leaseIdentity(l.Source, l.Destination, l.Variable)
 		lease := &config.Lease{
 			Source:        l.Source,
 			Destination:   l.Destination,
@@ -135,7 +135,7 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 
 	if len(req.Leases) > 0 {
 		for _, l := range req.Leases {
-			id := fmt.Sprintf("%s;%s;%s", l.Source, l.Destination, l.Variable)
+			id := leaseIdentity(l.Source, l.Destination, l.Variable)
 			if lease, ok := d.state.Leases[id]; ok {
 				slog.Debug("Revoking lease", "source", lease.Source)
 				if lease.LeaseType == "shell" {
