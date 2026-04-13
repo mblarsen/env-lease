@@ -1,0 +1,55 @@
+[tasks.default]
+description = "Run linting and the full test suite"
+depends = ["lint", "test"]
+
+[tasks.build]
+description = "Build the env-lease binary into ./bin"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+echo "Building binaries..."
+mkdir -p ./bin
+go build -o ./bin/env-lease ./cmd/env-lease
+'''
+
+[tasks.lint]
+description = "Run go vet lint checks"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+echo "Running linter..."
+go vet ./...
+'''
+
+[tasks.test]
+description = "Run all Go tests"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+echo "Running tests..."
+go test ./...
+'''
+
+[tasks.test-one]
+description = "Run a single test by exact name (usage: mise run test-one -- TestName)"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+if [ $# -ne 1 ]; then
+  echo "Usage: mise run test-one -- <TestName>" >&2
+  exit 1
+fi
+
+test_name="$1"
+echo "Running test: ${test_name}"
+go test ./... -run "^${test_name}$"
+'''
+
+[tasks.fmt]
+description = "Format Go source files with gofmt"
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+echo "Formatting code..."
+gofmt -w .
+'''

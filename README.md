@@ -60,6 +60,16 @@ However, it's important to understand the design trade-offs and limitations:
 *   **Compromised User Account:** The security model is designed to raise the bar for attack and prevent accidental interference. It does **not** protect against a sophisticated attacker who has already fully compromised your user account, as such an attacker could read the authentication token itself.
 
 
+## Development
+
+This repository uses [`mise`](https://mise.jdx.dev/) tasks for the common local workflow:
+
+- `mise run build` — build `./bin/env-lease`
+- `mise run lint` — run `go vet ./...`
+- `mise run test` — run the full test suite (`go test ./...`)
+- `mise run test-one -- TestName` — run a single test by exact name
+- `mise run fmt` — format code with `gofmt`
+
 ## Usage
 
 For installation instructions, configuration details, and a full command reference, please see the **[Full User Documentation](docs/USAGE.md)**.
