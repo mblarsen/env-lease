@@ -16,8 +16,9 @@ func TestLoadDaemonStateFallsBackToEmptyStateOnCorruption(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 	require.NoError(t, os.WriteFile(statePath, []byte("{"), 0600))
 
-	state := loadDaemonState(statePath)
+	state, err := loadDaemonState(statePath)
 
+	require.NoError(t, err)
 	require.NotNil(t, state)
 	assert.Empty(t, state.Leases)
 	assert.Empty(t, state.RetryQueue)
@@ -33,9 +34,21 @@ func TestLoadDaemonStateReturnsPersistedStateWhenValid(t *testing.T) {
 	}
 	require.NoError(t, expected.SaveState(statePath))
 
-	loaded := loadDaemonState(statePath)
+	loaded, err := loadDaemonState(statePath)
 
+	require.NoError(t, err)
 	require.NotNil(t, loaded)
 	require.Contains(t, loaded.Leases, "lease1")
 	assert.Equal(t, expected.Leases["lease1"].Source, loaded.Leases["lease1"].Source)
+}
+
+func TestLoadDaemonStateReturnsErrorForUnreadableState(t *testing.T) {
+	statePath := t.TempDir()
+
+	state, err := loadDaemonState(statePath)
+
+	require.Error(t, err)
+	assert.Nil(t, state)
+	assert.Contains(t, err.Error(), "failed to load daemon state")
+	assert.NotContains(t, err.Error(), "malformed")
 }

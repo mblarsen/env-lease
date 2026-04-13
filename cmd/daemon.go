@@ -85,7 +85,10 @@ var runCmd = &cobra.Command{
 			return err
 		}
 
-		state := loadDaemonState(statePath)
+		state, err := loadDaemonState(statePath)
+		if err != nil {
+			return err
+		}
 
 		// Set up dependencies
 		clock := &daemon.RealClock{}
@@ -104,15 +107,18 @@ var runCmd = &cobra.Command{
 	},
 }
 
-func loadDaemonState(statePath string) *daemon.State {
+func loadDaemonState(statePath string) (*daemon.State, error) {
 	state, err := daemon.LoadState(statePath)
 	if err != nil {
-		slog.Warn("Failed to load daemon state; starting with empty state", "path", statePath, "err", err)
-		return daemon.NewState()
+		if daemon.IsCorruptStateError(err) {
+			slog.Warn("State file is malformed; starting with empty state", "path", statePath, "err", err)
+			return daemon.NewState(), nil
+		}
+		return nil, fmt.Errorf("failed to load daemon state: %w", err)
 	}
 
 	slog.Info("Loaded state", "leases", len(state.Leases))
-	return state
+	return state, nil
 }
 
 var cleanupCmd = &cobra.Command{
