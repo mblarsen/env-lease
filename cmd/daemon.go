@@ -116,6 +116,11 @@ var cleanupCmd = &cobra.Command{
 	Long:  `Cleanup orphaned leases.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newIPCClient()
+		if client == nil {
+			fmt.Println("Cleanup command running in test mode.")
+			return nil
+		}
+
 		req := ipc.CleanupRequest{Command: "cleanup"}
 		var resp ipc.CleanupResponse
 

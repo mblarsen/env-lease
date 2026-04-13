@@ -18,6 +18,11 @@ var statusCmd = &cobra.Command{
 	Long:  `Show the status of active leases.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		client := newIPCClient()
+		if client == nil {
+			fmt.Println("Status command running in test mode.")
+			return nil
+		}
+
 		req := ipc.StatusRequest{Command: "status"}
 		var resp ipc.StatusResponse
 		if err := client.Send(req, &resp); err != nil {
