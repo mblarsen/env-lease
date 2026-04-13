@@ -373,6 +373,7 @@ func (d *Daemon) processRetryQueue() {
 	defer d.mu.Unlock()
 
 	now := d.clock.Now()
+	stateChanged := false
 	for i := len(d.state.RetryQueue) - 1; i >= 0; i-- {
 		item := d.state.RetryQueue[i]
 		if now.After(item.NextRetryTime) {
@@ -385,6 +386,7 @@ func (d *Daemon) processRetryQueue() {
 				item.Attempts++
 				item.NextRetryTime = now.Add(time.Duration(item.Attempts*2) * time.Second) // Exponential backoff
 				d.state.RetryQueue[i] = item
+				stateChanged = true
 
 				// Create failure file if necessary
 				if now.Sub(item.InitialFailure) > 5*time.Minute {
@@ -395,7 +397,14 @@ func (d *Daemon) processRetryQueue() {
 			} else {
 				// Success, remove from queue
 				d.state.RetryQueue = append(d.state.RetryQueue[:i], d.state.RetryQueue[i+1:]...)
+				stateChanged = true
 			}
+		}
+	}
+
+	if stateChanged {
+		if err := d.state.SaveState(d.statePath); err != nil {
+			slog.Error("Failed to save state after processing retry queue", "err", err)
 		}
 	}
 	slog.Debug("Finished processing retry queue.")
