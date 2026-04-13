@@ -698,9 +698,7 @@ func getTransformSummary(transforms []string) string {
 func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile string, client *ipc.Client) error {
 	slog.Debug("interactive grant: phase 1 start", "lease_count", len(cfg.Lease))
 	// ------- Phase 1: ROUND 1 – APPROVE SOURCES -------
-	options := make([]string, 0, len(cfg.Lease))
-	leaseMap := make(map[string]config.Lease, len(cfg.Lease))
-
+	selectedLeases := make([]config.Lease, 0, len(cfg.Lease))
 	for _, l := range cfg.Lease {
 		isExplode := hasExplode(l.Transform)
 
@@ -714,30 +712,19 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 			key = fmt.Sprintf("'%s'", l.Source)
 		}
 
-		options = append(options, key)
-		leaseMap[key] = l
-	}
-
-	selectedLeaseKeys := make([]string, 0, len(options))
-	for _, opt := range options {
-		if confirm(fmt.Sprintf("Grant %s?", opt)) {
-			selectedLeaseKeys = append(selectedLeaseKeys, opt)
+		if confirm(fmt.Sprintf("Grant %s?", key)) {
+			selectedLeases = append(selectedLeases, l)
 		}
 	}
 
-	if len(selectedLeaseKeys) == 0 {
+	if len(selectedLeases) == 0 {
 		fmt.Fprintln(os.Stderr, "No leases selected.")
 		return nil
 	}
 
 	slog.Debug("interactive grant: phase 1 approvals",
-		"selected_count", len(selectedLeaseKeys),
-		"skipped_count", len(cfg.Lease)-len(selectedLeaseKeys))
-
-	selectedLeases := make([]config.Lease, 0, len(selectedLeaseKeys))
-	for _, key := range selectedLeaseKeys {
-		selectedLeases = append(selectedLeases, leaseMap[key])
-	}
+		"selected_count", len(selectedLeases),
+		"skipped_count", len(cfg.Lease)-len(selectedLeases))
 
 	continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 	override, _ := cmd.Flags().GetBool("override")

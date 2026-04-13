@@ -82,6 +82,52 @@ duration = "1m"
 		assert.True(t, os.IsNotExist(err), "destination file should not be created")
 	})
 
+	t.Run("interactive mode duplicate prompt labels", func(t *testing.T) {
+		destFileOne := filepath.Join(tempDir, ".env.duplicate.one")
+		destFileTwo := filepath.Join(tempDir, ".env.duplicate.two")
+		configContent := `
+[[lease]]
+source = "mock-duplicate-1"
+destination = "` + destFileOne + `"
+variable = "API_KEY"
+duration = "1m"
+format = "%s=%q"
+
+[[lease]]
+source = "mock-duplicate-2"
+destination = "` + destFileTwo + `"
+variable = "API_KEY"
+duration = "1m"
+format = "%s=%q"
+`
+		configFile := writeConfig(configContent)
+		grantCmd.Flags().Set("config", configFile)
+		grantCmd.Flags().Set("interactive", "true")
+
+		apiKeyPromptCount := 0
+		originalConfirm := confirm
+		defer func() { confirm = originalConfirm }()
+		resetConfirmState()
+		confirm = func(prompt string) bool {
+			if prompt == "Grant 'API_KEY'?" {
+				apiKeyPromptCount++
+			}
+			return true
+		}
+
+		err := grantCmd.RunE(grantCmd, []string{})
+		assert.NoError(t, err, "grant command failed")
+		assert.Equal(t, 2, apiKeyPromptCount, "expected duplicate prompt label to be shown for each lease")
+
+		contentOne, err := os.ReadFile(destFileOne)
+		assert.NoError(t, err, "failed to read first destination file")
+		assert.Contains(t, string(contentOne), `API_KEY="secret-for-mock-duplicate-1"`)
+
+		contentTwo, err := os.ReadFile(destFileTwo)
+		assert.NoError(t, err, "failed to read second destination file")
+		assert.Contains(t, string(contentTwo), `API_KEY="secret-for-mock-duplicate-2"`)
+	})
+
 	t.Run("interactive mode multi-phase flow", func(t *testing.T) {
 		destFileSimple := filepath.Join(tempDir, ".env.simple")
 		destFileExplode := filepath.Join(tempDir, ".env.explode")
