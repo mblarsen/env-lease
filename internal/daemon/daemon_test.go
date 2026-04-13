@@ -56,6 +56,17 @@ func TestDaemon_Run(t *testing.T) {
 	}
 }
 
+func TestNewDaemon_InitializesStateWhenNil(t *testing.T) {
+	d := NewDaemon(nil, "/dev/null", &mockClock{now: time.Now()}, nil, &mockRevoker{}, nil)
+
+	require.NotNil(t, d.state)
+	assert.NotNil(t, d.state.Leases)
+	assert.NotNil(t, d.state.RetryQueue)
+	assert.NotPanics(t, func() {
+		d.revokeExpiredLeases()
+	})
+}
+
 func TestDaemon_revokeExpiredLeases(t *testing.T) {
 	// Arrange
 	state := NewState()

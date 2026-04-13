@@ -32,6 +32,19 @@ func NewState() *State {
 	}
 }
 
+func normalizeState(state *State) *State {
+	if state == nil {
+		return NewState()
+	}
+	if state.Leases == nil {
+		state.Leases = make(map[string]*config.Lease)
+	}
+	if state.RetryQueue == nil {
+		state.RetryQueue = make([]RetryItem, 0)
+	}
+	return state
+}
+
 // LoadState loads the daemon state from a file.
 func LoadState(path string) (*State, error) {
 	data, err := os.ReadFile(path)
@@ -50,7 +63,7 @@ func LoadState(path string) (*State, error) {
 	if err := json.Unmarshal(data, &state); err != nil {
 		return nil, err
 	}
-	return &state, nil
+	return normalizeState(&state), nil
 }
 
 // SaveState saves the daemon state to a file.
