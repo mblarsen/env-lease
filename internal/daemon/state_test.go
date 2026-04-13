@@ -57,5 +57,18 @@ func TestState(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected an error, got nil")
 		}
+		if !IsCorruptStateError(err) {
+			t.Fatalf("expected malformed-state error, got: %v", err)
+		}
+	})
+
+	t.Run("load read failure is not corrupt", func(t *testing.T) {
+		_, err := LoadState(dir)
+		if err == nil {
+			t.Fatal("expected an error, got nil")
+		}
+		if IsCorruptStateError(err) {
+			t.Fatalf("expected non-corrupt read error, got: %v", err)
+		}
 	})
 }

@@ -46,7 +46,7 @@ type Daemon struct {
 // NewDaemon creates a new daemon.
 func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Server, revoker Revoker, notifier Notifier) *Daemon {
 	return &Daemon{
-		state:     state,
+		state:     normalizeState(state),
 		statePath: statePath,
 		clock:     clock,
 		ipcServer: ipcServer,

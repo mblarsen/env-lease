@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -24,12 +25,33 @@ type RetryItem struct {
 	InitialFailure time.Time     `json:"initial_failure"`
 }
 
+// ErrMalformedState indicates the state file contains invalid JSON payload data.
+var ErrMalformedState = errors.New("malformed daemon state file")
+
 // NewState creates a new, empty state.
 func NewState() *State {
 	return &State{
 		Leases:     make(map[string]*config.Lease),
 		RetryQueue: make([]RetryItem, 0),
 	}
+}
+
+// IsCorruptStateError reports whether an error is caused by malformed state content.
+func IsCorruptStateError(err error) bool {
+	return errors.Is(err, ErrMalformedState)
+}
+
+func normalizeState(state *State) *State {
+	if state == nil {
+		return NewState()
+	}
+	if state.Leases == nil {
+		state.Leases = make(map[string]*config.Lease)
+	}
+	if state.RetryQueue == nil {
+		state.RetryQueue = make([]RetryItem, 0)
+	}
+	return state
 }
 
 // LoadState loads the daemon state from a file.
@@ -48,9 +70,9 @@ func LoadState(path string) (*State, error) {
 
 	var state State
 	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %v", ErrMalformedState, err)
 	}
-	return &state, nil
+	return normalizeState(&state), nil
 }
 
 // SaveState saves the daemon state to a file.

@@ -85,12 +85,9 @@ var runCmd = &cobra.Command{
 			return err
 		}
 
-		// Load state
-		state, err := daemon.LoadState(statePath)
+		state, err := loadDaemonState(statePath)
 		if err != nil {
-			slog.Warn("No state file found, initializing new state.")
-		} else {
-			slog.Info("Loaded state", "leases", len(state.Leases))
+			return err
 		}
 
 		// Set up dependencies
@@ -108,6 +105,20 @@ var runCmd = &cobra.Command{
 
 		return d.Run(context.Background())
 	},
+}
+
+func loadDaemonState(statePath string) (*daemon.State, error) {
+	state, err := daemon.LoadState(statePath)
+	if err != nil {
+		if daemon.IsCorruptStateError(err) {
+			slog.Warn("State file is malformed; starting with empty state", "path", statePath, "err", err)
+			return daemon.NewState(), nil
+		}
+		return nil, fmt.Errorf("failed to load daemon state: %w", err)
+	}
+
+	slog.Info("Loaded state", "leases", len(state.Leases))
+	return state, nil
 }
 
 var cleanupCmd = &cobra.Command{
