@@ -39,12 +39,20 @@ func IsPathInsideRoot(root, path string) (bool, error) {
 	}
 
 	// Clean the path before symlink resolution so that .. segments are
-	// resolved lexically first, matching the behaviour of writeLease which
-	// uses filepath.Join (and therefore filepath.Clean) to build the
-	// destination. Without this, a path like link/../secret would be
-	// resolved through the symlink at "link" and the .. would ascend from
-	// the symlink target, producing a false-positive denial even though
-	// filepath.Join would have cancelled link/.. and written inside root.
+	// resolved lexically first. This matches writeLease, processLease,
+	// and canonicalLeaseDestination, which all use filepath.Join (for
+	// relative paths, which calls Clean internally) or filepath.Clean
+	// (for absolute paths) to build the destination.
+	//
+	// Without this, a path like link/../secret would be resolved through
+	// the symlink at "link" and the .. would ascend from the symlink
+	// target, producing a false-positive denial even though filepath.Join
+	// would have cancelled link/.. and written inside root.
+	//
+	// Security: because both validation and write paths clean before
+	// resolving, a symlink/.. pattern is cancelled on both sides.
+	// Symlink escapes without .. (e.g. outside_link/secret) are still
+	// caught by resolvePathAllowMissing following the symlink target.
 	if !filepath.IsAbs(expandedPath) {
 		expandedPath = filepath.Join(absRoot, expandedPath)
 	} else {

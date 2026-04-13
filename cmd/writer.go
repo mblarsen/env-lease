@@ -17,6 +17,8 @@ func writeLease(l config.Lease, secretVal, projectRoot string, override bool) (b
 	dest := l.Destination
 	if !filepath.IsAbs(dest) {
 		dest = filepath.Join(projectRoot, dest)
+	} else {
+		dest = filepath.Clean(dest)
 	}
 
 	if _, err := os.Stat(dest); os.IsNotExist(err) {
