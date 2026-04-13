@@ -217,3 +217,72 @@ func TestDaemon_ShutdownRevokesLeasesAndClearsState(t *testing.T) {
 	assert.Contains(t, string(envContent), "ENV_VAR=")
 	assert.NotContains(t, string(envContent), "value", "env variable should be cleared during shutdown")
 }
+
+func TestDaemon_processRetryQueue_PersistsBackoffUpdate(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.json")
+	now := time.Now()
+
+	state := NewState()
+	state.RetryQueue = []RetryItem{
+		{
+			Lease: &config.Lease{
+				Source:      "onepassword://vault/item/retry",
+				Destination: filepath.Join(tempDir, "retry.env"),
+				LeaseType:   "env",
+			},
+			Attempts:       1,
+			NextRetryTime:  now.Add(-1 * time.Second),
+			InitialFailure: now.Add(-1 * time.Minute),
+		},
+	}
+	require.NoError(t, state.SaveState(statePath))
+
+	revoker := &mockRevoker{RevokeFunc: func(lease *config.Lease) error {
+		return fmt.Errorf("revoke failed")
+	}}
+	d := NewDaemon(state, statePath, &mockClock{now: now}, nil, revoker, nil)
+
+	d.processRetryQueue()
+
+	require.Len(t, state.RetryQueue, 1)
+	assert.Equal(t, 2, state.RetryQueue[0].Attempts)
+	assert.WithinDuration(t, now.Add(4*time.Second), state.RetryQueue[0].NextRetryTime, time.Millisecond)
+
+	reloaded, err := LoadState(statePath)
+	require.NoError(t, err)
+	require.Len(t, reloaded.RetryQueue, 1)
+	assert.Equal(t, 2, reloaded.RetryQueue[0].Attempts)
+	assert.WithinDuration(t, now.Add(4*time.Second), reloaded.RetryQueue[0].NextRetryTime, time.Millisecond)
+}
+
+func TestDaemon_processRetryQueue_PersistsSuccessfulRemoval(t *testing.T) {
+	tempDir := t.TempDir()
+	statePath := filepath.Join(tempDir, "state.json")
+	now := time.Now()
+
+	state := NewState()
+	state.RetryQueue = []RetryItem{
+		{
+			Lease: &config.Lease{
+				Source:      "onepassword://vault/item/retry-success",
+				Destination: filepath.Join(tempDir, "retry-success.env"),
+				LeaseType:   "env",
+			},
+			Attempts:       1,
+			NextRetryTime:  now.Add(-1 * time.Second),
+			InitialFailure: now.Add(-1 * time.Minute),
+		},
+	}
+	require.NoError(t, state.SaveState(statePath))
+
+	d := NewDaemon(state, statePath, &mockClock{now: now}, nil, &mockRevoker{}, nil)
+
+	d.processRetryQueue()
+
+	assert.Empty(t, state.RetryQueue)
+
+	reloaded, err := LoadState(statePath)
+	require.NoError(t, err)
+	assert.Empty(t, reloaded.RetryQueue)
+}
