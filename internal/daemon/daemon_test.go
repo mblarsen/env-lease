@@ -240,6 +240,113 @@ variable = "VAR_A"
 	assert.NotContains(t, state.Leases, "lease-b")
 }
 
+func TestDaemon_revokeOrphanedLeases_DoesNotRevokeUnchangedRelativeDestination(t *testing.T) {
+	state := NewState()
+	clock := &mockClock{now: time.Now()}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+
+	stateFile, err := os.CreateTemp("", "env-lease-state-*.json")
+	require.NoError(t, err)
+	defer os.Remove(stateFile.Name())
+
+	daemon := NewDaemon(state, stateFile.Name(), clock, nil, revoker, notifier)
+
+	configFile, err := os.CreateTemp("", "env-lease-*.toml")
+	require.NoError(t, err)
+	defer os.Remove(configFile.Name())
+
+	source := "onepassword://vault/item/relative"
+	relativeDestination := ".env"
+	_, err = configFile.WriteString(fmt.Sprintf(`
+[[lease]]
+source = %q
+destination = %q
+duration = "1h"
+lease_type = "env"
+variable = "API_KEY"
+`, source, relativeDestination))
+	require.NoError(t, err)
+	require.NoError(t, configFile.Close())
+
+	state.Leases["relative"] = &config.Lease{
+		Source:      source,
+		Destination: filepath.Join(filepath.Dir(configFile.Name()), relativeDestination),
+		LeaseType:   "env",
+		Variable:    "API_KEY",
+		ConfigFile:  configFile.Name(),
+	}
+
+	daemon.revokeOrphanedLeases()
+
+	assert.Equal(t, 0, revoker.RevokeCount)
+	assert.Contains(t, state.Leases, "relative")
+}
+
+func TestDaemon_revokeOrphanedLeases_PreservesExplodeChildrenWhenConfigUnchanged(t *testing.T) {
+	state := NewState()
+	clock := &mockClock{now: time.Now()}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+
+	stateFile, err := os.CreateTemp("", "env-lease-state-*.json")
+	require.NoError(t, err)
+	defer os.Remove(stateFile.Name())
+
+	daemon := NewDaemon(state, stateFile.Name(), clock, nil, revoker, notifier)
+
+	configFile, err := os.CreateTemp("", "env-lease-*.toml")
+	require.NoError(t, err)
+	defer os.Remove(configFile.Name())
+
+	source := "onepassword://vault/item/exploded"
+	relativeDestination := ".env.exploded"
+	_, err = configFile.WriteString(fmt.Sprintf(`
+[[lease]]
+source = %q
+destination = %q
+duration = "1h"
+lease_type = "env"
+transform = ["json", "explode"]
+`, source, relativeDestination))
+	require.NoError(t, err)
+	require.NoError(t, configFile.Close())
+
+	destination := filepath.Join(filepath.Dir(configFile.Name()), relativeDestination)
+	parent := parentLeaseIdentity(source, destination)
+
+	state.Leases["parent"] = &config.Lease{
+		Source:      source,
+		Destination: destination,
+		LeaseType:   "env",
+		Variable:    "",
+		ConfigFile:  configFile.Name(),
+	}
+	state.Leases["child-key1"] = &config.Lease{
+		Source:       source,
+		Destination:  destination,
+		LeaseType:    "env",
+		Variable:     "KEY1",
+		ParentSource: parent,
+		ConfigFile:   configFile.Name(),
+	}
+	state.Leases["child-key2"] = &config.Lease{
+		Source:       source,
+		Destination:  destination,
+		LeaseType:    "env",
+		Variable:     "KEY2",
+		ParentSource: parent,
+		ConfigFile:   configFile.Name(),
+	}
+
+	daemon.revokeOrphanedLeases()
+
+	assert.Equal(t, 0, revoker.RevokeCount)
+	assert.Contains(t, state.Leases, "parent")
+	assert.Contains(t, state.Leases, "child-key1")
+	assert.Contains(t, state.Leases, "child-key2")
+}
+
 func TestDaemon_ShutdownRevokesLeasesAndClearsState(t *testing.T) {
 	tempDir := t.TempDir()
 	socketPath := filepath.Join(os.TempDir(), fmt.Sprintf("env-lease-shutdown-%d.sock", time.Now().UnixNano()))

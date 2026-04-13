@@ -153,27 +153,48 @@ func (d *Daemon) revokeOrphanedLeases() {
 		// Lease identity must include source + destination + variable to avoid
 		// collisions when multiple leases share a source.
 		configLeases := make(map[string]struct{}, len(cfg.Lease))
+		explodeParents := make(map[string]struct{})
 		for _, l := range cfg.Lease {
-			configLeases[leaseIdentity(l.Source, l.Destination, l.Variable)] = struct{}{}
+			destination, err := canonicalLeaseDestination(cfg.Root, l)
+			if err != nil {
+				slog.Warn("Could not normalize lease destination; skipping config lease", "source", l.Source, "destination", l.Destination, "err", err)
+				continue
+			}
+
+			configLeases[leaseIdentity(l.Source, destination, l.Variable)] = struct{}{}
+			if hasExplodeTransform(l.Transform) {
+				// Explode leases create a parent entry with an empty variable and
+				// child entries that reference ParentSource at runtime.
+				configLeases[leaseIdentity(l.Source, destination, "")] = struct{}{}
+				explodeParents[parentLeaseIdentity(l.Source, destination)] = struct{}{}
+			}
 		}
 
 		// Check active leases against the config
 		for key, activeLease := range d.state.LeasesForConfigFile(configFile) {
-			if _, exists := configLeases[leaseIdentity(activeLease.Source, activeLease.Destination, activeLease.Variable)]; !exists {
-				slog.Info("Lease removed from config, revoking", "key", key)
-				if activeLease.LeaseType == "shell" {
-					slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
-					delete(d.state.Leases, key)
-					stateChanged = true
+			activeIdentity := leaseIdentity(activeLease.Source, activeLease.Destination, activeLease.Variable)
+			if _, exists := configLeases[activeIdentity]; exists {
+				continue
+			}
+			if activeLease.ParentSource != "" {
+				if _, exists := explodeParents[activeLease.ParentSource]; exists {
 					continue
 				}
-				if err := d.revoker.Revoke(activeLease); err != nil {
-					slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
-					// Optionally, add to a retry queue here as well
-				} else {
-					delete(d.state.Leases, key)
-					stateChanged = true
-				}
+			}
+
+			slog.Info("Lease removed from config, revoking", "key", key)
+			if activeLease.LeaseType == "shell" {
+				slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
+				delete(d.state.Leases, key)
+				stateChanged = true
+				continue
+			}
+			if err := d.revoker.Revoke(activeLease); err != nil {
+				slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
+				// Optionally, add to a retry queue here as well
+			} else {
+				delete(d.state.Leases, key)
+				stateChanged = true
 			}
 		}
 	}
