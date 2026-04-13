@@ -125,16 +125,25 @@ variable = "VAR2"
 
 	// Add leases to the state, pretending they were granted from the config
 	state.Leases["lease1"] = &config.Lease{
-		Source:     "onepassword://vault/item/field1",
-		ConfigFile: configFile.Name(),
+		Source:      "onepassword://vault/item/field1",
+		Destination: "/tmp/file1",
+		Variable:    "VAR1",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
 	}
 	state.Leases["lease2"] = &config.Lease{
-		Source:     "onepassword://vault/item/field2", // This one will be removed from config
-		ConfigFile: configFile.Name(),
+		Source:      "onepassword://vault/item/field2", // This one will be removed from config
+		Destination: "/tmp/file2",
+		Variable:    "VAR2",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
 	}
 	state.Leases["lease3"] = &config.Lease{
-		Source:     "onepassword://vault/item/field3", // This one will be removed from config
-		ConfigFile: configFile.Name(),
+		Source:      "onepassword://vault/item/field3", // This one will be removed from config
+		Destination: "/tmp/file3",
+		Variable:    "VAR3",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
 	}
 
 	// Act: Modify the config file to "remove" lease2 and lease3
@@ -155,6 +164,80 @@ variable = "VAR1"
 	assert.Equal(t, 2, revoker.RevokeCount, "Revoke should be called for the two removed leases")
 	assert.Len(t, state.Leases, 1, "Only one lease should remain in the state")
 	assert.NotNil(t, state.Leases["lease1"], "Lease1 should still be in the state")
+}
+
+func TestDaemon_revokeOrphanedLeases_RevokesRemovedSiblingWithSameSource(t *testing.T) {
+	state := NewState()
+	clock := &mockClock{now: time.Now()}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+
+	stateFile, err := os.CreateTemp("", "env-lease-state-*.json")
+	require.NoError(t, err)
+	defer os.Remove(stateFile.Name())
+
+	daemon := NewDaemon(state, stateFile.Name(), clock, nil, revoker, notifier)
+
+	configFile, err := os.CreateTemp("", "env-lease-*.toml")
+	require.NoError(t, err)
+	defer os.Remove(configFile.Name())
+
+	tempDir := t.TempDir()
+	sharedSource := "onepassword://vault/item/shared"
+	destinationA := filepath.Join(tempDir, "a.env")
+	destinationB := filepath.Join(tempDir, "b.env")
+
+	_, err = configFile.WriteString(fmt.Sprintf(`
+[[lease]]
+source = %q
+destination = %q
+duration = "1h"
+lease_type = "env"
+variable = "VAR_A"
+
+[[lease]]
+source = %q
+destination = %q
+duration = "1h"
+lease_type = "env"
+variable = "VAR_B"
+`, sharedSource, destinationA, sharedSource, destinationB))
+	require.NoError(t, err)
+	require.NoError(t, configFile.Close())
+
+	state.Leases["lease-a"] = &config.Lease{
+		Source:      sharedSource,
+		Destination: destinationA,
+		Variable:    "VAR_A",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
+	}
+	state.Leases["lease-b"] = &config.Lease{
+		Source:      sharedSource,
+		Destination: destinationB,
+		Variable:    "VAR_B",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
+	}
+
+	err = os.WriteFile(configFile.Name(), []byte(fmt.Sprintf(`
+[[lease]]
+source = %q
+destination = %q
+duration = "1h"
+lease_type = "env"
+variable = "VAR_A"
+`, sharedSource, destinationA)), 0644)
+	require.NoError(t, err)
+
+	daemon.revokeOrphanedLeases()
+
+	assert.Equal(t, 1, revoker.RevokeCount, "only removed sibling lease should be revoked")
+	require.Len(t, revoker.revoked, 1)
+	assert.Equal(t, "VAR_B", revoker.revoked[0].Variable)
+	assert.Equal(t, destinationB, revoker.revoked[0].Destination)
+	assert.Contains(t, state.Leases, "lease-a")
+	assert.NotContains(t, state.Leases, "lease-b")
 }
 
 func TestDaemon_ShutdownRevokesLeasesAndClearsState(t *testing.T) {

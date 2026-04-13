@@ -149,17 +149,17 @@ func (d *Daemon) revokeOrphanedLeases() {
 			continue
 		}
 
-		// Create a map of leases defined in the config for efficient lookup
-		configLeases := make(map[string]struct{})
+		// Create a map of leases defined in the config for efficient lookup.
+		// Lease identity must include source + destination + variable to avoid
+		// collisions when multiple leases share a source.
+		configLeases := make(map[string]struct{}, len(cfg.Lease))
 		for _, l := range cfg.Lease {
-			// The key in the state is a composite of source, destination, and variable.
-			// We only need to check the source for existence.
-			configLeases[l.Source] = struct{}{}
+			configLeases[leaseIdentity(l.Source, l.Destination, l.Variable)] = struct{}{}
 		}
 
 		// Check active leases against the config
 		for key, activeLease := range d.state.LeasesForConfigFile(configFile) {
-			if _, exists := configLeases[activeLease.Source]; !exists {
+			if _, exists := configLeases[leaseIdentity(activeLease.Source, activeLease.Destination, activeLease.Variable)]; !exists {
 				slog.Info("Lease removed from config, revoking", "key", key)
 				if activeLease.LeaseType == "shell" {
 					slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
