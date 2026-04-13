@@ -27,6 +27,8 @@ func canonicalLeaseDestination(root string, lease config.Lease) (string, error) 
 	}
 	if !filepath.IsAbs(destination) {
 		destination = filepath.Join(root, destination)
+	} else {
+		destination = filepath.Clean(destination)
 	}
 	return destination, nil
 }

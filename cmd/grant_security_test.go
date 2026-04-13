@@ -114,7 +114,31 @@ duration = "1h"
 		t.Errorf("Did not expect an error, but got: %v\nStderr: %s", err, stderr)
 	}
 
-	// Test case 3: Destination inside root (should succeed)
+	// Test case 3: Destination through symlink in root that points outside (should fail)
+	outsideLink := filepath.Join(projectRoot, "outside-link")
+	if err := os.Symlink(outsideDir, outsideLink); err != nil {
+		t.Skipf("Symlinks not supported on this platform: %v", err)
+	}
+	symlinkDestination := filepath.Join(outsideLink, "secret-via-link")
+	configContent = fmt.Sprintf(`
+[[lease]]
+lease_type = "file"
+source = "op://vault/item/field"
+destination = "%s"
+duration = "1h"
+`, symlinkDestination)
+	os.WriteFile(configFile, []byte(configContent), 0644)
+
+	_, _, err = runGrantCommand(t, "--config", configFile, "--destination-outside-root=false", "--interactive=false")
+	if err == nil {
+		t.Error("Expected an error for symlink escape, but got none")
+	}
+	expectedSymlinkError := fmt.Sprintf("destination path '%s' is outside the project root", symlinkDestination)
+	if err != nil && !strings.Contains(err.Error(), expectedSymlinkError) {
+		t.Errorf("Expected error message to contain '%s', but it was: %s", expectedSymlinkError, err.Error())
+	}
+
+	// Test case 4: Destination inside root (should succeed)
 	configContent = fmt.Sprintf(`
 [[lease]]
 lease_type = "file"
@@ -129,7 +153,7 @@ duration = "1h"
 		t.Errorf("Did not expect an error, but got: %v\nStderr: %s", err, stderr)
 	}
 
-	// Test case 4: Exploded lease, check for empty unset in revoke
+	// Test case 5: Exploded lease, check for empty unset in revoke
 	configContent = `
 [[lease]]
 lease_type = "shell"

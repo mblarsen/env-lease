@@ -622,6 +622,8 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal, projectRoot, co
 		}
 		if !filepath.IsAbs(absDest) {
 			absDest = filepath.Join(projectRoot, absDest)
+		} else {
+			absDest = filepath.Clean(absDest)
 		}
 	}
 
