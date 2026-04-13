@@ -20,12 +20,9 @@ func ExpandPath(path string) (string, error) {
 }
 
 // IsPathInsideRoot checks if the given path is within the root directory.
-// Both paths are expected to be absolute paths.
+// Symlinks are resolved for existing path components to enforce true
+// filesystem containment instead of lexical containment.
 func IsPathInsideRoot(root, path string) (bool, error) {
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(root, path)
-	}
-
 	expandedPath, err := ExpandPath(path)
 	if err != nil {
 		return false, fmt.Errorf("could not expand path '%s': %w", path, err)
@@ -36,22 +33,115 @@ func IsPathInsideRoot(root, path string) (bool, error) {
 		return false, fmt.Errorf("could not get absolute path for root '%s': %w", root, err)
 	}
 
-	absPath, err := filepath.Abs(expandedPath)
+	resolvedRoot, err := filepath.EvalSymlinks(absRoot)
 	if err != nil {
-		return false, fmt.Errorf("could not get absolute path for path '%s': %w", expandedPath, err)
+		return false, fmt.Errorf("could not resolve root path '%s': %w", absRoot, err)
+	}
+
+	if !filepath.IsAbs(expandedPath) {
+		expandedPath = joinPathPreserve(absRoot, expandedPath)
+	}
+
+	resolvedPath, err := resolvePathAllowMissing(expandedPath)
+	if err != nil {
+		return false, fmt.Errorf("could not resolve path '%s': %w", expandedPath, err)
 	}
 
 	// On Windows, drive letters must match.
-	if filepath.VolumeName(absRoot) != filepath.VolumeName(absPath) {
+	if filepath.VolumeName(resolvedRoot) != filepath.VolumeName(resolvedPath) {
 		return false, nil
 	}
 
-	rel, err := filepath.Rel(absRoot, absPath)
+	rel, err := filepath.Rel(resolvedRoot, resolvedPath)
 	if err != nil {
 		return false, fmt.Errorf("could not get relative path: %w", err)
 	}
 
-	// If the relative path starts with '..', it's outside the root.
-	// This also handles the case where the paths are the same (rel is '.').
-	return !strings.HasPrefix(rel, ".."), nil
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func joinPathPreserve(base, rel string) string {
+	if rel == "" {
+		return base
+	}
+	if strings.HasSuffix(base, string(os.PathSeparator)) {
+		return base + rel
+	}
+	return base + string(os.PathSeparator) + rel
+}
+
+func resolvePathAllowMissing(path string) (string, error) {
+	current := path
+	missingParts := make([]string, 0, 4)
+
+	for {
+		resolved, err := filepath.EvalSymlinks(current)
+		if err == nil {
+			for i := len(missingParts) - 1; i >= 0; i-- {
+				resolved = filepath.Join(resolved, missingParts[i])
+			}
+			return resolved, nil
+		}
+
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+
+		parent, component, ok := splitPathPreserve(current)
+		if !ok {
+			return "", err
+		}
+
+		missingParts = append(missingParts, component)
+		current = parent
+	}
+}
+
+func splitPathPreserve(path string) (parent, component string, ok bool) {
+	if path == "" {
+		return "", "", false
+	}
+
+	volume := filepath.VolumeName(path)
+	volumeLen := len(volume)
+	end := len(path)
+
+	for end > volumeLen+1 && os.IsPathSeparator(path[end-1]) {
+		end--
+	}
+
+	if end <= volumeLen+1 {
+		if len(path) > volumeLen && os.IsPathSeparator(path[volumeLen]) {
+			return "", "", false
+		}
+	}
+
+	idx := end - 1
+	for idx >= volumeLen && !os.IsPathSeparator(path[idx]) {
+		idx--
+	}
+
+	if idx < volumeLen {
+		if filepath.IsAbs(path) {
+			return volume + string(os.PathSeparator), path[volumeLen:end], true
+		}
+		return ".", path[:end], true
+	}
+
+	component = path[idx+1 : end]
+	if idx == volumeLen {
+		parent = path[:idx+1]
+	} else {
+		parent = path[:idx]
+	}
+
+	if parent == "" {
+		parent = "."
+	}
+
+	return parent, component, true
 }
