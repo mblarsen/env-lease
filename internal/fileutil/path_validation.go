@@ -38,8 +38,17 @@ func IsPathInsideRoot(root, path string) (bool, error) {
 		return false, fmt.Errorf("could not resolve root path '%s': %w", absRoot, err)
 	}
 
+	// Clean the path before symlink resolution so that .. segments are
+	// resolved lexically first, matching the behaviour of writeLease which
+	// uses filepath.Join (and therefore filepath.Clean) to build the
+	// destination. Without this, a path like link/../secret would be
+	// resolved through the symlink at "link" and the .. would ascend from
+	// the symlink target, producing a false-positive denial even though
+	// filepath.Join would have cancelled link/.. and written inside root.
 	if !filepath.IsAbs(expandedPath) {
-		expandedPath = joinPathPreserve(absRoot, expandedPath)
+		expandedPath = filepath.Join(absRoot, expandedPath)
+	} else {
+		expandedPath = filepath.Clean(expandedPath)
 	}
 
 	resolvedPath, err := resolvePathAllowMissing(expandedPath)
@@ -62,16 +71,6 @@ func IsPathInsideRoot(root, path string) (bool, error) {
 	}
 
 	return true, nil
-}
-
-func joinPathPreserve(base, rel string) string {
-	if rel == "" {
-		return base
-	}
-	if strings.HasSuffix(base, string(os.PathSeparator)) {
-		return base + rel
-	}
-	return base + string(os.PathSeparator) + rel
 }
 
 func resolvePathAllowMissing(path string) (string, error) {

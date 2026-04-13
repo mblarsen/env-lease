@@ -106,14 +106,77 @@ func TestIsPathInsideRoot_SymlinkEscape(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "Symlink traversal with dotdot escaping root is rejected",
+			name:     "Symlink canceled by dotdot is allowed (path cleans inside root)",
 			path:     outsideLink + string(os.PathSeparator) + ".." + string(os.PathSeparator) + "escaped.txt",
-			expected: false,
+			expected: true,
 		},
 		{
 			name:     "Symlink to inside root is allowed",
 			path:     filepath.Join(insideLink, "secret.txt"),
 			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			inside, err := IsPathInsideRoot(rootDir, tc.path)
+			if err != nil {
+				t.Fatalf("did not expect error: %v", err)
+			}
+			if inside != tc.expected {
+				t.Fatalf("expected %v, got %v", tc.expected, inside)
+			}
+		})
+	}
+}
+
+func TestIsPathInsideRoot_DotDotCancelsSymlink(t *testing.T) {
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "root")
+	outsideDir := filepath.Join(tmpDir, "outside")
+
+	if err := os.MkdirAll(rootDir, 0o755); err != nil {
+		t.Fatalf("failed to create root dir: %v", err)
+	}
+	if err := os.MkdirAll(outsideDir, 0o755); err != nil {
+		t.Fatalf("failed to create outside dir: %v", err)
+	}
+
+	// outside-link is a symlink inside root that points outside root
+	outsideLink := filepath.Join(rootDir, "outside-link")
+	if err := os.Symlink(outsideDir, outsideLink); err != nil {
+		t.Skipf("symlink not supported on this platform: %v", err)
+	}
+
+	testCases := []struct {
+		name     string
+		path     string
+		expected bool
+	}{
+		{
+			name:     "Relative link/../secret is allowed when dotdot cancels symlink",
+			path:     filepath.Join("outside-link", "..", "secret.txt"),
+			expected: true,
+		},
+		{
+			name:     "Relative link/secret is still rejected (symlink escape)",
+			path:     filepath.Join("outside-link", "secret.txt"),
+			expected: false,
+		},
+		{
+			name:     "Relative link/../../escape is rejected",
+			path:     filepath.Join("outside-link", "..", "..", "escape.txt"),
+			expected: false,
+		},
+		{
+			name:     "Absolute link/../secret is allowed",
+			path:     filepath.Join(outsideLink, "..", "secret.txt"),
+			expected: true,
+		},
+		{
+			name:     "Absolute link/secret is rejected (symlink escape)",
+			path:     filepath.Join(outsideLink, "secret.txt"),
+			expected: false,
 		},
 	}
 
