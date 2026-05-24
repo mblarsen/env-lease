@@ -153,10 +153,9 @@ func (d *Daemon) revokeOrphanedLeases() {
 		// Create a map of leases defined in the config for efficient lookup.
 		// Lease identity must include source + destination + variable to avoid
 		// collisions when multiple leases share a source.
-		leaseSet, err := lease.Normalize(cfg, configFile)
-		if err != nil {
-			slog.Warn("Could not normalize config leases; skipping orphan check", "config", configFile, "err", err)
-			continue
+		leaseSet, normalizeErrs := lease.NormalizePartial(cfg, configFile)
+		for _, err := range normalizeErrs {
+			slog.Warn("Skipping invalid config lease during orphan check", "config", configFile, "err", err)
 		}
 		configLeases := make(map[string]struct{}, len(leaseSet.Leases))
 		explodeParents := make(map[string]struct{})

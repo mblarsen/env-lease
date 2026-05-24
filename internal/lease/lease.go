@@ -51,8 +51,18 @@ type Lease struct {
 
 // Normalize converts raw TOML config leases into the runtime Lease model.
 func Normalize(cfg *config.Config, configFile string) (*Set, error) {
+	set, errs := NormalizePartial(cfg, configFile)
+	if len(errs) > 0 {
+		return nil, errs[0]
+	}
+	return set, nil
+}
+
+// NormalizePartial converts all semantically valid raw TOML leases into the
+// runtime Lease model and returns per-lease errors for invalid leases.
+func NormalizePartial(cfg *config.Config, configFile string) (*Set, []error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("config is nil")
+		return nil, []error{fmt.Errorf("config is nil")}
 	}
 
 	absConfigFile := configFile
@@ -62,7 +72,7 @@ func Normalize(cfg *config.Config, configFile string) (*Set, error) {
 	if !filepath.IsAbs(absConfigFile) {
 		abs, err := filepath.Abs(absConfigFile)
 		if err != nil {
-			return nil, fmt.Errorf("could not get absolute path for config: %w", err)
+			return nil, []error{fmt.Errorf("could not get absolute path for config: %w", err)}
 		}
 		absConfigFile = abs
 	}
@@ -72,16 +82,18 @@ func Normalize(cfg *config.Config, configFile string) (*Set, error) {
 		ConfigFile: absConfigFile,
 		Leases:     make([]Lease, 0, len(cfg.Lease)),
 	}
+	var errs []error
 
 	for i, raw := range cfg.Lease {
 		l, err := normalizeOne(cfg.Root, absConfigFile, raw)
 		if err != nil {
-			return nil, fmt.Errorf("lease %d: %w", i, err)
+			errs = append(errs, fmt.Errorf("lease %d: %w", i, err))
+			continue
 		}
 		set.Leases = append(set.Leases, l)
 	}
 
-	return set, nil
+	return set, errs
 }
 
 func normalizeOne(root, configFile string, raw config.Lease) (Lease, error) {

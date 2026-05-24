@@ -87,6 +87,37 @@ func TestNormalizeValidatesSemanticRequirements(t *testing.T) {
 	}
 }
 
+func TestNormalizePartialKeepsValidLeases(t *testing.T) {
+	root := t.TempDir()
+	cfg := &config.Config{
+		Root: root,
+		Lease: []config.Lease{
+			{
+				Source:      "op://vault/item/secret",
+				Destination: ".env",
+				Duration:    "1h",
+				Variable:    "API_KEY",
+			},
+			{
+				Destination: ".env",
+				Duration:    "1h",
+				Variable:    "MISSING_SOURCE",
+			},
+		},
+	}
+
+	set, errs := NormalizePartial(cfg, filepath.Join(root, "env-lease.toml"))
+	if len(errs) != 1 {
+		t.Fatalf("expected one invalid lease error, got %d", len(errs))
+	}
+	if len(set.Leases) != 1 {
+		t.Fatalf("expected one valid lease, got %d", len(set.Leases))
+	}
+	if set.Leases[0].Variable != "API_KEY" {
+		t.Fatalf("expected valid lease to remain, got %q", set.Leases[0].Variable)
+	}
+}
+
 func TestNormalizeExplodeParentIdentity(t *testing.T) {
 	root := t.TempDir()
 	cfg := &config.Config{

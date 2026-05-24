@@ -177,6 +177,69 @@ variable = "VAR1"
 	assert.NotNil(t, state.Leases["lease1"], "Lease1 should still be in the state")
 }
 
+func TestDaemon_revokeOrphanedLeases_RevokesRemovedLeasesWhenAnotherConfigLeaseIsInvalid(t *testing.T) {
+	state := NewState()
+	clock := &mockClock{now: time.Now()}
+	revoker := &mockRevoker{}
+	notifier := &mockNotifier{}
+
+	stateFile, err := os.CreateTemp("", "env-lease-state-*.json")
+	require.NoError(t, err)
+	defer os.Remove(stateFile.Name())
+
+	daemon := NewDaemon(state, stateFile.Name(), clock, nil, revoker, notifier)
+
+	configFile, err := os.CreateTemp("", "env-lease-*.toml")
+	require.NoError(t, err)
+	defer os.Remove(configFile.Name())
+
+	tempDir := t.TempDir()
+	keptSource := "onepassword://vault/item/kept"
+	removedSource := "onepassword://vault/item/removed"
+	keptDestination := filepath.Join(tempDir, "kept.env")
+	removedDestination := filepath.Join(tempDir, "removed.env")
+
+	_, err = configFile.WriteString(fmt.Sprintf(`
+[[lease]]
+source = %q
+destination = %q
+duration = "1h"
+lease_type = "env"
+variable = "KEPT"
+
+[[lease]]
+destination = %q
+duration = "1h"
+lease_type = "env"
+variable = "INVALID"
+`, keptSource, keptDestination, filepath.Join(tempDir, "invalid.env")))
+	require.NoError(t, err)
+	require.NoError(t, configFile.Close())
+
+	state.Leases["kept"] = &lease.Lease{
+		Source:      keptSource,
+		Destination: keptDestination,
+		Variable:    "KEPT",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
+	}
+	state.Leases["removed"] = &lease.Lease{
+		Source:      removedSource,
+		Destination: removedDestination,
+		Variable:    "REMOVED",
+		LeaseType:   "env",
+		ConfigFile:  configFile.Name(),
+	}
+
+	daemon.revokeOrphanedLeases()
+
+	assert.Equal(t, 1, revoker.RevokeCount, "invalid config lease should not skip orphan reconciliation")
+	require.Len(t, revoker.revoked, 1)
+	assert.Equal(t, "REMOVED", revoker.revoked[0].Variable)
+	assert.Contains(t, state.Leases, "kept")
+	assert.NotContains(t, state.Leases, "removed")
+}
+
 func TestDaemon_revokeOrphanedLeases_RevokesRemovedSiblingWithSameSource(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
