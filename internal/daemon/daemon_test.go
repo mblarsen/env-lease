@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/lease"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -79,7 +79,7 @@ func TestDaemon_revokeExpiredLeases(t *testing.T) {
 	daemon := NewDaemon(state, "/dev/null", clock, server, revoker, notifier)
 
 	// Add a lease that is already expired
-	state.Leases["test"] = &config.Lease{
+	state.Leases["test"] = &lease.Lease{
 		Source:    "onepassword://vault/item/field",
 		ExpiresAt: clock.Now().Add(-1 * time.Hour),
 	}
@@ -135,21 +135,21 @@ variable = "VAR2"
 	configFile.Close()
 
 	// Add leases to the state, pretending they were granted from the config
-	state.Leases["lease1"] = &config.Lease{
+	state.Leases["lease1"] = &lease.Lease{
 		Source:      "onepassword://vault/item/field1",
 		Destination: "/tmp/file1",
 		Variable:    "VAR1",
 		LeaseType:   "env",
 		ConfigFile:  configFile.Name(),
 	}
-	state.Leases["lease2"] = &config.Lease{
+	state.Leases["lease2"] = &lease.Lease{
 		Source:      "onepassword://vault/item/field2", // This one will be removed from config
 		Destination: "/tmp/file2",
 		Variable:    "VAR2",
 		LeaseType:   "env",
 		ConfigFile:  configFile.Name(),
 	}
-	state.Leases["lease3"] = &config.Lease{
+	state.Leases["lease3"] = &lease.Lease{
 		Source:      "onepassword://vault/item/field3", // This one will be removed from config
 		Destination: "/tmp/file3",
 		Variable:    "VAR3",
@@ -216,14 +216,14 @@ variable = "VAR_B"
 	require.NoError(t, err)
 	require.NoError(t, configFile.Close())
 
-	state.Leases["lease-a"] = &config.Lease{
+	state.Leases["lease-a"] = &lease.Lease{
 		Source:      sharedSource,
 		Destination: destinationA,
 		Variable:    "VAR_A",
 		LeaseType:   "env",
 		ConfigFile:  configFile.Name(),
 	}
-	state.Leases["lease-b"] = &config.Lease{
+	state.Leases["lease-b"] = &lease.Lease{
 		Source:      sharedSource,
 		Destination: destinationB,
 		Variable:    "VAR_B",
@@ -280,7 +280,7 @@ variable = "API_KEY"
 	require.NoError(t, err)
 	require.NoError(t, configFile.Close())
 
-	state.Leases["relative"] = &config.Lease{
+	state.Leases["relative"] = &lease.Lease{
 		Source:      source,
 		Destination: filepath.Join(filepath.Dir(configFile.Name()), relativeDestination),
 		LeaseType:   "env",
@@ -324,16 +324,16 @@ transform = ["json", "explode"]
 	require.NoError(t, configFile.Close())
 
 	destination := filepath.Join(filepath.Dir(configFile.Name()), relativeDestination)
-	parent := parentLeaseIdentity(source, destination)
+	parent := lease.ParentIdentity(source, destination)
 
-	state.Leases["parent"] = &config.Lease{
+	state.Leases["parent"] = &lease.Lease{
 		Source:      source,
 		Destination: destination,
 		LeaseType:   "env",
 		Variable:    "",
 		ConfigFile:  configFile.Name(),
 	}
-	state.Leases["child-key1"] = &config.Lease{
+	state.Leases["child-key1"] = &lease.Lease{
 		Source:       source,
 		Destination:  destination,
 		LeaseType:    "env",
@@ -341,7 +341,7 @@ transform = ["json", "explode"]
 		ParentSource: parent,
 		ConfigFile:   configFile.Name(),
 	}
-	state.Leases["child-key2"] = &config.Lease{
+	state.Leases["child-key2"] = &lease.Lease{
 		Source:       source,
 		Destination:  destination,
 		LeaseType:    "env",
@@ -364,18 +364,18 @@ func TestDaemon_ShutdownRevokesLeasesAndClearsState(t *testing.T) {
 	statePath := filepath.Join(tempDir, "state.json")
 
 	state := NewState()
-	state.Leases["env"] = &config.Lease{
+	state.Leases["env"] = &lease.Lease{
 		Source:      "onepassword://vault/item/env",
 		Destination: "/tmp/env",
 		LeaseType:   "env",
 		Variable:    "ENV_VAR",
 	}
-	state.Leases["file"] = &config.Lease{
+	state.Leases["file"] = &lease.Lease{
 		Source:      "onepassword://vault/item/file",
 		Destination: "/tmp/file",
 		LeaseType:   "file",
 	}
-	state.Leases["shell"] = &config.Lease{
+	state.Leases["shell"] = &lease.Lease{
 		Source:    "onepassword://vault/item/shell",
 		LeaseType: "shell",
 	}
@@ -427,7 +427,7 @@ func TestDaemon_processRetryQueue_PersistsBackoffUpdate(t *testing.T) {
 	state := NewState()
 	state.RetryQueue = []RetryItem{
 		{
-			Lease: &config.Lease{
+			Lease: &lease.Lease{
 				Source:      "onepassword://vault/item/retry",
 				Destination: filepath.Join(tempDir, "retry.env"),
 				LeaseType:   "env",
@@ -439,7 +439,7 @@ func TestDaemon_processRetryQueue_PersistsBackoffUpdate(t *testing.T) {
 	}
 	require.NoError(t, state.SaveState(statePath))
 
-	revoker := &mockRevoker{RevokeFunc: func(lease *config.Lease) error {
+	revoker := &mockRevoker{RevokeFunc: func(lease *lease.Lease) error {
 		return fmt.Errorf("revoke failed")
 	}}
 	d := NewDaemon(state, statePath, &mockClock{now: now}, nil, revoker, nil)
@@ -465,7 +465,7 @@ func TestDaemon_processRetryQueue_PersistsSuccessfulRemoval(t *testing.T) {
 	state := NewState()
 	state.RetryQueue = []RetryItem{
 		{
-			Lease: &config.Lease{
+			Lease: &lease.Lease{
 				Source:      "onepassword://vault/item/retry-success",
 				Destination: filepath.Join(tempDir, "retry-success.env"),
 				LeaseType:   "env",

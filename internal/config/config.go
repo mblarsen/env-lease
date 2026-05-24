@@ -78,55 +78,6 @@ func loadAndMerge(path, localPath string, depth int) (*Config, error) {
 		Root:  filepath.Dir(absPath),
 	}
 
-	for i := range config.Lease {
-		lease := &config.Lease[i]
-		expandedDest, err := fileutil.ExpandPath(lease.Destination)
-		if err != nil {
-			return nil, fmt.Errorf("lease %d: could not expand destination path: %w", i, err)
-		}
-		lease.Destination = expandedDest
-
-		// Backward compatibility for encoding
-		if len(lease.Transform) == 0 && lease.Format == "base64" {
-			lease.Transform = []string{"base64-encode"}
-		}
-
-		// Set default lease type
-		if lease.LeaseType == "" {
-			lease.LeaseType = "env"
-		}
-
-		// Set default provider
-		if lease.Provider == "" {
-			lease.Provider = "1password"
-		}
-
-		// Validate required fields
-		if lease.Source == "" {
-			return nil, fmt.Errorf("lease %d: source is required", i)
-		}
-
-		if lease.LeaseType == "env" && lease.Destination == "" {
-			return nil, fmt.Errorf("lease %d: destination is required for lease_type '%s'", i, lease.LeaseType)
-		}
-
-		if lease.LeaseType == "file" && lease.Destination == "" {
-			lease.Destination = filepath.Base(lease.Source)
-		}
-
-		isExplode := false
-		for _, t := range lease.Transform {
-			if strings.HasPrefix(t, "explode") {
-				isExplode = true
-				break
-			}
-		}
-
-		if (lease.LeaseType == "env" || lease.LeaseType == "shell") && lease.Variable == "" && !isExplode {
-			return nil, fmt.Errorf("lease %d: variable is required for lease_type '%s'", i, lease.LeaseType)
-		}
-	}
-
 	if depth == 0 {
 		// Load local override file
 		resolvedLocalPath, err := resolveLocalConfigFile(absPath, localPath)

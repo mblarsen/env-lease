@@ -40,7 +40,7 @@ func IsPathInsideRoot(root, path string) (bool, error) {
 
 	// Clean the path before symlink resolution so that .. segments are
 	// resolved lexically first. This matches writeLease, processLease,
-	// and canonicalLeaseDestination, which all use filepath.Join (for
+	// and lease.Normalize, which all use filepath.Join (for
 	// relative paths, which calls Clean internally) or filepath.Clean
 	// (for absolute paths) to build the destination.
 	//

@@ -7,22 +7,22 @@ import (
 	"os"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 // State represents the persistent state of the daemon.
 type State struct {
-	Leases     map[string]*config.Lease `json:"leases"`
-	RetryQueue []RetryItem              `json:"retry_queue"`
+	Leases     map[string]*lease.Lease `json:"leases"`
+	RetryQueue []RetryItem             `json:"retry_queue"`
 }
 
 // RetryItem represents a lease that failed to be revoked.
 type RetryItem struct {
-	Lease          *config.Lease `json:"lease"`
-	Attempts       int           `json:"attempts"`
-	NextRetryTime  time.Time     `json:"next_retry_time"`
-	InitialFailure time.Time     `json:"initial_failure"`
+	Lease          *lease.Lease `json:"lease"`
+	Attempts       int          `json:"attempts"`
+	NextRetryTime  time.Time    `json:"next_retry_time"`
+	InitialFailure time.Time    `json:"initial_failure"`
 }
 
 // ErrMalformedState indicates the state file contains invalid JSON payload data.
@@ -31,7 +31,7 @@ var ErrMalformedState = errors.New("malformed daemon state file")
 // NewState creates a new, empty state.
 func NewState() *State {
 	return &State{
-		Leases:     make(map[string]*config.Lease),
+		Leases:     make(map[string]*lease.Lease),
 		RetryQueue: make([]RetryItem, 0),
 	}
 }
@@ -46,7 +46,7 @@ func normalizeState(state *State) *State {
 		return NewState()
 	}
 	if state.Leases == nil {
-		state.Leases = make(map[string]*config.Lease)
+		state.Leases = make(map[string]*lease.Lease)
 	}
 	if state.RetryQueue == nil {
 		state.RetryQueue = make([]RetryItem, 0)
@@ -85,8 +85,8 @@ func (s *State) SaveState(path string) error {
 	return err
 }
 
-func (s *State) LeasesForConfigFile(configFile string) map[string]*config.Lease {
-	leases := make(map[string]*config.Lease)
+func (s *State) LeasesForConfigFile(configFile string) map[string]*lease.Lease {
+	leases := make(map[string]*lease.Lease)
 	for key, lease := range s.Leases {
 		if lease.ConfigFile == configFile {
 			leases[key] = lease

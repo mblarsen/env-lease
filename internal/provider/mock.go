@@ -3,7 +3,7 @@ package provider
 import (
 	"fmt"
 
-	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 // MockProvider is a fake secret provider for testing.
@@ -21,7 +21,7 @@ func (p *MockProvider) Fetch(sourceURI string) (string, error) {
 }
 
 // FetchLeases iterates through leases and calls Fetch for each one.
-func (p *MockProvider) FetchLeases(leases []config.Lease) (map[string]string, []ProviderError) {
+func (p *MockProvider) FetchLeases(leases []lease.Lease) (map[string]string, []ProviderError) {
 	secrets := make(map[string]string)
 	var errors []ProviderError
 

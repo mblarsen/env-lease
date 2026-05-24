@@ -1,10 +1,10 @@
 package provider
 
-import "github.com/mblarsen/env-lease/internal/config"
+import "github.com/mblarsen/env-lease/internal/lease"
 
 // ProviderError associates an error with a specific lease that failed.
 type ProviderError struct {
-	Lease config.Lease
+	Lease lease.Lease
 	Err   error
 }
 
@@ -15,7 +15,7 @@ type SecretProvider interface {
 	// FetchLeases retrieves secrets for a slice of leases.
 	// RETURN CONTRACT: the returned map MUST be keyed by Lease.Source (the source URI).
 	// This ensures a stable key across simple, file, and explode flows.
-	FetchLeases(leases []config.Lease) (map[string]string, []ProviderError)
+	FetchLeases(leases []lease.Lease) (map[string]string, []ProviderError)
 }
 
 // BulkSecretProvider defines the interface for providers that can fetch multiple

@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 type mockExecer struct {
@@ -46,7 +46,7 @@ func TestOnePasswordCLI_FetchLeases(t *testing.T) {
 		}
 
 		provider := &OnePasswordCLI{}
-		leases := []config.Lease{
+		leases := []lease.Lease{
 			{Variable: "VAR1", Source: "op://vault/item1", OpAccount: "account1"},
 			{Variable: "VAR2", Source: "op://vault/item2", OpAccount: "account2"},
 		}

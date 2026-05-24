@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 func TestState(t *testing.T) {
@@ -15,7 +15,7 @@ func TestState(t *testing.T) {
 
 	t.Run("save and load", func(t *testing.T) {
 		state := NewState()
-		state.Leases["lease1"] = &config.Lease{
+		state.Leases["lease1"] = &lease.Lease{
 			ExpiresAt: time.Now().Add(1 * time.Hour),
 			Source:    "test",
 		}

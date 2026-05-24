@@ -77,6 +77,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/lease"
 	"github.com/mblarsen/env-lease/internal/provider"
 	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
@@ -112,7 +113,7 @@ func (e *GrantErrors) Error() string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, projectRoot string, absConfigFile string, interactive bool, errs *[]grantError, continueOnError bool) ([]ipc.Lease, []string, error) {
+func processSingleLease(cmd *cobra.Command, l lease.Lease, secretVal string, projectRoot string, absConfigFile string, interactive bool, errs *[]grantError, continueOnError bool) ([]ipc.Lease, []string, error) {
 	// Duration validation
 	duration, err := time.ParseDuration(l.Duration)
 	if err != nil {
@@ -122,32 +123,12 @@ func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, pr
 		slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
 	}
 
-	// Set default format
-	if l.Format == "" {
-		switch filepath.Base(l.Destination) {
-		case ".envrc":
-			l.Format = "export %s=%q"
-		case ".env":
-			l.Format = "%s=%q"
-		default:
-			if l.LeaseType == "env" {
-				return nil, nil, fmt.Errorf("lease for '%s' has no format specified", l.Destination)
-			}
-		}
-	}
-
 	// Handle result: could be a single string or exploded data
 	var approvedLeases []ipc.Lease
 	var approvedShellCommands []string
 
 	// Pre-determine the prompt string
-	isExplode := false
-	for _, t := range l.Transform {
-		if strings.HasPrefix(strings.TrimSpace(t), "explode") {
-			isExplode = true
-			break
-		}
-	}
+	isExplode := l.IsExplode()
 
 	var prompt string
 	if isExplode {
@@ -213,7 +194,7 @@ func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, pr
 				return nil, nil, err
 			}
 			approvedLeases = append(approvedLeases, parentLeases...)
-			uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
+			uniqueParentID := parentLeaseConfig.ParentIdentity()
 
 			// Process all the child leases
 			fmt.Fprintf(os.Stderr, "Granting sub-leases from '%s'%s:\n", l.Source, getTransformSummary(l.Transform))
@@ -244,15 +225,15 @@ func processSingleLease(cmd *cobra.Command, l config.Lease, secretVal string, pr
 // same parallelized batching strategy as the interactive flow. The returned map is keyed
 // by source URI. Any encountered errors are returned as grantError entries; when
 // continueOnError is false, the first failure terminates early.
-func fetchSecretsParallel(leases []config.Lease, continueOnError bool, mode string) (map[string]string, []grantError, error) {
+func fetchSecretsParallel(leases []lease.Lease, continueOnError bool, mode string) (map[string]string, []grantError, error) {
 	type accountGroup struct {
 		account string
-		leases  []config.Lease
+		leases  []lease.Lease
 	}
 
 	opBatches := map[string]*accountGroup{}
 	fileURIs := map[string]struct{}{}
-	var directFetchLeases []config.Lease
+	var directFetchLeases []lease.Lease
 
 	for _, l := range leases {
 		if strings.HasPrefix(l.Source, "op://") {
@@ -443,6 +424,10 @@ This can be overridden with the --destination-outside-root flag.`,
 			return fmt.Errorf("failed to load config: %w", err)
 		}
 		absConfigFile = filepath.Join(cfg.Root, filepath.Base(configFile))
+		leaseSet, err := lease.Normalize(cfg, absConfigFile)
+		if err != nil {
+			return fmt.Errorf("failed to normalize leases: %w", err)
+		}
 
 		interactive, _ := cmd.Flags().GetBool("interactive")
 		appendMode, _ := cmd.Flags().GetBool("append")
@@ -459,7 +444,7 @@ This can be overridden with the --destination-outside-root flag.`,
 				"Please run 'eval $(env-lease grant)' without the interactive flag.")
 		}
 
-		for _, l := range cfg.Lease {
+		for _, l := range leaseSet.Leases {
 			if l.LeaseType == "shell" {
 				shellMode = true
 				break
@@ -469,21 +454,21 @@ This can be overridden with the --destination-outside-root flag.`,
 		client := ensureDaemonClient()
 
 		if interactive {
-			return interactiveGrant(cmd, cfg, absConfigFile, client)
+			return interactiveGrant(cmd, leaseSet, client)
 		}
 
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 		var errs []grantError
 		var shellCommands []string
-		leases := make([]ipc.Lease, 0, len(cfg.Lease))
+		leases := make([]ipc.Lease, 0, len(leaseSet.Leases))
 
-		fetched, fetchErrs, fetchErr := fetchSecretsParallel(cfg.Lease, continueOnError, "non-interactive")
+		fetched, fetchErrs, fetchErr := fetchSecretsParallel(leaseSet.Leases, continueOnError, "non-interactive")
 		errs = append(errs, fetchErrs...)
 		if fetchErr != nil {
 			return &GrantErrors{errs: errs}
 		}
 
-		for _, l := range cfg.Lease {
+		for _, l := range leaseSet.Leases {
 			secretVal, ok := fetched[l.Source]
 			if !ok {
 				// Missing secret indicates a prior fetch failure.
@@ -492,7 +477,7 @@ This can be overridden with the --destination-outside-root flag.`,
 				}
 				continue
 			}
-			finalLeases, sc, err := processSingleLease(cmd, l, secretVal, cfg.Root, absConfigFile, false, &errs, continueOnError)
+			finalLeases, sc, err := processSingleLease(cmd, l, secretVal, leaseSet.Root, leaseSet.ConfigFile, false, &errs, continueOnError)
 			if err != nil {
 				errs = append(errs, grantError{Source: l.Source, Err: err})
 				if !continueOnError {
@@ -514,7 +499,7 @@ This can be overridden with the --destination-outside-root flag.`,
 			Leases:     leases,
 			Override:   override,
 			Append:     false,
-			ConfigFile: absConfigFile,
+			ConfigFile: leaseSet.ConfigFile,
 		}
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
@@ -573,11 +558,15 @@ This can be overridden with the --destination-outside-root flag.`,
 //     lease object to allow the daemon to associate the lease with a specific
 //     project, which is crucial for commands like `env-lease status` and
 //     `env-lease revoke` to correctly identify leases for the current project.
-func processLease(cmd *cobra.Command, l config.Lease, secretVal, projectRoot, configFile string) ([]ipc.Lease, []string, error) {
+func processLease(cmd *cobra.Command, l lease.Lease, secretVal, projectRoot, configFile string) ([]ipc.Lease, []string, error) {
+	var err error
+	l, err = l.WithDefaultFormat()
+	if err != nil {
+		return nil, nil, err
+	}
+
 	var shellCommands []string
 	var leases []ipc.Lease
-	var absDest string
-	var err error
 
 	// For file leases, ensure the destination is within the project root.
 	if l.LeaseType == "file" {
@@ -601,7 +590,6 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal, projectRoot, co
 		if l.Variable != "" {
 			shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
 		}
-		absDest = filepath.Join(projectRoot, "<shell>")
 	} else {
 		// For file/env leases, only write if there's a variable,
 		// or if it's a file lease. This prevents writing the
@@ -616,29 +604,11 @@ func processLease(cmd *cobra.Command, l config.Lease, secretVal, projectRoot, co
 				fmt.Fprintf(os.Stderr, "Created file: %s\n", l.Destination)
 			}
 		}
-		absDest, err = fileutil.ExpandPath(l.Destination)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to expand path for %s: %w", l.Destination, err)
-		}
-		if !filepath.IsAbs(absDest) {
-			absDest = filepath.Join(projectRoot, absDest)
-		} else {
-			absDest = filepath.Clean(absDest)
-		}
 	}
 
-	leases = append(leases, ipc.Lease{
-		Source:       l.Source,
-		Destination:  absDest,
-		Duration:     l.Duration,
-		LeaseType:    l.LeaseType,
-		Variable:     l.Variable,
-		Format:       l.Format,
-		Transform:    l.Transform,
-		FileMode:     l.FileMode,
-		ParentSource: l.ParentSource,
-		ConfigFile:   configFile,
-	})
+	ipcLease := l.ToIPC()
+	ipcLease.ConfigFile = configFile
+	leases = append(leases, ipcLease)
 	return leases, shellCommands, nil
 }
 
@@ -697,12 +667,12 @@ func getTransformSummary(transforms []string) string {
 // Round 1 and sub-leases from Round 2) into a single list and sends it to the
 // `env-lease` daemon to be activated. It also handles the output of any shell
 // commands for `shell` type leases.
-func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile string, client *ipc.Client) error {
-	slog.Debug("interactive grant: phase 1 start", "lease_count", len(cfg.Lease))
+func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Client) error {
+	slog.Debug("interactive grant: phase 1 start", "lease_count", len(leaseSet.Leases))
 	// ------- Phase 1: ROUND 1 – APPROVE SOURCES -------
-	selectedLeases := make([]config.Lease, 0, len(cfg.Lease))
-	for _, l := range cfg.Lease {
-		isExplode := hasExplode(l.Transform)
+	selectedLeases := make([]lease.Lease, 0, len(leaseSet.Leases))
+	for _, l := range leaseSet.Leases {
+		isExplode := l.IsExplode()
 
 		var key string
 		if isExplode {
@@ -726,7 +696,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	slog.Debug("interactive grant: phase 1 approvals",
 		"selected_count", len(selectedLeases),
-		"skipped_count", len(cfg.Lease)-len(selectedLeases))
+		"skipped_count", len(leaseSet.Leases)-len(selectedLeases))
 
 	continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 	override, _ := cmd.Flags().GetBool("override")
@@ -747,27 +717,20 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	// Pre-compute explode expansions without writing or prompting
 	type child struct {
-		lease config.Lease
+		lease lease.Lease
 		value string
 	}
 	explodedChildren := make([]child, 0)
-	simpleApproved := make([]config.Lease, 0)
+	simpleApproved := make([]lease.Lease, 0)
 	parentApproved := make([]ipc.Lease, 0)
 
 	slog.Debug("interactive grant: preprocessing transforms",
 		"selected_count", len(selectedLeases))
 
 	for _, l := range selectedLeases {
-		isExplode := hasExplode(l.Transform)
+		isExplode := l.IsExplode()
 		raw := fetched[l.Source]
 		formatted := l
-		if err := ensureLeaseFormat(&formatted); err != nil {
-			errs = append(errs, grantError{Source: l.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
 		slog.Debug("interactive grant: preparing lease",
 			"source", formatted.Source,
 			"explode", isExplode,
@@ -802,7 +765,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 			parentLeaseConfig := formatted
 			parentLeaseConfig.Variable = ""
 
-			parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", cfg.Root, absConfigFile)
+			parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", leaseSet.Root, leaseSet.ConfigFile)
 			if err != nil {
 				errs = append(errs, grantError{Source: formatted.Source, Err: err})
 				if !continueOnError {
@@ -818,7 +781,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 				continue
 			}
 
-			uniqueParentID := parentLeases[0].Source + "->" + parentLeases[0].Destination
+			uniqueParentID := parentLeaseConfig.ParentIdentity()
 			for i := range parentLeases {
 				parentLeases[i].ParentSource = ""
 			}
@@ -854,7 +817,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 	// First, materialize all simple leases (no new prompts)
 	for _, l := range simpleApproved {
 		val := fetched[l.Source]
-		leas, sc, err := processLease(cmd, l, val, cfg.Root, absConfigFile)
+		leas, sc, err := processLease(cmd, l, val, leaseSet.Root, leaseSet.ConfigFile)
 		if err != nil {
 			errs = append(errs, grantError{Source: l.Source, Err: err})
 			if !continueOnError {
@@ -873,7 +836,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 		if !confirm(prompt) {
 			continue
 		}
-		leas, sc, err := processLease(cmd, ch.lease, ch.value, cfg.Root, absConfigFile)
+		leas, sc, err := processLease(cmd, ch.lease, ch.value, leaseSet.Root, leaseSet.ConfigFile)
 		if err != nil {
 			errs = append(errs, grantError{Source: ch.lease.Source, Err: err})
 			if !continueOnError {
@@ -891,7 +854,7 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 
 	// ------- Phase 4: GRANT (single request) -------
 	slog.Debug("interactive grant: phase 4 start", "final_lease_count", len(finalLeases))
-	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, Append: appendMode, ConfigFile: absConfigFile}
+	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, Append: appendMode, ConfigFile: leaseSet.ConfigFile}
 	if client != nil {
 		var resp ipc.GrantResponse
 		if err := client.Send(req, &resp); err != nil {
@@ -919,37 +882,5 @@ func interactiveGrant(cmd *cobra.Command, cfg *config.Config, absConfigFile stri
 	}
 
 	fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
-	return nil
-}
-
-// hasExplode reports whether a lease has any explode transformation step.
-func hasExplode(steps []string) bool {
-	for _, t := range steps {
-		if strings.HasPrefix(strings.TrimSpace(t), "explode") {
-			return true
-		}
-	}
-	return false
-}
-
-// ensureLeaseFormat applies default formatting for env leases when no explicit
-// format is provided. It mirrors the non-interactive behaviour so that leases
-// written during the interactive flow produce consistent output.
-func ensureLeaseFormat(l *config.Lease) error {
-	if l.LeaseType != "env" {
-		return nil
-	}
-	if l.Format != "" {
-		return nil
-	}
-
-	switch filepath.Base(l.Destination) {
-	case ".envrc":
-		l.Format = "export %s=%q"
-	case ".env":
-		l.Format = "%s=%q"
-	default:
-		return fmt.Errorf("lease for '%s' has no format specified", l.Destination)
-	}
 	return nil
 }

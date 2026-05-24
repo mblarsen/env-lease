@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 func TestFileRevoker_Revoke(t *testing.T) {
@@ -19,7 +19,7 @@ func TestFileRevoker_Revoke(t *testing.T) {
 			t.Fatalf("failed to create test file: %v", err)
 		}
 
-		lease := &config.Lease{
+		lease := &lease.Lease{
 			LeaseType:   "file",
 			Destination: filePath,
 		}
@@ -39,7 +39,7 @@ func TestFileRevoker_Revoke(t *testing.T) {
 	t.Run("file lease, file already deleted", func(t *testing.T) {
 		filePath := filepath.Join(tempDir, "already-deleted.txt")
 
-		lease := &config.Lease{
+		lease := &lease.Lease{
 			LeaseType:   "file",
 			Destination: filePath,
 		}

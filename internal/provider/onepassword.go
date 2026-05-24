@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 // OnePasswordCLI is a SecretProvider that fetches secrets using the 1Password CLI.
@@ -187,19 +187,19 @@ func (p *OnePasswordCLI) fetchWithRead(sourceURI string) (string, error) {
 
 // FetchLeases fetches secrets for a slice of leases, using `op inject` for op://
 // URIs and falling back to individual `op read` calls for op+file:// URIs.
-func (p *OnePasswordCLI) FetchLeases(leases []config.Lease) (map[string]string, []ProviderError) {
+func (p *OnePasswordCLI) FetchLeases(leases []lease.Lease) (map[string]string, []ProviderError) {
 	secrets := make(map[string]string, len(leases))
 	var perrs []ProviderError
 
 	// Partition by scheme
-	type leaseBatch map[string][]config.Lease // sanitized source -> leases sharing it
+	type leaseBatch map[string][]lease.Lease // sanitized source -> leases sharing it
 	type accountBatch struct {
 		account string
 		leases  leaseBatch
 	}
 	opAccounts := map[string]*accountBatch{} // grouping key -> batch
 
-	var singletons []config.Lease // op+file and anything non-batchable
+	var singletons []lease.Lease // op+file and anything non-batchable
 
 	for _, l := range leases {
 		src := sanitizeOpURI(l.Source)

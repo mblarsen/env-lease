@@ -7,7 +7,7 @@ import (
 )
 
 func TestLoad(t *testing.T) {
-	t.Run("valid config", func(t *testing.T) {
+	t.Run("loads raw config without semantic normalization", func(t *testing.T) {
 		content := `
 [[lease]]
 source = "op://vault/item/secret"
@@ -27,12 +27,12 @@ variable = "API_KEY"
 			t.Fatalf("expected 1 lease, got %d", len(config.Lease))
 		}
 
-		if config.Lease[0].LeaseType != "env" {
-			t.Errorf("expected default lease type 'env', got %s", config.Lease[0].LeaseType)
+		if config.Lease[0].LeaseType != "" {
+			t.Errorf("expected raw lease_type to remain empty, got %s", config.Lease[0].LeaseType)
 		}
 	})
 
-	t.Run("missing required source", func(t *testing.T) {
+	t.Run("does not validate semantic lease requirements", func(t *testing.T) {
 		content := `
 [[lease]]
 destination = ".envrc"
@@ -41,13 +41,16 @@ duration = "1h"
 		path := createTempConfig(t, content)
 		defer os.Remove(path)
 
-		_, err := Load(path, "")
-		if err == nil {
-			t.Fatal("expected an error, got nil")
+		config, err := Load(path, "")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if config.Lease[0].Source != "" {
+			t.Fatalf("expected raw missing source to remain empty")
 		}
 	})
 
-	t.Run("file lease with missing destination", func(t *testing.T) {
+	t.Run("keeps file lease destination empty for normalization", func(t *testing.T) {
 		content := `
 [[lease]]
 source = "op+file://app-iac container env/container_env.json"
@@ -66,9 +69,8 @@ duration = "1h"
 			t.Fatalf("expected 1 lease, got %d", len(config.Lease))
 		}
 
-		expected := "container_env.json"
-		if config.Lease[0].Destination != expected {
-			t.Errorf("expected destination to be '%s', got '%s'", expected, config.Lease[0].Destination)
+		if config.Lease[0].Destination != "" {
+			t.Errorf("expected raw destination to remain empty, got '%s'", config.Lease[0].Destination)
 		}
 	})
 
@@ -95,22 +97,6 @@ duration = "1h"
 		expected := "my_file.json"
 		if config.Lease[0].Destination != expected {
 			t.Errorf("expected destination to be '%s', got '%s'", expected, config.Lease[0].Destination)
-		}
-	})
-
-	t.Run("env lease with missing destination", func(t *testing.T) {
-		content := `
-[[lease]]
-source = "op://vault/item/secret"
-duration = "1h"
-lease_type = "env"
-`
-		path := createTempConfig(t, content)
-		defer os.Remove(path)
-
-		_, err := Load(path, "")
-		if err == nil {
-			t.Fatal("expected an error, got nil")
 		}
 	})
 }

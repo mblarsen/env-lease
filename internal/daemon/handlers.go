@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
@@ -87,24 +87,13 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 			return nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
 		}
 
-		key := leaseIdentity(l.Source, l.Destination, l.Variable)
-		lease := &config.Lease{
-			Source:        l.Source,
-			Destination:   l.Destination,
-			Duration:      l.Duration,
-			LeaseType:     l.LeaseType,
-			Variable:      l.Variable,
-			Format:        l.Format,
-			Transform:     l.Transform,
-			FileMode:      l.FileMode,
-			OpAccount:     l.OpAccount,
-			ExpiresAt:     d.clock.Now().Add(duration),
-			OrphanedSince: nil,
-			ConfigFile:    req.ConfigFile,
-			ParentSource:  l.ParentSource,
-		}
-		d.state.Leases[key] = lease
-		slog.Debug("Adding lease to state", "source", lease.Source, "expires_at", lease.ExpiresAt)
+		runtimeLease := lease.FromIPC(l)
+		runtimeLease.ExpiresAt = d.clock.Now().Add(duration)
+		runtimeLease.OrphanedSince = nil
+		runtimeLease.ConfigFile = req.ConfigFile
+		key := runtimeLease.Identity()
+		d.state.Leases[key] = &runtimeLease
+		slog.Debug("Adding lease to state", "source", runtimeLease.Source, "expires_at", runtimeLease.ExpiresAt)
 	}
 
 	if err := d.state.SaveState(d.statePath); err != nil {
@@ -135,7 +124,7 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 
 	if len(req.Leases) > 0 {
 		for _, l := range req.Leases {
-			id := leaseIdentity(l.Source, l.Destination, l.Variable)
+			id := lease.FromIPC(l).Identity()
 			if lease, ok := d.state.Leases[id]; ok {
 				slog.Debug("Revoking lease", "source", lease.Source)
 				if lease.LeaseType == "shell" {
