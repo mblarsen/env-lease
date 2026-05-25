@@ -185,102 +185,72 @@ func (p *OnePasswordCLI) fetchWithRead(sourceURI string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// FetchLeases fetches secrets for a slice of leases, using `op inject` for op://
-// URIs and falling back to individual `op read` calls for op+file:// URIs.
+// FetchLeases fetches secrets for this adapter's configured account. Callers
+// are responsible for grouping Leases by account before crossing this seam.
 func (p *OnePasswordCLI) FetchLeases(leases []lease.Lease) (map[string]string, []ProviderError) {
 	secrets := make(map[string]string, len(leases))
 	var perrs []ProviderError
 
-	// Partition by scheme
-	type leaseBatch map[string][]lease.Lease // sanitized source -> leases sharing it
-	type accountBatch struct {
-		account string
-		leases  leaseBatch
-	}
-	opAccounts := map[string]*accountBatch{} // grouping key -> batch
-
-	var singletons []lease.Lease // op+file and anything non-batchable
+	leasesBySource := make(map[string][]lease.Lease)
+	var singletons []lease.Lease
 
 	for _, l := range leases {
 		src := sanitizeOpURI(l.Source)
 		if strings.HasPrefix(src, "op://") {
-			actualAcct := l.OpAccount
-			if actualAcct == "" {
-				actualAcct = p.Account
-			}
-			key := actualAcct
-			if key == "" {
-				key = "default"
-			}
-
-			group := opAccounts[key]
-			if group == nil {
-				group = &accountBatch{
-					account: actualAcct,
-					leases:  make(leaseBatch),
-				}
-				opAccounts[key] = group
-			}
-			group.leases[src] = append(group.leases[src], l)
+			leasesBySource[src] = append(leasesBySource[src], l)
 			slog.Debug("onepassword: queued op lease",
-				"account_group", key,
-				"account", actualAcct,
+				"account", p.Account,
 				"source", l.Source,
 				"sanitized", src)
 			continue
 		}
-		// op+file:// and others are fetched one-by-one (grant-side also caches)
+
+		// This fallback keeps the adapter safe for direct callers; higher-level
+		// lookup orchestration normally fetches non-batchable sources itself.
 		singletons = append(singletons, l)
 		slog.Debug("onepassword: queued singleton lease",
+			"account", p.Account,
 			"source", l.Source,
 			"sanitized", src)
 	}
 
-	// Batch op:// by account
-	for key, batch := range opAccounts {
-		sub := &OnePasswordCLI{Account: batch.account}
-		request := make(map[string]string, len(batch.leases))
-		for sanitized := range batch.leases {
+	if len(leasesBySource) > 0 {
+		request := make(map[string]string, len(leasesBySource))
+		for sanitized := range leasesBySource {
 			request[sanitized] = sanitized
 		}
 
 		slog.Debug("onepassword: fetch bulk start",
-			"account_group", key,
-			"account", batch.account,
+			"account", p.Account,
 			"request_count", len(request))
 
-		res, err := sub.FetchBulk(request)
+		res, err := p.FetchBulk(request)
 		if err != nil {
-			// attribute an error to each lease in this batch
-			for _, leases := range batch.leases {
+			for _, leases := range leasesBySource {
 				for _, l := range leases {
 					perrs = append(perrs, ProviderError{Lease: l, Err: err})
 				}
 			}
 			slog.Debug("onepassword: fetch bulk error",
-				"account_group", key,
-				"account", batch.account,
+				"account", p.Account,
 				"err", err)
-			continue
-		}
-
-		for sanitized, leases := range batch.leases {
-			val, ok := res[sanitized]
-			if !ok {
-				continue
-			}
-			for _, l := range leases {
-				secrets[l.Source] = val
-				slog.Debug("onepassword: fetched lease",
-					"account_group", key,
-					"account", batch.account,
-					"source", l.Source,
-					"sanitized", sanitized)
+		} else {
+			for sanitized, leases := range leasesBySource {
+				val, ok := res[sanitized]
+				if !ok {
+					continue
+				}
+				for _, l := range leases {
+					secrets[l.Source] = val
+					slog.Debug("onepassword: fetched lease",
+						"account", p.Account,
+						"source", l.Source,
+						"sanitized", sanitized)
+				}
 			}
 		}
 	}
 
-	// Fetch singletons
 	for _, l := range singletons {
 		slog.Debug("onepassword: fetch singleton start", "source", l.Source)
 		val, err := p.Fetch(l.Source)
