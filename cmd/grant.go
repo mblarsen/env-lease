@@ -156,57 +156,24 @@ func processSingleLease(cmd *cobra.Command, l lease.Lease, secretVal string, pro
 			slog.Info("Fetched secret", "source", l.Source)
 		}
 
-		// Run transform pipeline
-		var transformResult interface{} = secretVal
-		if len(l.Transform) > 0 {
-
-			pipeline, err := transform.NewPipeline(l.Transform)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to create transform pipeline: %w", err)
-			}
-			transformResult, err = pipeline.Run(secretVal)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to transform secret: %w", err)
-			}
+		result, err := transform.Apply(l, secretVal)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to transform secret: %w", err)
 		}
 
-		switch result := transformResult.(type) {
-		case string:
-			// SINGLE LEASE CASE
-			finalLeases, sc, err := processLease(cmd, l, result, projectRoot, absConfigFile)
-			if err != nil {
-				return nil, nil, err
-			}
-			approvedLeases = append(approvedLeases, finalLeases...)
-			approvedShellCommands = append(approvedShellCommands, sc...)
-
-		case transform.ExplodedData:
-			// EXPLODED LEASE CASE
-			if l.LeaseType == "file" {
-				return nil, nil, fmt.Errorf("'explode' transform cannot be used with lease_type 'file'")
-			}
-
-			// Add a parent/container lease for the status command to find
-			parentLeaseConfig := l
-			parentLeaseConfig.Variable = "" // No single variable for the parent
-			parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", projectRoot, absConfigFile)
+		if result.IsExploded() {
+			parentLeases, _, err := processLease(cmd, *result.Parent, "", projectRoot, absConfigFile)
 			if err != nil {
 				return nil, nil, err
 			}
 			approvedLeases = append(approvedLeases, parentLeases...)
-			uniqueParentID := parentLeaseConfig.ParentIdentity()
 
-			// Process all the child leases
 			fmt.Fprintf(os.Stderr, "Granting sub-leases from '%s'%s:\n", l.Source, getTransformSummary(l.Transform))
-			for key, value := range result {
-				if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", key)) {
-					explodedLeaseConfig := l
-					explodedLeaseConfig.Variable = key
-					explodedLeaseConfig.ParentSource = uniqueParentID
-
-					finalLeases, sc, err := processLease(cmd, explodedLeaseConfig, value, projectRoot, absConfigFile)
+			for _, transformedSecret := range result.Secrets {
+				if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", transformedSecret.Lease.Variable)) {
+					finalLeases, sc, err := processLease(cmd, transformedSecret.Lease, transformedSecret.Value, projectRoot, absConfigFile)
 					if err != nil {
-						*errs = append(*errs, grantError{Source: key, Err: err})
+						*errs = append(*errs, grantError{Source: transformedSecret.Lease.Variable, Err: err})
 						if !continueOnError {
 							return nil, nil, err
 						}
@@ -216,6 +183,16 @@ func processSingleLease(cmd *cobra.Command, l lease.Lease, secretVal string, pro
 					approvedShellCommands = append(approvedShellCommands, sc...)
 				}
 			}
+			return approvedLeases, approvedShellCommands, nil
+		}
+
+		for _, transformedSecret := range result.Secrets {
+			finalLeases, sc, err := processLease(cmd, transformedSecret.Lease, transformedSecret.Value, projectRoot, absConfigFile)
+			if err != nil {
+				return nil, nil, err
+			}
+			approvedLeases = append(approvedLeases, finalLeases...)
+			approvedShellCommands = append(approvedShellCommands, sc...)
 		}
 	}
 	return approvedLeases, approvedShellCommands, nil
@@ -380,7 +357,7 @@ This can be overridden with the --destination-outside-root flag.`,
 //
 // Parameters:
 //   - cmd: The cobra.Command object, used to access command-line flags.
-//   - l: The config.Lease object containing the lease details.
+//   - l: The normalized lease object containing the lease details.
 //   - secretVal: The secret value fetched from the provider.
 //   - projectRoot: The absolute path to the project root directory, which is the
 //     directory containing the configuration file. This is used to resolve
@@ -579,37 +556,22 @@ func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Clien
 			"source", formatted.Source,
 			"explode", isExplode,
 			"transform_steps", len(formatted.Transform))
-		if len(formatted.Transform) == 0 {
-			// simple lease; Phase 1 already approved — no more prompts later
-			simpleApproved = append(simpleApproved, simple{lease: formatted, value: raw})
+
+		result, err := transform.Apply(formatted, raw)
+		if err != nil {
+			errs = append(errs, grantError{Source: formatted.Source, Err: err})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
 			continue
 		}
 
-		pipe, err := transform.NewPipeline(formatted.Transform)
-		if err != nil {
-			errs = append(errs, grantError{Source: formatted.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-		res, err := pipe.Run(raw)
-		if err != nil {
-			errs = append(errs, grantError{Source: formatted.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-		if data, ok := res.(transform.ExplodedData); ok {
+		if result.IsExploded() {
 			slog.Debug("interactive grant: explode result",
 				"source", formatted.Source,
-				"child_count", len(data))
+				"child_count", len(result.Secrets))
 
-			parentLeaseConfig := formatted
-			parentLeaseConfig.Variable = ""
-
-			parentLeases, _, err := processLease(cmd, parentLeaseConfig, "", leaseSet.Root, leaseSet.ConfigFile)
+			parentLeases, _, err := processLease(cmd, *result.Parent, "", leaseSet.Root, leaseSet.ConfigFile)
 			if err != nil {
 				errs = append(errs, grantError{Source: formatted.Source, Err: err})
 				if !continueOnError {
@@ -625,31 +587,19 @@ func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Clien
 				continue
 			}
 
-			uniqueParentID := parentLeaseConfig.ParentIdentity()
-			for i := range parentLeases {
-				parentLeases[i].ParentSource = ""
-			}
 			parentApproved = append(parentApproved, parentLeases...)
-
-			for k, v := range data {
-				childLease := formatted
-				childLease.Variable = k
-				childLease.ParentSource = uniqueParentID
+			for _, transformedSecret := range result.Secrets {
 				explodedChildren = append(explodedChildren, child{
-					lease: childLease,
-					value: v,
+					lease: transformedSecret.Lease,
+					value: transformedSecret.Value,
 				})
 			}
-		} else if s, ok := res.(string); ok {
-			// pipeline resulted in single value — treat as simple
-			slog.Debug("interactive grant: pipeline produced single value", "source", formatted.Source)
-			formatted.Variable = strings.TrimSpace(formatted.Variable)
-			simpleApproved = append(simpleApproved, simple{lease: formatted, value: s})
-		} else {
-			errs = append(errs, grantError{Source: formatted.Source, Err: fmt.Errorf("transform pipeline must produce a string or exploded data")})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
+			continue
+		}
+
+		for _, transformedSecret := range result.Secrets {
+			slog.Debug("interactive grant: pipeline produced single value", "source", transformedSecret.Lease.Source)
+			simpleApproved = append(simpleApproved, simple{lease: transformedSecret.Lease, value: transformedSecret.Value})
 		}
 	}
 
