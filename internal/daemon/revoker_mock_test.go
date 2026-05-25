@@ -1,18 +1,24 @@
 package daemon
 
-import "github.com/mblarsen/env-lease/internal/lease"
+import (
+	"github.com/mblarsen/env-lease/internal/destination"
+	"github.com/mblarsen/env-lease/internal/lease"
+)
 
 type mockRevoker struct {
 	RevokeCount int
-	RevokeFunc  func(lease *lease.Lease) error
+	RevokeFunc  func(lease *lease.Lease) (destination.Revoked, error)
 	revoked     []*lease.Lease
 }
 
-func (m *mockRevoker) Revoke(lease *lease.Lease) error {
+func (m *mockRevoker) Revoke(l *lease.Lease) (destination.Revoked, error) {
 	m.RevokeCount++
-	m.revoked = append(m.revoked, lease)
+	m.revoked = append(m.revoked, l)
 	if m.RevokeFunc != nil {
-		return m.RevokeFunc(lease)
+		return m.RevokeFunc(l)
 	}
-	return nil
+	if l != nil && l.LeaseType == lease.TypeShell && l.Variable != "" {
+		return destination.Revoked{ShellCommands: []string{"unset " + l.Variable}}, nil
+	}
+	return destination.Revoked{}, nil
 }

@@ -24,6 +24,10 @@ _Avoid_: delete, cleanup, expire
 The local place where a granted Secret is materialized, such as an environment file, whole file, or shell session.
 _Avoid_: target, output, sink
 
+**Destination Mutation**:
+The reversible act of applying or removing a Secret at a Destination during Grant and Revoke.
+_Avoid_: file write, shell output, destination handling
+
 **Provider**:
 The external secret store or CLI that resolves a Secret source into Secret material.
 _Avoid_: backend, vault, service
@@ -56,6 +60,7 @@ _Avoid_: manifest, spec, settings
 
 - A **Config** declares zero or more **Leases**.
 - A **Lease** identifies exactly one **Secret** source and one **Destination**.
+- **Destination Mutation** applies or removes a **Secret** at a **Destination**.
 - A **Provider** performs **Secret Lookup** for an approved **Lease**.
 - A **Grant** runs a **Grant Workflow**.
 - The **Grant Workflow** uses **Secret Lookup** before **Secret Transformation**.
@@ -67,7 +72,7 @@ _Avoid_: manifest, spec, settings
 ## Example dialogue
 
 > **Dev:** "When I run **Grant**, does every **Secret** go through **Secret Lookup** immediately?"
-> **Domain expert:** "The **Grant Workflow** decides which **Leases** are approved first. Only approved **Leases** perform **Secret Lookup**; then **Secret Transformation** shapes the fetched material, and the **Daemon** owns the **Lease Lifecycle** that decides when each **Lease** should **Revoke** its **Destination**."
+> **Domain expert:** "The **Grant Workflow** decides which **Leases** are approved first. Only approved **Leases** perform **Secret Lookup**; then **Secret Transformation** shapes the fetched material, **Destination Mutation** applies it, and the **Daemon** owns the **Lease Lifecycle** that decides when each **Lease** should **Revoke** its **Destination**."
 
 ## Flagged ambiguities
 

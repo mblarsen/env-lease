@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
+	"github.com/mblarsen/env-lease/internal/destination"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
@@ -77,7 +78,7 @@ func (l *Lifecycle) reconcileGrantRequest(req ipc.GrantRequest) {
 		}
 
 		slog.Info("Revoking lease removed from config", "key", key)
-		if err := l.revokeDestination(activeLease); err != nil {
+		if _, err := l.revokeDestination(activeLease); err != nil {
 			slog.Error("Failed to revoke lease removed from config", "key", key, "err", err)
 		}
 		delete(l.state.Leases, key)
@@ -120,14 +121,11 @@ func (l *Lifecycle) Revoke(req ipc.RevokeRequest) (RevokeResult, error) {
 
 func (l *Lifecycle) revokeTrackedLease(id string, activeLease *lease.Lease, result *RevokeResult) {
 	slog.Debug("Revoking lease", "source", activeLease.Source)
-	if activeLease.LeaseType == lease.TypeShell {
-		if activeLease.Variable != "" {
-			result.ShellCommands = append(result.ShellCommands, fmt.Sprintf("unset %s", activeLease.Variable))
-		}
-		slog.Debug("Ignoring revoker for shell lease type", "id", id)
-	} else if err := l.revokeDestination(activeLease); err != nil {
+	revoked, err := l.revokeDestination(activeLease)
+	if err != nil {
 		slog.Error("Failed to revoke lease", "id", id, "err", err)
 	}
+	result.ShellCommands = append(result.ShellCommands, revoked.ShellCommands...)
 
 	delete(l.state.Leases, id)
 	if isActualLease(activeLease) {
@@ -203,13 +201,7 @@ func (l *Lifecycle) reconcileConfigFile(configFile string) bool {
 		}
 
 		slog.Info("Lease removed from config, revoking", "key", key)
-		if activeLease.LeaseType == lease.TypeShell {
-			slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
-			delete(l.state.Leases, key)
-			stateChanged = true
-			continue
-		}
-		if err := l.revokeDestination(activeLease); err != nil {
+		if _, err := l.revokeDestination(activeLease); err != nil {
 			slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
 			continue
 		}
@@ -222,13 +214,7 @@ func (l *Lifecycle) reconcileConfigFile(configFile string) bool {
 func (l *Lifecycle) revokeLeasesForMissingConfig(configFile string) bool {
 	stateChanged := false
 	for key, activeLease := range l.state.LeasesForConfigFile(configFile) {
-		if activeLease.LeaseType == lease.TypeShell {
-			slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
-			delete(l.state.Leases, key)
-			stateChanged = true
-			continue
-		}
-		if err := l.revokeDestination(activeLease); err != nil {
+		if _, err := l.revokeDestination(activeLease); err != nil {
 			slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
 			continue
 		}
@@ -287,7 +273,7 @@ func (l *Lifecycle) MarkOrphanedLeases() {
 
 		if activeLease.OrphanedSince != nil && now.Sub(*activeLease.OrphanedSince) > 30*24*time.Hour {
 			slog.Info("Purging lease orphaned for more than 30 days", "id", id)
-			if err := l.revokeDestination(activeLease); err != nil {
+			if _, err := l.revokeDestination(activeLease); err != nil {
 				slog.Error("Failed to revoke purged lease", "id", id, "err", err)
 			}
 			delete(l.state.Leases, id)
@@ -312,7 +298,7 @@ func (l *Lifecycle) RevokeExpired() {
 			continue
 		}
 
-		if err := l.revokeDestination(activeLease); err != nil {
+		if _, err := l.revokeDestination(activeLease); err != nil {
 			slog.Error("Failed to revoke lease, adding to retry queue", "id", id, "err", err)
 			l.state.RetryQueue = append(l.state.RetryQueue, RetryItem{
 				Lease:          activeLease,
@@ -357,7 +343,7 @@ func (l *Lifecycle) ProcessRetryQueue() {
 			continue
 		}
 
-		if err := l.revokeDestination(item.Lease); err != nil {
+		if _, err := l.revokeDestination(item.Lease); err != nil {
 			item.Attempts++
 			item.NextRetryTime = now.Add(time.Duration(item.Attempts*2) * time.Second)
 			l.state.RetryQueue[i] = item
@@ -407,7 +393,7 @@ func (l *Lifecycle) Shutdown() error {
 			slog.Debug("Skipping shell lease during shutdown", "source", activeLease.Source)
 			continue
 		}
-		if err := l.revokeDestination(activeLease); err != nil {
+		if _, err := l.revokeDestination(activeLease); err != nil {
 			slog.Error("Failed to revoke lease during shutdown", "source", activeLease.Source, "destination", activeLease.Destination, "err", err)
 		} else {
 			slog.Info("Revoked lease during shutdown", "source", activeLease.Source, "destination", activeLease.Destination)
@@ -422,7 +408,7 @@ func (l *Lifecycle) Shutdown() error {
 			slog.Debug("Skipping shell lease from retry queue during shutdown", "source", retry.Lease.Source)
 			continue
 		}
-		if err := l.revokeDestination(retry.Lease); err != nil {
+		if _, err := l.revokeDestination(retry.Lease); err != nil {
 			slog.Error("Failed to revoke lease from retry queue during shutdown", "source", retry.Lease.Source, "destination", retry.Lease.Destination, "err", err)
 		} else {
 			slog.Info("Revoked lease from retry queue during shutdown", "source", retry.Lease.Source, "destination", retry.Lease.Destination)
@@ -464,9 +450,9 @@ func (l *Lifecycle) drainStateForShutdown() ([]*lease.Lease, []RetryItem) {
 	return leasesToRevoke, retryItems
 }
 
-func (l *Lifecycle) revokeDestination(activeLease *lease.Lease) error {
-	if activeLease == nil || activeLease.LeaseType == lease.TypeShell {
-		return nil
+func (l *Lifecycle) revokeDestination(activeLease *lease.Lease) (destination.Revoked, error) {
+	if activeLease == nil || l.revoker == nil {
+		return destination.Revoked{}, nil
 	}
 	return l.revoker.Revoke(activeLease)
 }

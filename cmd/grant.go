@@ -71,7 +71,7 @@ import (
 	"path/filepath"
 
 	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/destination"
 	"github.com/mblarsen/env-lease/internal/grantflow"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
@@ -139,6 +139,13 @@ This can be overridden with the --destination-outside-root flag.`,
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
 		override, _ := cmd.Flags().GetBool("override")
 		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
+		destinationOutsideRoot, _ := cmd.Flags().GetBool("destination-outside-root")
+		materializer := destination.Materializer{
+			ProjectRoot:      leaseSet.Root,
+			ConfigFile:       leaseSet.ConfigFile,
+			Override:         override,
+			AllowOutsideRoot: destinationOutsideRoot,
+		}
 
 		flow := grantflow.Flow{
 			Confirm: confirm,
@@ -146,8 +153,11 @@ This can be overridden with the --destination-outside-root flag.`,
 				fmt.Fprintln(os.Stderr, message)
 			},
 			Materialize: func(l lease.Lease, secret string) (grantflow.Materialized, error) {
-				leases, shellCommands, err := processLease(cmd, l, secret, leaseSet.Root, leaseSet.ConfigFile)
-				return grantflow.Materialized{Leases: leases, ShellCommands: shellCommands}, err
+				materialized, err := materializer.Materialize(l, secret)
+				for _, notice := range materialized.Notices {
+					fmt.Fprintln(os.Stderr, notice)
+				}
+				return grantflow.Materialized{Leases: materialized.Leases, ShellCommands: materialized.ShellCommands}, err
 			},
 		}
 		result, err := flow.Run(leaseSet, grantflow.Options{
@@ -194,77 +204,6 @@ This can be overridden with the --destination-outside-root flag.`,
 		fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
 		return err
 	},
-}
-
-// processLease handles the logic for processing a single lease, including validating
-// file paths, writing lease files, and preparing the lease for communication with
-// the daemon. It returns a slice of IPC leases, a slice of shell commands, or an
-// error.
-//
-// Parameters:
-//   - cmd: The cobra.Command object, used to access command-line flags.
-//   - l: The normalized lease object containing the lease details.
-//   - secretVal: The secret value fetched from the provider.
-//   - projectRoot: The absolute path to the project root directory, which is the
-//     directory containing the configuration file. This is used to resolve
-//     relative paths for file-based leases and ensure they are written within the
-//     project directory for security.
-//   - configFile: The absolute path to the configuration file. This is stored in the
-//     lease object to allow the daemon to associate the lease with a specific
-//     project, which is crucial for commands like `env-lease status` and
-//     `env-lease revoke` to correctly identify leases for the current project.
-func processLease(cmd *cobra.Command, l lease.Lease, secretVal, projectRoot, configFile string) ([]ipc.Lease, []string, error) {
-	var err error
-	l, err = l.WithDefaultFormat()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var shellCommands []string
-	var leases []ipc.Lease
-
-	// For file leases, ensure the destination is within the project root.
-	if l.LeaseType == "file" {
-		destinationOutsideRoot, _ := cmd.Flags().GetBool("destination-outside-root")
-		if !destinationOutsideRoot {
-			expandedDest, err := fileutil.ExpandPath(l.Destination)
-			if err != nil {
-				return nil, nil, fmt.Errorf("could not expand destination path: %w", err)
-			}
-			isInside, err := fileutil.IsPathInsideRoot(projectRoot, expandedDest)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to validate destination path: %w", err)
-			}
-			if !isInside {
-				return nil, nil, fmt.Errorf("destination path '%s' is outside the project root. Use --destination-outside-root to override", l.Destination)
-			}
-		}
-	}
-
-	if l.LeaseType == "shell" {
-		if l.Variable != "" {
-			shellCommands = append(shellCommands, fmt.Sprintf("export %s=%q", l.Variable, secretVal))
-		}
-	} else {
-		// For file/env leases, only write if there's a variable,
-		// or if it's a file lease. This prevents writing the
-		// parent/container lease of an explode.
-		if l.LeaseType == "file" || (l.LeaseType == "env" && l.Variable != "") {
-			override, _ := cmd.Flags().GetBool("override")
-			created, err := writeLease(l, secretVal, projectRoot, override)
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to write lease: %w", err)
-			}
-			if created {
-				fmt.Fprintf(os.Stderr, "Created file: %s\n", l.Destination)
-			}
-		}
-	}
-
-	ipcLease := l.ToIPC()
-	ipcLease.ConfigFile = configFile
-	leases = append(leases, ipcLease)
-	return leases, shellCommands, nil
 }
 
 func init() {
