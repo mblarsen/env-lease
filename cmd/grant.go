@@ -156,7 +156,7 @@ This can be overridden with the --destination-outside-root flag.`,
 			Append:          appendMode,
 			Override:        override,
 		})
-		if err != nil {
+		if err != nil && len(result.Request.Leases) == 0 {
 			return err
 		}
 		if result.Noop {
@@ -166,7 +166,7 @@ This can be overridden with the --destination-outside-root flag.`,
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
 			fmt.Fprintln(os.Stderr, "Grant request (test mode) processed successfully.")
-			return nil
+			return err
 		}
 
 		if client != nil {
@@ -192,7 +192,7 @@ This can be overridden with the --destination-outside-root flag.`,
 			}
 		}
 		fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
-		return nil
+		return err
 	},
 }
 

@@ -75,8 +75,8 @@ func (f Flow) Run(set *lease.Set, opts Options) (Result, error) {
 	} else {
 		result, err = f.runNonInteractive(set, opts)
 	}
-	if err != nil {
-		return Result{}, err
+	if err != nil && len(result.Request.Leases) == 0 {
+		return result, err
 	}
 	if result.Noop {
 		return result, nil
@@ -89,7 +89,7 @@ func (f Flow) Run(set *lease.Set, opts Options) (Result, error) {
 		Append:     opts.Append,
 		ConfigFile: set.ConfigFile,
 	}
-	return result, nil
+	return result, err
 }
 
 func (f Flow) runNonInteractive(set *lease.Set, opts Options) (Result, error) {
@@ -114,19 +114,20 @@ func (f Flow) runNonInteractive(set *lease.Set, opts Options) (Result, error) {
 			continue
 		}
 
-		materialized, err := f.applyAndMaterialize(l, raw)
-		if err != nil {
-			errs = append(errs, Error{Source: l.Source, Err: err})
+		materialized, materializeErrs := f.applyAndMaterialize(l, raw, opts.ContinueOnError)
+		if len(materializeErrs) > 0 {
+			errs = append(errs, materializeErrs...)
 			if !opts.ContinueOnError {
 				return Result{}, Errors{errs: errs}
 			}
+			result.append(materialized)
 			continue
 		}
 		result.append(materialized)
 	}
 
 	if len(errs) > 0 {
-		return Result{}, Errors{errs: errs}
+		return result, Errors{errs: errs}
 	}
 	return result, nil
 }
@@ -283,19 +284,20 @@ func (f Flow) materializeInteractive(prepared preparedInteractive, opts Options)
 	return result, errs
 }
 
-func (f Flow) applyAndMaterialize(l lease.Lease, raw string) (Materialized, error) {
+func (f Flow) applyAndMaterialize(l lease.Lease, raw string, continueOnError bool) (Materialized, []Error) {
 	warnLongLease(l)
 	transformResult, err := applyTransform(l, raw)
 	if err != nil {
-		return Materialized{}, fmt.Errorf("failed to transform secret: %w", err)
+		return Materialized{}, []Error{{Source: l.Source, Err: fmt.Errorf("failed to transform secret: %w", err)}}
 	}
 
 	var materialized Materialized
+	var errs []Error
 	if transformResult.IsExploded() {
 		f.Notice(fmt.Sprintf("Granting sub-leases from '%s'%s:", l.Source, transformSummary(l.Transform)))
 		parent, err := f.Materialize(*transformResult.Parent, "")
 		if err != nil {
-			return Materialized{}, err
+			return Materialized{}, []Error{{Source: l.Source, Err: err}}
 		}
 		materialized.append(parent)
 	}
@@ -303,11 +305,15 @@ func (f Flow) applyAndMaterialize(l lease.Lease, raw string) (Materialized, erro
 	for _, transformedSecret := range transformResult.Secrets {
 		m, err := f.Materialize(transformedSecret.Lease, transformedSecret.Value)
 		if err != nil {
-			return Materialized{}, err
+			errs = append(errs, materializeError(transformedSecret.Lease, err))
+			if !continueOnError {
+				return materialized, errs
+			}
+			continue
 		}
 		materialized.append(m)
 	}
-	return materialized, nil
+	return materialized, errs
 }
 
 func applyTransform(l lease.Lease, raw string) (transform.Result, error) {
@@ -372,6 +378,13 @@ func hasErrorForSource(errs []Error, source string) bool {
 		}
 	}
 	return false
+}
+
+func materializeError(l lease.Lease, err error) Error {
+	if l.ParentSource != "" && l.Variable != "" {
+		return Error{Source: l.Variable, Err: err}
+	}
+	return Error{Source: l.Source, Err: err}
 }
 
 // NeedsDirenv reports whether a Grant result touched a .envrc destination.

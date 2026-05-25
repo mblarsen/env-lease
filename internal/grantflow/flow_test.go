@@ -1,6 +1,7 @@
 package grantflow
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -137,6 +138,34 @@ func TestRunInteractiveContinueOnLookupErrorReturnsSuccessfulGrant(t *testing.T)
 	wantCalls := []string{"SUCCESS_KEY=secret-for-mock"}
 	if !reflect.DeepEqual(gotCalls, wantCalls) {
 		t.Fatalf("materializer calls mismatch\nwant: %#v\n got: %#v", wantCalls, gotCalls)
+	}
+}
+
+func TestRunNonInteractiveContinueOnExplodedChildErrorReturnsSuccessfulSiblings(t *testing.T) {
+	t.Setenv("ENV_LEASE_TEST", "1")
+
+	flow := Flow{
+		Notice: func(string) {},
+		Materialize: func(l lease.Lease, secret string) (Materialized, error) {
+			if l.Variable == "KEY2" {
+				return Materialized{}, errors.New("cannot write KEY2")
+			}
+			return Materialized{Leases: []ipc.Lease{l.ToIPC()}}, nil
+		},
+	}
+
+	result, err := flow.Run(testSet(testExplodeLease("mock-explode")), Options{ContinueOnError: true})
+	if err == nil {
+		t.Fatal("expected aggregated error")
+	}
+	if !strings.Contains(err.Error(), "Lease: KEY2") {
+		t.Fatalf("expected KEY2 in error, got %v", err)
+	}
+
+	gotVariables := variablesFromLeases(result.Request.Leases)
+	wantVariables := []string{"", "KEY1"}
+	if !reflect.DeepEqual(gotVariables, wantVariables) {
+		t.Fatalf("variables mismatch\nwant: %#v\n got: %#v", wantVariables, gotVariables)
 	}
 }
 
