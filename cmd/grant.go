@@ -67,144 +67,18 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/grantflow"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
-	"github.com/mblarsen/env-lease/internal/secretlookup"
-	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
 )
 
 var shellMode bool
-
-type grantError struct {
-	Source string
-	Err    error
-}
-
-type GrantErrors struct {
-	errs []grantError
-}
-
-func (e *GrantErrors) Error() string {
-	var sb strings.Builder
-	if len(e.errs) > 1 {
-		sb.WriteString(fmt.Sprintf("Failed to grant %d leases:\n\n", len(e.errs)))
-	} else {
-		sb.WriteString("Failed to grant lease:\n\n")
-	}
-	for _, ge := range e.errs {
-		sb.WriteString(fmt.Sprintf("Lease: %s\n", ge.Source))
-		sb.WriteString(fmt.Sprintf("└─ Error: %s\n\n", ge.Err))
-	}
-
-	if len(e.errs) > 1 {
-		sb.WriteString("Note: Other leases may have been granted successfully.\n")
-	}
-	return strings.TrimRight(sb.String(), "\n")
-}
-
-func processSingleLease(cmd *cobra.Command, l lease.Lease, secretVal string, projectRoot string, absConfigFile string, interactive bool, errs *[]grantError, continueOnError bool) ([]ipc.Lease, []string, error) {
-	// Duration validation
-	duration, err := time.ParseDuration(l.Duration)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
-	}
-	if duration > 12*time.Hour {
-		slog.Warn("Leases longer than 12 hours are discouraged for security reasons.")
-	}
-
-	// Handle result: could be a single string or exploded data
-	var approvedLeases []ipc.Lease
-	var approvedShellCommands []string
-
-	// Pre-determine the prompt string
-	isExplode := l.IsExplode()
-
-	var prompt string
-	if isExplode {
-		prompt = fmt.Sprintf("Grant leases from '%s'?", l.Source)
-	} else if l.Variable == "" {
-		prompt = fmt.Sprintf("Grant lease for '%s'?", l.Source)
-	} else {
-		prompt = fmt.Sprintf("Grant lease for '%s'?", l.Variable)
-	}
-
-	if !interactive || (secretVal != "") || confirm(prompt) {
-		// Fetch secret if not already fetched
-		if secretVal == "" {
-			slog.Info("Fetching secret", "source", l.Source)
-			secrets, lookupErrs, err := secretlookup.Fetch([]lease.Lease{l}, secretlookup.Options{})
-			if len(lookupErrs) > 0 {
-				return nil, nil, fmt.Errorf("failed to fetch secret: %w", lookupErrs[0].Err)
-			}
-			if err != nil {
-				return nil, nil, fmt.Errorf("failed to fetch secret: %w", err)
-			}
-			var ok bool
-			secretVal, ok = secrets.Get(l)
-			if !ok {
-				return nil, nil, fmt.Errorf("failed to fetch secret: no secret returned for %s", l.Source)
-			}
-			slog.Info("Fetched secret", "source", l.Source)
-		}
-
-		result, err := transform.Apply(l, secretVal)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to transform secret: %w", err)
-		}
-
-		if result.IsExploded() {
-			parentLeases, _, err := processLease(cmd, *result.Parent, "", projectRoot, absConfigFile)
-			if err != nil {
-				return nil, nil, err
-			}
-			approvedLeases = append(approvedLeases, parentLeases...)
-
-			fmt.Fprintf(os.Stderr, "Granting sub-leases from '%s'%s:\n", l.Source, getTransformSummary(l.Transform))
-			for _, transformedSecret := range result.Secrets {
-				if !interactive || confirm(fmt.Sprintf("Grant lease for '%s'?", transformedSecret.Lease.Variable)) {
-					finalLeases, sc, err := processLease(cmd, transformedSecret.Lease, transformedSecret.Value, projectRoot, absConfigFile)
-					if err != nil {
-						*errs = append(*errs, grantError{Source: transformedSecret.Lease.Variable, Err: err})
-						if !continueOnError {
-							return nil, nil, err
-						}
-						continue
-					}
-					approvedLeases = append(approvedLeases, finalLeases...)
-					approvedShellCommands = append(approvedShellCommands, sc...)
-				}
-			}
-			return approvedLeases, approvedShellCommands, nil
-		}
-
-		for _, transformedSecret := range result.Secrets {
-			finalLeases, sc, err := processLease(cmd, transformedSecret.Lease, transformedSecret.Value, projectRoot, absConfigFile)
-			if err != nil {
-				return nil, nil, err
-			}
-			approvedLeases = append(approvedLeases, finalLeases...)
-			approvedShellCommands = append(approvedShellCommands, sc...)
-		}
-	}
-	return approvedLeases, approvedShellCommands, nil
-}
-
-func lookupGrantErrors(lookupErrs []secretlookup.Error) []grantError {
-	errs := make([]grantError, 0, len(lookupErrs))
-	for _, lookupErr := range lookupErrs {
-		errs = append(errs, grantError{Source: lookupErr.Lease.Source, Err: lookupErr.Err})
-	}
-	return errs
-}
 
 var grantCmd = &cobra.Command{
 	Use:   "grant",
@@ -262,66 +136,42 @@ This can be overridden with the --destination-outside-root flag.`,
 
 		client := ensureDaemonClient()
 
-		if interactive {
-			return interactiveGrant(cmd, leaseSet, client)
-		}
-
 		continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
-		var errs []grantError
-		var shellCommands []string
-		leases := make([]ipc.Lease, 0, len(leaseSet.Leases))
-
-		fetched, fetchErrs, fetchErr := secretlookup.Fetch(leaseSet.Leases, secretlookup.Options{ContinueOnError: continueOnError, Mode: "non-interactive"})
-		errs = append(errs, lookupGrantErrors(fetchErrs)...)
-		if fetchErr != nil {
-			return &GrantErrors{errs: errs}
-		}
-
-		for _, l := range leaseSet.Leases {
-			secretVal, ok := fetched.Get(l)
-			if !ok {
-				// Missing secret indicates a prior fetch failure.
-				if !continueOnError {
-					return &GrantErrors{errs: errs}
-				}
-				continue
-			}
-			finalLeases, sc, err := processSingleLease(cmd, l, secretVal, leaseSet.Root, leaseSet.ConfigFile, false, &errs, continueOnError)
-			if err != nil {
-				errs = append(errs, grantError{Source: l.Source, Err: err})
-				if !continueOnError {
-					return &GrantErrors{errs: errs}
-				}
-				continue
-			}
-			leases = append(leases, finalLeases...)
-			shellCommands = append(shellCommands, sc...)
-		}
-
-		if len(errs) > 0 {
-			return &GrantErrors{errs: errs}
-		}
-
 		override, _ := cmd.Flags().GetBool("override")
-		req := ipc.GrantRequest{
-			Command:    "grant",
-			Leases:     leases,
-			Override:   override,
-			Append:     false,
-			ConfigFile: leaseSet.ConfigFile,
+		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
+
+		flow := grantflow.Flow{
+			Confirm: confirm,
+			Notice: func(message string) {
+				fmt.Fprintln(os.Stderr, message)
+			},
+			Materialize: func(l lease.Lease, secret string) (grantflow.Materialized, error) {
+				leases, shellCommands, err := processLease(cmd, l, secret, leaseSet.Root, leaseSet.ConfigFile)
+				return grantflow.Materialized{Leases: leases, ShellCommands: shellCommands}, err
+			},
 		}
+		result, err := flow.Run(leaseSet, grantflow.Options{
+			Interactive:     interactive,
+			ContinueOnError: continueOnError,
+			Append:          appendMode,
+			Override:        override,
+		})
+		if err != nil {
+			return err
+		}
+		if result.Noop {
+			return nil
+		}
+
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
 			fmt.Fprintln(os.Stderr, "Grant request (test mode) processed successfully.")
-			if len(errs) > 0 {
-				return &GrantErrors{errs: errs}
-			}
 			return nil
 		}
 
 		if client != nil {
 			var resp ipc.GrantResponse
-			if err := client.Send(req, &resp); err != nil {
+			if err := client.Send(result.Request, &resp); err != nil {
 				handleClientError(err)
 			}
 			for _, msg := range resp.Messages {
@@ -331,17 +181,13 @@ This can be overridden with the --destination-outside-root flag.`,
 			fmt.Fprintln(os.Stderr, "Grant request processed in test mode.")
 		}
 
-		noDirenv, _ := cmd.Flags().GetBool("no-direnv")
-		for _, l := range leases {
-			if filepath.Base(l.Destination) == ".envrc" {
-				HandleDirenv(noDirenv, os.Stderr)
-				break
-			}
+		if result.NeedsDirenv() {
+			HandleDirenv(noDirenv, os.Stderr)
 		}
 
 		if shellMode {
 			fmt.Fprintln(os.Stderr, "# When using shell lease types run this command like `eval $(env-lease grant)`")
-			for _, cmd := range shellCommands {
+			for _, cmd := range result.ShellCommands {
 				fmt.Println(cmd)
 			}
 		}
@@ -431,254 +277,4 @@ func init() {
 	grantCmd.Flags().Bool("append", false, "In interactive mode, keep existing granted leases and only add newly approved leases. Skipped prompts are left unchanged.")
 	grantCmd.Flags().Bool("destination-outside-root", false, "Allow file-based leases to write outside of the project root.")
 	rootCmd.AddCommand(grantCmd)
-}
-
-// getTransformSummary creates a short, human-readable summary of the transform pipeline.
-func getTransformSummary(transforms []string) string {
-	if len(transforms) == 0 {
-		return ""
-	}
-	return fmt.Sprintf(" (%s)", strings.Join(transforms, ", "))
-}
-
-// interactiveGrant orchestrates the user-facing interactive lease approval process.
-// It is designed around a multi-phase workflow to provide a clear, consistent,
-// and secure user experience, deferring all secret lookups until after the user
-// has explicitly approved them.
-//
-// The function executes the following distinct phases:
-//
-// ### Phase 1: Round 1 - Approve Sources
-// The function first makes a complete pass through all `[[lease]]` blocks from
-// the configuration. It generates a descriptive prompt for each lease, including
-// transformation details for `explode` leases to avoid ambiguity. It collects
-// all of the user's 'yes' or 'no' responses for these top-level sources
-// without fetching any secrets.
-//
-// ### Phase 2: Fetch Secrets
-// After Round 1 is complete, the function identifies all unique secret sources
-// that need to be fetched based on the user's approvals. It then fetches these
-// secrets in parallel to maximize efficiency:
-//   - `op://` sources are grouped by `op_account` and fetched in batches.
-//   - `op+file://` sources are fetched individually, with the content of each
-//     unique URI being fetched only once and then cached for the remainder of the
-//     run.
-//
-// ### Phase 3: Round 2 - Approve Individual Secrets (Optional)
-// If any of the leases approved in Round 1 were `explode` leases, this phase
-// begins. The function iterates through the now-fetched and parsed secrets and
-// prompts the user to approve each individual key-value pair that resulted from
-// the `explode` transformation. Simple, non-exploding leases that were approved
-// in Round 1 are considered final and are not part of this phase.
-//
-// ### Phase 4: Grant Leases
-// Finally, the function gathers all the approved leases (both simple leases from
-// Round 1 and sub-leases from Round 2) into a single list and sends it to the
-// `env-lease` daemon to be activated. It also handles the output of any shell
-// commands for `shell` type leases.
-func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Client) error {
-	slog.Debug("interactive grant: phase 1 start", "lease_count", len(leaseSet.Leases))
-	// ------- Phase 1: ROUND 1 – APPROVE SOURCES -------
-	selectedLeases := make([]lease.Lease, 0, len(leaseSet.Leases))
-	for _, l := range leaseSet.Leases {
-		isExplode := l.IsExplode()
-
-		var key string
-		if isExplode {
-			// Descriptive label with transformation breadcrumbs
-			key = fmt.Sprintf("leases from '%s'%s", l.Source, getTransformSummary(l.Transform))
-		} else if l.Variable != "" {
-			key = fmt.Sprintf("'%s'", l.Variable)
-		} else {
-			key = fmt.Sprintf("'%s'", l.Source)
-		}
-
-		if confirm(fmt.Sprintf("Grant %s?", key)) {
-			selectedLeases = append(selectedLeases, l)
-		}
-	}
-
-	if len(selectedLeases) == 0 {
-		fmt.Fprintln(os.Stderr, "No leases selected.")
-		return nil
-	}
-
-	slog.Debug("interactive grant: phase 1 approvals",
-		"selected_count", len(selectedLeases),
-		"skipped_count", len(leaseSet.Leases)-len(selectedLeases))
-
-	continueOnError, _ := cmd.Flags().GetBool("continue-on-error")
-	override, _ := cmd.Flags().GetBool("override")
-	appendMode, _ := cmd.Flags().GetBool("append")
-	noDirenv, _ := cmd.Flags().GetBool("no-direnv")
-
-	if appendMode {
-		fmt.Fprintln(os.Stderr, "Append mode enabled: skipped leases will remain unchanged.")
-	}
-
-	var errs []grantError
-
-	fetched, fetchErrs, fetchErr := secretlookup.Fetch(selectedLeases, secretlookup.Options{ContinueOnError: continueOnError, Mode: "interactive"})
-	errs = append(errs, lookupGrantErrors(fetchErrs)...)
-	if fetchErr != nil {
-		return &GrantErrors{errs: errs}
-	}
-
-	// Pre-compute transform results without writing or prompting.
-	type child struct {
-		lease lease.Lease
-		value string
-	}
-	type simple struct {
-		lease lease.Lease
-		value string
-	}
-	explodedChildren := make([]child, 0)
-	simpleApproved := make([]simple, 0)
-	parentApproved := make([]ipc.Lease, 0)
-
-	slog.Debug("interactive grant: preprocessing transforms",
-		"selected_count", len(selectedLeases))
-
-	for _, l := range selectedLeases {
-		isExplode := l.IsExplode()
-		raw, ok := fetched.Get(l)
-		if !ok {
-			errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("no secret returned")})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-
-		formatted := l
-		slog.Debug("interactive grant: preparing lease",
-			"source", formatted.Source,
-			"explode", isExplode,
-			"transform_steps", len(formatted.Transform))
-
-		result, err := transform.Apply(formatted, raw)
-		if err != nil {
-			errs = append(errs, grantError{Source: formatted.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-
-		if result.IsExploded() {
-			slog.Debug("interactive grant: explode result",
-				"source", formatted.Source,
-				"child_count", len(result.Secrets))
-
-			parentLeases, _, err := processLease(cmd, *result.Parent, "", leaseSet.Root, leaseSet.ConfigFile)
-			if err != nil {
-				errs = append(errs, grantError{Source: formatted.Source, Err: err})
-				if !continueOnError {
-					return &GrantErrors{errs: errs}
-				}
-				continue
-			}
-			if len(parentLeases) == 0 {
-				errs = append(errs, grantError{Source: formatted.Source, Err: fmt.Errorf("explode parent produced no leases")})
-				if !continueOnError {
-					return &GrantErrors{errs: errs}
-				}
-				continue
-			}
-
-			parentApproved = append(parentApproved, parentLeases...)
-			for _, transformedSecret := range result.Secrets {
-				explodedChildren = append(explodedChildren, child{
-					lease: transformedSecret.Lease,
-					value: transformedSecret.Value,
-				})
-			}
-			continue
-		}
-
-		for _, transformedSecret := range result.Secrets {
-			slog.Debug("interactive grant: pipeline produced single value", "source", transformedSecret.Lease.Source)
-			simpleApproved = append(simpleApproved, simple{lease: transformedSecret.Lease, value: transformedSecret.Value})
-		}
-	}
-
-	// ------- Phase 3: ROUND 2 – APPROVE INDIVIDUAL SECRETS FOR EXPLODE -------
-	slog.Debug("interactive grant: phase 3 start",
-		"simple_count", len(simpleApproved),
-		"explode_children", len(explodedChildren))
-	finalLeases := make([]ipc.Lease, 0)
-	approvedShellCommands := make([]string, 0)
-
-	finalLeases = append(finalLeases, parentApproved...)
-
-	// First, materialize all simple leases (no new prompts)
-	for _, approved := range simpleApproved {
-		l := approved.lease
-		leas, sc, err := processLease(cmd, l, approved.value, leaseSet.Root, leaseSet.ConfigFile)
-		if err != nil {
-			errs = append(errs, grantError{Source: l.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-		finalLeases = append(finalLeases, leas...)
-		approvedShellCommands = append(approvedShellCommands, sc...)
-	}
-
-	// Then, prompt for exploded keys
-	// Group by parent source only for nice prompts
-	for _, ch := range explodedChildren {
-		prompt := fmt.Sprintf("Grant lease for '%s'?", ch.lease.Variable)
-		if !confirm(prompt) {
-			continue
-		}
-		leas, sc, err := processLease(cmd, ch.lease, ch.value, leaseSet.Root, leaseSet.ConfigFile)
-		if err != nil {
-			errs = append(errs, grantError{Source: ch.lease.Source, Err: err})
-			if !continueOnError {
-				return &GrantErrors{errs: errs}
-			}
-			continue
-		}
-		finalLeases = append(finalLeases, leas...)
-		approvedShellCommands = append(approvedShellCommands, sc...)
-	}
-
-	if len(errs) > 0 && !continueOnError {
-		return &GrantErrors{errs: errs}
-	}
-
-	// ------- Phase 4: GRANT (single request) -------
-	slog.Debug("interactive grant: phase 4 start", "final_lease_count", len(finalLeases))
-	req := ipc.GrantRequest{Command: "grant", Leases: finalLeases, Override: override, Append: appendMode, ConfigFile: leaseSet.ConfigFile}
-	if client != nil {
-		var resp ipc.GrantResponse
-		if err := client.Send(req, &resp); err != nil {
-			handleClientError(err)
-		}
-		for _, msg := range resp.Messages {
-			fmt.Fprintln(os.Stderr, msg)
-		}
-	} else {
-		fmt.Fprintln(os.Stderr, "Grant request processed in test mode.")
-	}
-
-	for _, l := range finalLeases {
-		if filepath.Base(l.Destination) == ".envrc" {
-			HandleDirenv(noDirenv, os.Stderr)
-			break
-		}
-	}
-
-	if shellMode {
-		fmt.Fprintln(os.Stderr, "# When using shell lease types run this command like `eval $(env-lease grant)`")
-		for _, c := range approvedShellCommands {
-			fmt.Println(c)
-		}
-	}
-
-	fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
-	return nil
 }
