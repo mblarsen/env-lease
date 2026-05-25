@@ -1,14 +1,14 @@
 package daemon
 
-import "github.com/mblarsen/env-lease/internal/config"
+import "github.com/mblarsen/env-lease/internal/lease"
 
 type mockRevoker struct {
 	RevokeCount int
-	RevokeFunc  func(lease *config.Lease) error
-	revoked     []*config.Lease
+	RevokeFunc  func(lease *lease.Lease) error
+	revoked     []*lease.Lease
 }
 
-func (m *mockRevoker) Revoke(lease *config.Lease) error {
+func (m *mockRevoker) Revoke(lease *lease.Lease) error {
 	m.RevokeCount++
 	m.revoked = append(m.revoked, lease)
 	if m.RevokeFunc != nil {

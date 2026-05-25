@@ -13,6 +13,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 // Clock is an interface for time-related functions to allow for mocking.
@@ -152,27 +153,27 @@ func (d *Daemon) revokeOrphanedLeases() {
 		// Create a map of leases defined in the config for efficient lookup.
 		// Lease identity must include source + destination + variable to avoid
 		// collisions when multiple leases share a source.
-		configLeases := make(map[string]struct{}, len(cfg.Lease))
+		leaseSet, normalizeErrs := lease.NormalizePartial(cfg, configFile)
+		for _, err := range normalizeErrs {
+			slog.Warn("Skipping invalid config lease during orphan check", "config", configFile, "err", err)
+		}
+		configLeases := make(map[string]struct{}, len(leaseSet.Leases))
 		explodeParents := make(map[string]struct{})
-		for _, l := range cfg.Lease {
-			destination, err := canonicalLeaseDestination(cfg.Root, l)
-			if err != nil {
-				slog.Warn("Could not normalize lease destination; skipping config lease", "source", l.Source, "destination", l.Destination, "err", err)
-				continue
-			}
-
-			configLeases[leaseIdentity(l.Source, destination, l.Variable)] = struct{}{}
-			if hasExplodeTransform(l.Transform) {
+		for _, l := range leaseSet.Leases {
+			configLeases[l.Identity()] = struct{}{}
+			if l.IsExplode() {
 				// Explode leases create a parent entry with an empty variable and
 				// child entries that reference ParentSource at runtime.
-				configLeases[leaseIdentity(l.Source, destination, "")] = struct{}{}
-				explodeParents[parentLeaseIdentity(l.Source, destination)] = struct{}{}
+				parent := l
+				parent.Variable = ""
+				configLeases[parent.Identity()] = struct{}{}
+				explodeParents[parent.ParentIdentity()] = struct{}{}
 			}
 		}
 
 		// Check active leases against the config
 		for key, activeLease := range d.state.LeasesForConfigFile(configFile) {
-			activeIdentity := leaseIdentity(activeLease.Source, activeLease.Destination, activeLease.Variable)
+			activeIdentity := activeLease.Identity()
 			if _, exists := configLeases[activeIdentity]; exists {
 				continue
 			}
@@ -230,7 +231,7 @@ func (d *Daemon) Shutdown() error {
 		d.state = NewState()
 	}
 
-	leasesToRevoke := make([]*config.Lease, 0, len(d.state.Leases))
+	leasesToRevoke := make([]*lease.Lease, 0, len(d.state.Leases))
 	for key, lease := range d.state.Leases {
 		if lease == nil {
 			delete(d.state.Leases, key)
@@ -273,7 +274,7 @@ func (d *Daemon) Shutdown() error {
 	}
 
 	d.mu.Lock()
-	d.state.Leases = make(map[string]*config.Lease)
+	d.state.Leases = make(map[string]*lease.Lease)
 	d.state.RetryQueue = nil
 	err := d.state.SaveState(d.statePath)
 	d.mu.Unlock()

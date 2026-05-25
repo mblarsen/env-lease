@@ -5,15 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"unsafe"
 
-	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/lease"
 )
 
-func writeLease(l config.Lease, secretVal, projectRoot string, override bool) (bool, error) {
+func writeLease(l lease.Lease, secretVal, projectRoot string, override bool) (bool, error) {
 	dest := l.Destination
 	if !filepath.IsAbs(dest) {
 		dest = filepath.Join(projectRoot, dest)
@@ -25,11 +24,16 @@ func writeLease(l config.Lease, secretVal, projectRoot string, override bool) (b
 		// File doesn't exist, so it will be created.
 	}
 
+	fileMode, err := l.ParseFileMode(0600)
+	if err != nil {
+		return false, err
+	}
+
 	switch l.LeaseType {
 	case "env":
-		return writeEnvFile(dest, l.Variable, secretVal, l.Format, override, l.FileMode)
+		return writeEnvFile(dest, l.Variable, secretVal, l.Format, override, fileMode)
 	case "file":
-		return writeFile(dest, secretVal, l.FileMode)
+		return writeFile(dest, secretVal, fileMode)
 	case "shell":
 		return false, fmt.Errorf("the 'shell' lease type should not be handled by writeLease")
 	default:
@@ -37,28 +41,18 @@ func writeLease(l config.Lease, secretVal, projectRoot string, override bool) (b
 	}
 }
 
-func writeFile(path, value string, fileModeStr string) (bool, error) {
-	fileMode, err := parseFileMode(fileModeStr, 0600)
-	if err != nil {
-		return false, err
-	}
-
+func writeFile(path, value string, fileMode os.FileMode) (bool, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		_, err := fileutil.AtomicWriteFile(path, []byte(value), fileMode)
 		return true, err
 	}
 
 	// If the file exists, we just overwrite it.
-	_, err = fileutil.AtomicWriteFile(path, []byte(value), fileMode)
+	_, err := fileutil.AtomicWriteFile(path, []byte(value), fileMode)
 	return false, err
 }
 
-func writeEnvFile(path, key, value, format string, override bool, fileModeStr string) (bool, error) {
-	fileMode, err := parseFileMode(fileModeStr, 0600)
-	if err != nil {
-		return false, err
-	}
-
+func writeEnvFile(path, key, value, format string, override bool, fileMode os.FileMode) (bool, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		content := fmt.Sprintf(format+"\n", key, value)
 		_, err := fileutil.AtomicWriteFile(path, []byte(content), fileMode)
@@ -108,17 +102,6 @@ func writeEnvFile(path, key, value, format string, override bool, fileModeStr st
 	output := strings.Join(nonEmptyLines, "\n") + "\n"
 	_, err = fileutil.AtomicWriteFile(path, []byte(output), fileMode)
 	return false, err
-}
-
-func parseFileMode(fileModeStr string, defaultMode os.FileMode) (os.FileMode, error) {
-	if fileModeStr == "" {
-		return defaultMode, nil
-	}
-	mode, err := strconv.ParseUint(fileModeStr, 8, 32)
-	if err != nil {
-		return 0, fmt.Errorf("invalid file mode: %w", err)
-	}
-	return os.FileMode(mode), nil
 }
 
 // clear overwrites the byte slice with random data to reduce the chance of the

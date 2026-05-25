@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/daemon"
+	"github.com/mblarsen/env-lease/internal/lease"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +28,7 @@ func TestLoadDaemonStateReturnsPersistedStateWhenValid(t *testing.T) {
 	statePath := filepath.Join(t.TempDir(), "state.json")
 
 	expected := daemon.NewState()
-	expected.Leases["lease1"] = &config.Lease{
+	expected.Leases["lease1"] = &lease.Lease{
 		Source:    "onepassword://vault/item/field",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
