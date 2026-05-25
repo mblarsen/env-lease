@@ -36,6 +36,10 @@ _Avoid_: provider fetch, backend lookup, source read
 The act of converting fetched Secret material into the final Secret or set of Secrets that Grant can materialize.
 _Avoid_: post-processing, parsing, pipeline output
 
+**Grant Workflow**:
+The ordered decisions and steps that turn a desired Lease set into a Daemon registration request.
+_Avoid_: grant command logic, grant orchestration, CLI flow
+
 **Daemon**:
 The background process that owns active Lease state and performs scheduled revocation.
 _Avoid_: worker, server, scheduler
@@ -53,16 +57,17 @@ _Avoid_: manifest, spec, settings
 - A **Config** declares zero or more **Leases**.
 - A **Lease** identifies exactly one **Secret** source and one **Destination**.
 - A **Provider** performs **Secret Lookup** for an approved **Lease**.
-- A **Grant** uses **Secret Lookup** before **Secret Transformation**.
-- **Secret Transformation** produces one **Secret** or an exploded set of Secrets for **Grant** to materialize at their **Destination**.
-- A **Grant** registers a **Lease** with the **Daemon**.
+- A **Grant** runs a **Grant Workflow**.
+- The **Grant Workflow** uses **Secret Lookup** before **Secret Transformation**.
+- **Secret Transformation** produces one **Secret** or an exploded set of Secrets for the **Grant Workflow** to materialize at their **Destination**.
+- The **Grant Workflow** produces the request that registers **Leases** with the **Daemon**.
 - The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
 - The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
 
 ## Example dialogue
 
 > **Dev:** "When I run **Grant**, does every **Secret** go through **Secret Lookup** immediately?"
-> **Domain expert:** "Only approved **Leases** should perform **Secret Lookup**; then **Secret Transformation** shapes the fetched material, and the **Daemon** owns the **Lease Lifecycle** that decides when each **Lease** should **Revoke** its **Destination**."
+> **Domain expert:** "The **Grant Workflow** decides which **Leases** are approved first. Only approved **Leases** perform **Secret Lookup**; then **Secret Transformation** shapes the fetched material, and the **Daemon** owns the **Lease Lifecycle** that decides when each **Lease** should **Revoke** its **Destination**."
 
 ## Flagged ambiguities
 
