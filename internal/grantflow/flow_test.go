@@ -109,6 +109,37 @@ func TestRunInteractiveNoSelectionIsNoop(t *testing.T) {
 	}
 }
 
+func TestRunInteractiveContinueOnLookupErrorReturnsSuccessfulGrant(t *testing.T) {
+	t.Setenv("ENV_LEASE_TEST", "1")
+
+	var calls []materializeCall
+	flow := Flow{
+		Confirm:     func(string) bool { return true },
+		Materialize: recordingMaterializer(&calls),
+	}
+	set := testSet(
+		testEnvLease("mock-fail", "FAIL_KEY"),
+		testEnvLease("mock", "SUCCESS_KEY"),
+	)
+
+	result, err := flow.Run(set, Options{Interactive: true, ContinueOnError: true})
+	if err != nil {
+		t.Fatalf("expected successful partial grant result, got %v", err)
+	}
+
+	gotVariables := variablesFromLeases(result.Request.Leases)
+	wantVariables := []string{"SUCCESS_KEY"}
+	if !reflect.DeepEqual(gotVariables, wantVariables) {
+		t.Fatalf("variables mismatch\nwant: %#v\n got: %#v", wantVariables, gotVariables)
+	}
+
+	gotCalls := callVariablesAndValues(calls)
+	wantCalls := []string{"SUCCESS_KEY=secret-for-mock"}
+	if !reflect.DeepEqual(gotCalls, wantCalls) {
+		t.Fatalf("materializer calls mismatch\nwant: %#v\n got: %#v", wantCalls, gotCalls)
+	}
+}
+
 func TestRunNonInteractiveContinueOnLookupErrorMaterializesSuccessfulLeases(t *testing.T) {
 	t.Setenv("ENV_LEASE_TEST", "1")
 

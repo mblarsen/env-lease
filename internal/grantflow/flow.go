@@ -165,9 +165,6 @@ func (f Flow) runInteractive(set *lease.Set, opts Options) (Result, error) {
 	if len(errs) > 0 && !opts.ContinueOnError {
 		return Result{}, Errors{errs: errs}
 	}
-	if len(errs) > 0 {
-		return Result{}, Errors{errs: errs}
-	}
 	return result, nil
 }
 
