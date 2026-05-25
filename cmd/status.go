@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"sort"
@@ -118,7 +119,8 @@ var statusCmd = &cobra.Command{
 }
 
 func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	var output bytes.Buffer
+	w := tabwriter.NewWriter(&output, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
 
 	for _, lease := range leases {
@@ -151,6 +153,7 @@ func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
 		}
 	}
 	w.Flush()
+	fmt.Fprint(os.Stdout, formatStatusOutput(output.String()))
 }
 
 func init() {
