@@ -28,6 +28,10 @@ _Avoid_: target, output, sink
 The external secret store or CLI that resolves a Secret source into Secret material.
 _Avoid_: backend, vault, service
 
+**Secret Lookup**:
+The act of resolving an approved Lease's Secret source through a Provider before Grant materializes it.
+_Avoid_: provider fetch, backend lookup, source read
+
 **Daemon**:
 The background process that owns active Lease state and performs scheduled revocation.
 _Avoid_: worker, server, scheduler
@@ -40,14 +44,15 @@ _Avoid_: manifest, spec, settings
 
 - A **Config** declares zero or more **Leases**.
 - A **Lease** identifies exactly one **Secret** source and one **Destination**.
-- A **Provider** resolves a **Secret** source during **Grant**.
+- A **Provider** performs **Secret Lookup** for an approved **Lease**.
+- A **Grant** uses **Secret Lookup** before materializing a **Secret** at its **Destination**.
 - A **Grant** registers a **Lease** with the **Daemon**.
 - The **Daemon** performs **Revoke** when a **Lease** expires or is removed from **Config**.
 
 ## Example dialogue
 
-> **Dev:** "When I run **Grant**, does every **Secret** get fetched immediately?"
-> **Domain expert:** "Only approved **Leases** should fetch their **Secret**, then the **Daemon** tracks when each **Lease** should **Revoke** its **Destination**."
+> **Dev:** "When I run **Grant**, does every **Secret** go through **Secret Lookup** immediately?"
+> **Domain expert:** "Only approved **Leases** should perform **Secret Lookup**, then the **Daemon** tracks when each **Lease** should **Revoke** its **Destination**."
 
 ## Flagged ambiguities
 

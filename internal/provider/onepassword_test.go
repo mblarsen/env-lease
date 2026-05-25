@@ -22,58 +22,41 @@ func TestOnePasswordCLI_FetchLeases(t *testing.T) {
 	originalExecer := cmdExecer
 	defer func() { cmdExecer = originalExecer }()
 
-	t.Run("groups leases by account", func(t *testing.T) {
+	t.Run("fetches batch through configured account", func(t *testing.T) {
 		var capturedArgs [][]string
 		var mu sync.Mutex
 
-		var injectCall int
 		cmdExecer = &mockExecer{
 			CommandFunc: func(name string, arg ...string) *exec.Cmd {
 				mu.Lock()
 				capturedArgs = append(capturedArgs, arg)
 				mu.Unlock()
 
-				// Simulate the output of `op inject`
 				if len(arg) > 0 && arg[0] == "inject" {
-					injectCall++
-					if injectCall == 1 {
-						return exec.Command("echo", "-n", "lease_0=\"secret1\"")
-					}
-					return exec.Command("echo", "-n", "lease_0=\"secret2\"")
+					return exec.Command("echo", "-n", "lease_0=\"secret1\"\nlease_1=\"secret2\"")
 				}
 				return exec.Command("echo", "-n", "my-secret")
 			},
 		}
 
-		provider := &OnePasswordCLI{}
+		provider := &OnePasswordCLI{Account: "account1"}
 		leases := []lease.Lease{
 			{Variable: "VAR1", Source: "op://vault/item1", OpAccount: "account1"},
-			{Variable: "VAR2", Source: "op://vault/item2", OpAccount: "account2"},
+			{Variable: "VAR2", Source: "op://vault/item2", OpAccount: "account1"},
 		}
-		_, errs := provider.FetchLeases(leases)
+		secrets, errs := provider.FetchLeases(leases)
 		if len(errs) > 0 {
 			t.Fatalf("unexpected errors: %v", errs)
 		}
 
-		if len(capturedArgs) != 2 {
-			t.Fatalf("expected 2 calls to op, got %d", len(capturedArgs))
+		if len(capturedArgs) != 1 {
+			t.Fatalf("expected 1 call to op, got %d", len(capturedArgs))
 		}
-
-		var foundAccount1, foundAccount2 bool
-		for _, args := range capturedArgs {
-			if strings.Contains(strings.Join(args, " "), "--account account1") {
-				foundAccount1 = true
-			}
-			if strings.Contains(strings.Join(args, " "), "--account account2") {
-				foundAccount2 = true
-			}
+		if !strings.Contains(strings.Join(capturedArgs[0], " "), "--account account1") {
+			t.Fatalf("expected a call with --account account1, got %v", capturedArgs[0])
 		}
-
-		if !foundAccount1 {
-			t.Error("expected a call with --account account1")
-		}
-		if !foundAccount2 {
-			t.Error("expected a call with --account account2")
+		if len(secrets) != 2 || secrets["op://vault/item1"] == "" || secrets["op://vault/item2"] == "" {
+			t.Fatalf("unexpected secrets: %v", secrets)
 		}
 	})
 }

@@ -71,17 +71,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
-	"github.com/mblarsen/env-lease/internal/provider"
+	"github.com/mblarsen/env-lease/internal/secretlookup"
 	"github.com/mblarsen/env-lease/internal/transform"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 )
 
 var shellMode bool
@@ -143,15 +141,17 @@ func processSingleLease(cmd *cobra.Command, l lease.Lease, secretVal string, pro
 		// Fetch secret if not already fetched
 		if secretVal == "" {
 			slog.Info("Fetching secret", "source", l.Source)
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: l.OpAccount}
+			secrets, lookupErrs, err := secretlookup.Fetch([]lease.Lease{l}, secretlookup.Options{})
+			if len(lookupErrs) > 0 {
+				return nil, nil, fmt.Errorf("failed to fetch secret: %w", lookupErrs[0].Err)
 			}
-			secretVal, err = p.Fetch(l.Source)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to fetch secret: %w", err)
+			}
+			var ok bool
+			secretVal, ok = secrets.Get(l)
+			if !ok {
+				return nil, nil, fmt.Errorf("failed to fetch secret: no secret returned for %s", l.Source)
 			}
 			slog.Info("Fetched secret", "source", l.Source)
 		}
@@ -221,180 +221,12 @@ func processSingleLease(cmd *cobra.Command, l lease.Lease, secretVal string, pro
 	return approvedLeases, approvedShellCommands, nil
 }
 
-// fetchSecretsParallel retrieves raw secret material for the provided leases using the
-// same parallelized batching strategy as the interactive flow. The returned map is keyed
-// by source URI. Any encountered errors are returned as grantError entries; when
-// continueOnError is false, the first failure terminates early.
-func fetchSecretsParallel(leases []lease.Lease, continueOnError bool, mode string) (map[string]string, []grantError, error) {
-	type accountGroup struct {
-		account string
-		leases  []lease.Lease
+func lookupGrantErrors(lookupErrs []secretlookup.Error) []grantError {
+	errs := make([]grantError, 0, len(lookupErrs))
+	for _, lookupErr := range lookupErrs {
+		errs = append(errs, grantError{Source: lookupErr.Lease.Source, Err: lookupErr.Err})
 	}
-
-	opBatches := map[string]*accountGroup{}
-	fileURIs := map[string]struct{}{}
-	var directFetchLeases []lease.Lease
-
-	for _, l := range leases {
-		if strings.HasPrefix(l.Source, "op://") {
-			actualAcct := l.OpAccount
-			key := actualAcct
-			if key == "" {
-				key = "default"
-			}
-			group := opBatches[key]
-			if group == nil {
-				group = &accountGroup{account: actualAcct}
-				opBatches[key] = group
-			}
-			group.leases = append(group.leases, l)
-			continue
-		}
-		if strings.HasPrefix(l.Source, "op+file://") {
-			fileURIs[l.Source] = struct{}{}
-			continue
-		}
-		directFetchLeases = append(directFetchLeases, l)
-	}
-
-	slog.Debug("grant fetch: phase 2 start",
-		"mode", mode,
-		"lease_count", len(leases),
-		"op_batches", len(opBatches),
-		"file_sources", len(fileURIs),
-		"direct_sources", len(directFetchLeases))
-
-	fetched := make(map[string]string, len(leases))
-	var errs []grantError
-
-	var fetchMu sync.Mutex
-	var fetchGroup errgroup.Group
-
-	for key, batch := range opBatches {
-		batchKey := key
-		b := batch
-		sources := make([]string, 0, len(b.leases))
-		for _, lease := range b.leases {
-			sources = append(sources, lease.Source)
-		}
-
-		fetchGroup.Go(func() error {
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: b.account}
-			}
-
-			secrets, perrs := p.FetchLeases(b.leases)
-
-			localErrs := make([]grantError, 0, len(perrs))
-			for _, pe := range perrs {
-				localErrs = append(localErrs, grantError{Source: pe.Lease.Source, Err: pe.Err})
-			}
-
-			fetchMu.Lock()
-			for src, val := range secrets {
-				fetched[src] = val
-			}
-			if len(localErrs) > 0 {
-				errs = append(errs, localErrs...)
-			}
-			fetchMu.Unlock()
-
-			slog.Debug("grant fetch: fetched op batch",
-				"mode", mode,
-				"group_key", batchKey,
-				"account", b.account,
-				"count", len(sources),
-				"success_count", len(secrets),
-				"error_count", len(perrs))
-
-			if len(localErrs) > 0 && !continueOnError {
-				return fmt.Errorf("grant fetch: failed op batch %s", batchKey)
-			}
-			return nil
-		})
-	}
-
-	for src := range fileURIs {
-		source := src
-
-		fetchGroup.Go(func() error {
-			var p provider.SecretProvider
-			lAccount := ""
-			for _, l := range leases {
-				if l.Source == source {
-					lAccount = l.OpAccount
-					break
-				}
-			}
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: lAccount}
-			}
-
-			val, err := p.Fetch(source)
-			if err != nil {
-				fetchMu.Lock()
-				errs = append(errs, grantError{Source: source, Err: err})
-				fetchMu.Unlock()
-				if !continueOnError {
-					return fmt.Errorf("grant fetch: failed file source %s", source)
-				}
-				return nil
-			}
-
-			fetchMu.Lock()
-			fetched[source] = val
-			fetchMu.Unlock()
-
-			slog.Debug("grant fetch: fetched file source",
-				"mode", mode,
-				"source", source)
-			return nil
-		})
-	}
-
-	for _, l := range directFetchLeases {
-		lease := l
-
-		fetchGroup.Go(func() error {
-			var p provider.SecretProvider
-			if os.Getenv("ENV_LEASE_TEST") == "1" {
-				p = &provider.MockProvider{}
-			} else {
-				p = &provider.OnePasswordCLI{Account: lease.OpAccount}
-			}
-
-			val, err := p.Fetch(lease.Source)
-			if err != nil {
-				fetchMu.Lock()
-				errs = append(errs, grantError{Source: lease.Source, Err: err})
-				fetchMu.Unlock()
-				if !continueOnError {
-					return fmt.Errorf("grant fetch: failed direct source %s", lease.Source)
-				}
-				return nil
-			}
-
-			fetchMu.Lock()
-			fetched[lease.Source] = val
-			fetchMu.Unlock()
-
-			slog.Debug("grant fetch: fetched direct source",
-				"mode", mode,
-				"source", lease.Source)
-			return nil
-		})
-	}
-
-	waitErr := fetchGroup.Wait()
-	if waitErr != nil && !continueOnError {
-		return fetched, errs, waitErr
-	}
-	return fetched, errs, nil
+	return errs
 }
 
 var grantCmd = &cobra.Command{
@@ -462,14 +294,14 @@ This can be overridden with the --destination-outside-root flag.`,
 		var shellCommands []string
 		leases := make([]ipc.Lease, 0, len(leaseSet.Leases))
 
-		fetched, fetchErrs, fetchErr := fetchSecretsParallel(leaseSet.Leases, continueOnError, "non-interactive")
-		errs = append(errs, fetchErrs...)
+		fetched, fetchErrs, fetchErr := secretlookup.Fetch(leaseSet.Leases, secretlookup.Options{ContinueOnError: continueOnError, Mode: "non-interactive"})
+		errs = append(errs, lookupGrantErrors(fetchErrs)...)
 		if fetchErr != nil {
 			return &GrantErrors{errs: errs}
 		}
 
 		for _, l := range leaseSet.Leases {
-			secretVal, ok := fetched[l.Source]
+			secretVal, ok := fetched.Get(l)
 			if !ok {
 				// Missing secret indicates a prior fetch failure.
 				if !continueOnError {
@@ -709,19 +541,23 @@ func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Clien
 
 	var errs []grantError
 
-	fetched, fetchErrs, fetchErr := fetchSecretsParallel(selectedLeases, continueOnError, "interactive")
-	errs = append(errs, fetchErrs...)
+	fetched, fetchErrs, fetchErr := secretlookup.Fetch(selectedLeases, secretlookup.Options{ContinueOnError: continueOnError, Mode: "interactive"})
+	errs = append(errs, lookupGrantErrors(fetchErrs)...)
 	if fetchErr != nil {
 		return &GrantErrors{errs: errs}
 	}
 
-	// Pre-compute explode expansions without writing or prompting
+	// Pre-compute transform results without writing or prompting.
 	type child struct {
 		lease lease.Lease
 		value string
 	}
+	type simple struct {
+		lease lease.Lease
+		value string
+	}
 	explodedChildren := make([]child, 0)
-	simpleApproved := make([]lease.Lease, 0)
+	simpleApproved := make([]simple, 0)
 	parentApproved := make([]ipc.Lease, 0)
 
 	slog.Debug("interactive grant: preprocessing transforms",
@@ -729,18 +565,26 @@ func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Clien
 
 	for _, l := range selectedLeases {
 		isExplode := l.IsExplode()
-		raw := fetched[l.Source]
+		raw, ok := fetched.Get(l)
+		if !ok {
+			errs = append(errs, grantError{Source: l.Source, Err: fmt.Errorf("no secret returned")})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
+			continue
+		}
+
 		formatted := l
 		slog.Debug("interactive grant: preparing lease",
 			"source", formatted.Source,
 			"explode", isExplode,
 			"transform_steps", len(formatted.Transform))
-		if !isExplode {
+		if len(formatted.Transform) == 0 {
 			// simple lease; Phase 1 already approved — no more prompts later
-			simpleApproved = append(simpleApproved, formatted)
+			simpleApproved = append(simpleApproved, simple{lease: formatted, value: raw})
 			continue
 		}
-		// explode: run pipeline on the fetched raw
+
 		pipe, err := transform.NewPipeline(formatted.Transform)
 		if err != nil {
 			errs = append(errs, grantError{Source: formatted.Source, Err: err})
@@ -800,8 +644,12 @@ func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Clien
 			// pipeline resulted in single value — treat as simple
 			slog.Debug("interactive grant: pipeline produced single value", "source", formatted.Source)
 			formatted.Variable = strings.TrimSpace(formatted.Variable)
-			fetched[formatted.Source] = s
-			simpleApproved = append(simpleApproved, formatted)
+			simpleApproved = append(simpleApproved, simple{lease: formatted, value: s})
+		} else {
+			errs = append(errs, grantError{Source: formatted.Source, Err: fmt.Errorf("transform pipeline must produce a string or exploded data")})
+			if !continueOnError {
+				return &GrantErrors{errs: errs}
+			}
 		}
 	}
 
@@ -815,9 +663,9 @@ func interactiveGrant(cmd *cobra.Command, leaseSet *lease.Set, client *ipc.Clien
 	finalLeases = append(finalLeases, parentApproved...)
 
 	// First, materialize all simple leases (no new prompts)
-	for _, l := range simpleApproved {
-		val := fetched[l.Source]
-		leas, sc, err := processLease(cmd, l, val, leaseSet.Root, leaseSet.ConfigFile)
+	for _, approved := range simpleApproved {
+		l := approved.lease
+		leas, sc, err := processLease(cmd, l, approved.value, leaseSet.Root, leaseSet.ConfigFile)
 		if err != nil {
 			errs = append(errs, grantError{Source: l.Source, Err: err})
 			if !continueOnError {

@@ -8,13 +8,15 @@ type ProviderError struct {
 	Err   error
 }
 
-// SecretProvider defines the interface for fetching secrets from a backend.
+// SecretProvider defines the low-level adapter interface for fetching Secrets
+// from a Provider. Callers choose the concrete Provider/account adapter before
+// crossing this seam.
 type SecretProvider interface {
-	// Fetch retrieves a secret from the given source URI.
+	// Fetch retrieves a Secret from the given source URI.
 	Fetch(sourceURI string) (string, error)
-	// FetchLeases retrieves secrets for a slice of leases.
-	// RETURN CONTRACT: the returned map MUST be keyed by Lease.Source (the source URI).
-	// This ensures a stable key across simple, file, and explode flows.
+	// FetchLeases retrieves Secrets for a slice of Leases using this adapter's
+	// configured account. RETURN CONTRACT: the returned map MUST be keyed by
+	// Lease.Source (the source URI).
 	FetchLeases(leases []lease.Lease) (map[string]string, []ProviderError)
 }
 
