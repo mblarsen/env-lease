@@ -55,7 +55,7 @@ func doConfirm(prompt string, in io.Reader) bool {
 	reader := bufio.NewReader(in)
 
 	for {
-		fmt.Print(styleConfirmPrompt(prompt))
+		fmt.Print(formatConfirmPrompt(prompt))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			// On EOF, default to "no"

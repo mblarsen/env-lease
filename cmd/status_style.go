@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"regexp"
 	"strings"
 
@@ -47,6 +48,14 @@ var (
 	statusDurationPattern     = regexp.MustCompile(`\b\d+(?:h|m|s)(?:\d+(?:h|m|s))*\b`)
 	statusDurationPartPattern = regexp.MustCompile(`(\d+)([hms])`)
 )
+
+func formatStatusOutput(output string) string {
+	if !colorsEnabled(os.Stdout) {
+		return output
+	}
+
+	return styleStatusOutput(output)
+}
 
 func styleStatusOutput(output string) string {
 	if output == "" {

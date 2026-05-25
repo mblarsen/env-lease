@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"regexp"
 
 	"github.com/charmbracelet/lipgloss/v2"
@@ -15,7 +16,21 @@ var (
 					Foreground(lipgloss.Color("#38bdf8"))
 )
 
+const confirmOptionsText = "[y/n/a/d/?]"
+
 var grantPromptPattern = regexp.MustCompile(`^(Grant) '([^']+)'([?])$`)
+
+func formatConfirmPrompt(prompt string) string {
+	if !colorsEnabled(os.Stdout) {
+		return plainConfirmPrompt(prompt)
+	}
+
+	return styleConfirmPrompt(prompt)
+}
+
+func plainConfirmPrompt(prompt string) string {
+	return prompt + " " + confirmOptionsText + ": "
+}
 
 func styleConfirmPrompt(prompt string) string {
 	return styleConfirmPromptText(prompt) + " " + styleConfirmOptions() + ": "
@@ -36,5 +51,5 @@ func styleConfirmPromptText(prompt string) string {
 }
 
 func styleConfirmOptions() string {
-	return confirmPromptTextStyle.Render("[y/n/a/d/?]")
+	return confirmPromptTextStyle.Render(confirmOptionsText)
 }

@@ -6,6 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestFormatConfirmPromptPreservesPlainTextWhenNoColorIsSet(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+
+	assert.Equal(t, "Grant 'GOOGLE_API_KEY'? [y/n/a/d/?]: ", formatConfirmPrompt("Grant 'GOOGLE_API_KEY'?"))
+}
+
 func TestStyleConfirmPromptPreservesGrantPromptText(t *testing.T) {
 	plain := "Grant 'GOOGLE_API_KEY'? [y/n/a/d/?]: "
 

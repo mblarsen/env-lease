@@ -11,6 +11,14 @@ func stripANSI(s string) string {
 	return ansi.Strip(s)
 }
 
+func TestFormatStatusOutputPreservesPlainTextWhenNoColorIsSet(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	plain := "VARIABLE   SOURCE   DESTINATION       EXPIRES IN\n" +
+		"<file>     source   /Users/mbl/.env   59m33s\n"
+
+	assert.Equal(t, plain, formatStatusOutput(plain))
+}
+
 func TestStyleStatusOutputPreservesTextLayout(t *testing.T) {
 	plain := "VARIABLE           SOURCE                             DESTINATION       EXPIRES IN\n" +
 		"<exploded>         op+file://container_env.json      /Users/mbl/.env   59m33s\n" +

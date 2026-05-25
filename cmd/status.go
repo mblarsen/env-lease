@@ -153,7 +153,7 @@ func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
 		}
 	}
 	w.Flush()
-	fmt.Fprint(os.Stdout, styleStatusOutput(output.String()))
+	fmt.Fprint(os.Stdout, formatStatusOutput(output.String()))
 }
 
 func init() {
