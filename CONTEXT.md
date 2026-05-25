@@ -36,6 +36,10 @@ _Avoid_: provider fetch, backend lookup, source read
 The background process that owns active Lease state and performs scheduled revocation.
 _Avoid_: worker, server, scheduler
 
+**Lease Lifecycle**:
+The state transitions that register, expire, retry, reconcile, and revoke active Leases inside the Daemon.
+_Avoid_: state handling, timer logic, daemon cleanup
+
 **Config**:
 The TOML declaration that describes desired Leases for a project.
 _Avoid_: manifest, spec, settings
@@ -47,12 +51,13 @@ _Avoid_: manifest, spec, settings
 - A **Provider** performs **Secret Lookup** for an approved **Lease**.
 - A **Grant** uses **Secret Lookup** before materializing a **Secret** at its **Destination**.
 - A **Grant** registers a **Lease** with the **Daemon**.
-- The **Daemon** performs **Revoke** when a **Lease** expires or is removed from **Config**.
+- The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
+- The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
 
 ## Example dialogue
 
 > **Dev:** "When I run **Grant**, does every **Secret** go through **Secret Lookup** immediately?"
-> **Domain expert:** "Only approved **Leases** should perform **Secret Lookup**, then the **Daemon** tracks when each **Lease** should **Revoke** its **Destination**."
+> **Domain expert:** "Only approved **Leases** should perform **Secret Lookup**, then the **Daemon** owns the **Lease Lifecycle** that decides when each **Lease** should **Revoke** its **Destination**."
 
 ## Flagged ambiguities
 

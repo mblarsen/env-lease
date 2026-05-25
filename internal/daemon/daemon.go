@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,10 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/mblarsen/env-lease/internal/config"
-	"github.com/mblarsen/env-lease/internal/fileutil"
 	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 // Clock is an interface for time-related functions to allow for mocking.
@@ -36,23 +32,20 @@ func (c *RealClock) Ticker(d time.Duration) *time.Ticker {
 // Daemon is the main daemon struct.
 type Daemon struct {
 	state     *State
-	statePath string
 	clock     Clock
 	ipcServer *ipc.Server
-	revoker   Revoker
-	notifier  Notifier
+	lifecycle *Lifecycle
 	mu        sync.Mutex
 }
 
 // NewDaemon creates a new daemon.
 func NewDaemon(state *State, statePath string, clock Clock, ipcServer *ipc.Server, revoker Revoker, notifier Notifier) *Daemon {
+	lifecycle := NewLifecycle(state, statePath, clock, revoker, notifier)
 	return &Daemon{
-		state:     normalizeState(state),
-		statePath: statePath,
+		state:     lifecycle.state,
 		clock:     clock,
 		ipcServer: ipcServer,
-		revoker:   revoker,
-		notifier:  notifier,
+		lifecycle: lifecycle,
 	}
 }
 
@@ -108,104 +101,27 @@ func (d *Daemon) Run(ctx context.Context) error {
 }
 
 func (d *Daemon) revokeOrphanedLeases() {
-	slog.Debug("Checking for orphaned leases from config changes...")
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.lifecycle.ReconcileConfigLeases()
+}
 
-	// Gather unique config files from the state
-	configFiles := make(map[string]struct{})
-	for _, lease := range d.state.Leases {
-		if lease.ConfigFile != "" {
-			configFiles[lease.ConfigFile] = struct{}{}
-		}
-	}
+func (d *Daemon) cleanupOrphanedLeases() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lifecycle.MarkOrphanedLeases()
+}
 
-	stateChanged := false
-	for configFile := range configFiles {
-		// Load the current configuration from disk
-		resolvedConfigFile, err := config.ResolveConfigFile(configFile)
-		if err != nil {
-			slog.Warn("Could not resolve config file, skipping", "config", configFile, "err", err)
-			continue
-		}
-		cfg, err := config.Load(resolvedConfigFile, "")
-		if err != nil {
-			// If config can't be loaded (e.g., deleted), revoke all leases associated with it.
-			slog.Warn("Config file not found or failed to load; revoking associated leases", "config", configFile, "err", err)
-			for key, lease := range d.state.LeasesForConfigFile(configFile) {
-				if lease.LeaseType == "shell" {
-					slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
-					delete(d.state.Leases, key)
-					stateChanged = true
-					continue
-				}
-				if err := d.revoker.Revoke(lease); err != nil {
-					slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
-				} else {
-					slog.Info("Revoked orphaned lease", "key", key)
-					delete(d.state.Leases, key)
-					stateChanged = true
-				}
-			}
-			continue
-		}
+func (d *Daemon) revokeExpiredLeases() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lifecycle.RevokeExpired()
+}
 
-		// Create a map of leases defined in the config for efficient lookup.
-		// Lease identity must include source + destination + variable to avoid
-		// collisions when multiple leases share a source.
-		leaseSet, normalizeErrs := lease.NormalizePartial(cfg, configFile)
-		for _, err := range normalizeErrs {
-			slog.Warn("Skipping invalid config lease during orphan check", "config", configFile, "err", err)
-		}
-		configLeases := make(map[string]struct{}, len(leaseSet.Leases))
-		explodeParents := make(map[string]struct{})
-		for _, l := range leaseSet.Leases {
-			configLeases[l.Identity()] = struct{}{}
-			if l.IsExplode() {
-				// Explode leases create a parent entry with an empty variable and
-				// child entries that reference ParentSource at runtime.
-				parent := l
-				parent.Variable = ""
-				configLeases[parent.Identity()] = struct{}{}
-				explodeParents[parent.ParentIdentity()] = struct{}{}
-			}
-		}
-
-		// Check active leases against the config
-		for key, activeLease := range d.state.LeasesForConfigFile(configFile) {
-			activeIdentity := activeLease.Identity()
-			if _, exists := configLeases[activeIdentity]; exists {
-				continue
-			}
-			if activeLease.ParentSource != "" {
-				if _, exists := explodeParents[activeLease.ParentSource]; exists {
-					continue
-				}
-			}
-
-			slog.Info("Lease removed from config, revoking", "key", key)
-			if activeLease.LeaseType == "shell" {
-				slog.Debug("Ignoring shell lease type in orphaned lease check", "key", key)
-				delete(d.state.Leases, key)
-				stateChanged = true
-				continue
-			}
-			if err := d.revoker.Revoke(activeLease); err != nil {
-				slog.Error("Failed to revoke orphaned lease", "key", key, "err", err)
-				// Optionally, add to a retry queue here as well
-			} else {
-				delete(d.state.Leases, key)
-				stateChanged = true
-			}
-		}
-	}
-
-	if stateChanged {
-		if err := d.state.SaveState(d.statePath); err != nil {
-			slog.Error("Failed to save state after revoking orphaned leases", "err", err)
-		}
-	}
-	slog.Debug("Finished checking for orphaned leases.")
+func (d *Daemon) processRetryQueue() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.lifecycle.ProcessRetryQueue()
 }
 
 func (d *Daemon) Shutdown() error {
@@ -219,215 +135,8 @@ func (d *Daemon) Shutdown() error {
 	}
 
 	d.mu.Lock()
-
-	if d.statePath != "" {
-		if reloaded, err := LoadState(d.statePath); err != nil {
-			slog.Warn("Failed to reload state from disk during shutdown; continuing with in-memory state", "err", err)
-		} else {
-			d.state = reloaded
-		}
-	}
-	if d.state == nil {
-		d.state = NewState()
-	}
-
-	leasesToRevoke := make([]*lease.Lease, 0, len(d.state.Leases))
-	for key, lease := range d.state.Leases {
-		if lease == nil {
-			delete(d.state.Leases, key)
-			continue
-		}
-		leasesToRevoke = append(leasesToRevoke, lease)
-		delete(d.state.Leases, key)
-	}
-
-	retryItems := d.state.RetryQueue
-	d.state.RetryQueue = nil
-
+	err := d.lifecycle.Shutdown()
+	d.state = d.lifecycle.state
 	d.mu.Unlock()
-
-	for _, lease := range leasesToRevoke {
-		if lease.LeaseType == "shell" {
-			slog.Debug("Skipping shell lease during shutdown", "source", lease.Source)
-			continue
-		}
-		if err := d.revoker.Revoke(lease); err != nil {
-			slog.Error("Failed to revoke lease during shutdown", "source", lease.Source, "destination", lease.Destination, "err", err)
-		} else {
-			slog.Info("Revoked lease during shutdown", "source", lease.Source, "destination", lease.Destination)
-		}
-	}
-
-	for _, retry := range retryItems {
-		if retry.Lease == nil {
-			continue
-		}
-		if retry.Lease.LeaseType == "shell" {
-			slog.Debug("Skipping shell lease from retry queue during shutdown", "source", retry.Lease.Source)
-			continue
-		}
-		if err := d.revoker.Revoke(retry.Lease); err != nil {
-			slog.Error("Failed to revoke lease from retry queue during shutdown", "source", retry.Lease.Source, "destination", retry.Lease.Destination, "err", err)
-		} else {
-			slog.Info("Revoked lease from retry queue during shutdown", "source", retry.Lease.Source, "destination", retry.Lease.Destination)
-		}
-	}
-
-	d.mu.Lock()
-	d.state.Leases = make(map[string]*lease.Lease)
-	d.state.RetryQueue = nil
-	err := d.state.SaveState(d.statePath)
-	d.mu.Unlock()
-
-	if err != nil {
-		slog.Error("Failed to save cleared state during shutdown", "err", err)
-	} else {
-		if d.statePath != "" {
-			if removeErr := os.Remove(d.statePath); removeErr != nil && !os.IsNotExist(removeErr) {
-				slog.Warn("Failed to remove state file after saving empty state", "err", removeErr)
-			} else {
-				slog.Info("State cleared and state file removed; shutdown complete.")
-			}
-		} else {
-			slog.Info("State cleared; shutdown complete.")
-		}
-	}
-	return nil
-}
-
-func (d *Daemon) cleanupOrphanedLeases() {
-	slog.Debug("Starting orphaned lease cleanup...")
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	now := d.clock.Now()
-	stateChanged := false
-
-	for id, lease := range d.state.Leases {
-		// If a lease doesn't have a config file path, we can't check it.
-		if lease.ConfigFile == "" {
-			continue
-		}
-
-		// Check if the original config file still exists.
-		if _, err := os.Stat(lease.ConfigFile); os.IsNotExist(err) {
-			// The file is gone, so the lease is an orphan.
-			if lease.OrphanedSince == nil {
-				slog.Info("Marking lease as orphaned", "id", id, "config_file", lease.ConfigFile)
-				lease.OrphanedSince = &now
-				d.state.Leases[id] = lease
-				stateChanged = true
-			}
-		} else {
-			// The file exists, so if it was marked as orphaned, un-mark it.
-			if lease.OrphanedSince != nil {
-				slog.Info("Un-marking lease as orphaned", "id", id)
-				lease.OrphanedSince = nil
-				d.state.Leases[id] = lease
-				stateChanged = true
-			}
-		}
-
-		// Now, check if the lease has been orphaned for too long.
-		if lease.OrphanedSince != nil && now.Sub(*lease.OrphanedSince) > 30*24*time.Hour {
-			slog.Info("Purging lease orphaned for more than 30 days", "id", id)
-			// We can reuse the revokeOrphanedLeases logic, which already handles revocation.
-			// Here we just delete it from the state.
-			if err := d.revoker.Revoke(lease); err != nil {
-				slog.Error("Failed to revoke purged lease", "id", id, "err", err)
-			}
-			delete(d.state.Leases, id)
-			stateChanged = true
-		}
-	}
-
-	if stateChanged {
-		if err := d.state.SaveState(d.statePath); err != nil {
-			slog.Error("Failed to save state after cleaning up orphaned leases", "err", err)
-		}
-	}
-	slog.Debug("Finished cleaning up orphaned leases.")
-}
-
-func (d *Daemon) revokeExpiredLeases() {
-	slog.Debug("Checking for expired leases...")
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	now := d.clock.Now()
-	for id, lease := range d.state.Leases {
-		if now.After(lease.ExpiresAt) {
-			var err error
-			if lease.LeaseType != "shell" {
-				err = d.revoker.Revoke(lease)
-			}
-
-			if err != nil {
-				slog.Error("Failed to revoke lease, adding to retry queue", "id", id, "err", err)
-				d.state.RetryQueue = append(d.state.RetryQueue, RetryItem{
-					Lease:          lease,
-					Attempts:       1,
-					NextRetryTime:  now.Add(2 * time.Second),
-					InitialFailure: now,
-				})
-			} else {
-				slog.Info("Lease expired and was revoked", "id", id)
-				if d.notifier != nil {
-					title := "Lease Expired"
-					message := fmt.Sprintf("Lease for %s has expired and was revoked.", lease.Source)
-					if err := d.notifier.Notify(title, message); err != nil {
-						slog.Error("Failed to send notification", "err", err)
-					}
-				}
-			}
-			delete(d.state.Leases, id)
-			if err := d.state.SaveState(d.statePath); err != nil {
-				slog.Error("Failed to save state after lease expiration", "err", err)
-			}
-		}
-	}
-	slog.Debug("Finished checking for expired leases.")
-}
-
-func (d *Daemon) processRetryQueue() {
-	slog.Debug("Processing retry queue...")
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	now := d.clock.Now()
-	stateChanged := false
-	for i := len(d.state.RetryQueue) - 1; i >= 0; i-- {
-		item := d.state.RetryQueue[i]
-		if now.After(item.NextRetryTime) {
-			var err error
-			if item.Lease.LeaseType != "shell" {
-				err = d.revoker.Revoke(item.Lease)
-			}
-
-			if err != nil {
-				item.Attempts++
-				item.NextRetryTime = now.Add(time.Duration(item.Attempts*2) * time.Second) // Exponential backoff
-				d.state.RetryQueue[i] = item
-				stateChanged = true
-
-				// Create failure file if necessary
-				if now.Sub(item.InitialFailure) > 5*time.Minute {
-					failureFile := item.Lease.Destination + ".env-lease-REVOCATION-FAILURE"
-					content := fmt.Sprintf("Failed to revoke lease for %s at %s", item.Lease.Source, now.Format(time.RFC3339))
-					fileutil.AtomicWriteFile(failureFile, []byte(content), 0644)
-				}
-			} else {
-				// Success, remove from queue
-				d.state.RetryQueue = append(d.state.RetryQueue[:i], d.state.RetryQueue[i+1:]...)
-				stateChanged = true
-			}
-		}
-	}
-
-	if stateChanged {
-		if err := d.state.SaveState(d.statePath); err != nil {
-			slog.Error("Failed to save state after processing retry queue", "err", err)
-		}
-	}
-	slog.Debug("Finished processing retry queue.")
+	return err
 }
