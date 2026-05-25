@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/mblarsen/env-lease/internal/ipc"
-	"github.com/mblarsen/env-lease/internal/lease"
 )
 
 func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
@@ -32,6 +30,8 @@ func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
 		defer d.mu.Unlock()
 		return d.handleStatus(payload)
 	case "cleanup":
+		d.mu.Lock()
+		defer d.mu.Unlock()
 		return d.handleCleanup(payload)
 	default:
 		return nil, fmt.Errorf("unknown command: %s", req.Command)
@@ -41,9 +41,8 @@ func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
 func (d *Daemon) handleCleanup(payload []byte) ([]byte, error) {
 	slog.Debug("Received cleanup request")
 
-	// Run the cleanup logic immediately
-	d.cleanupOrphanedLeases()
-	d.revokeOrphanedLeases()
+	d.lifecycle.MarkOrphanedLeases()
+	d.lifecycle.ReconcileConfigLeases()
 
 	resp := ipc.CleanupResponse{Messages: []string{"Orphaned lease cleanup process completed."}}
 	slog.Info("Orphaned lease cleanup process completed.")
@@ -57,57 +56,12 @@ func (d *Daemon) handleGrant(payload []byte) ([]byte, error) {
 	}
 	slog.Debug("Received grant request", "leases", len(req.Leases))
 
-	if !req.Append {
-		// Revoke any leases that are in the state but not in the request.
-		activeLeases := d.state.LeasesForConfigFile(req.ConfigFile)
-		for key, activeLease := range activeLeases {
-			found := false
-			for _, reqLease := range req.Leases {
-				if activeLease.Source == reqLease.Source && activeLease.Destination == reqLease.Destination && activeLease.Variable == reqLease.Variable {
-					found = true
-					break
-				}
-			}
-			if !found {
-				slog.Info("Revoking lease removed from config", "key", key)
-				if err := d.revoker.Revoke(activeLease); err != nil {
-					slog.Error("Failed to revoke lease removed from config", "key", key, "err", err)
-					// Continue trying to revoke other leases
-				}
-				delete(d.state.Leases, key)
-			}
-		}
-	} else {
-		slog.Debug("Grant request in append mode; skipping reconciliation revokes", "config_file", req.ConfigFile)
-	}
-
-	for _, l := range req.Leases {
-		duration, err := time.ParseDuration(l.Duration)
-		if err != nil {
-			return nil, fmt.Errorf("invalid duration '%s': %w", l.Duration, err)
-		}
-
-		runtimeLease := lease.FromIPC(l)
-		runtimeLease.ExpiresAt = d.clock.Now().Add(duration)
-		runtimeLease.OrphanedSince = nil
-		runtimeLease.ConfigFile = req.ConfigFile
-		key := runtimeLease.Identity()
-		d.state.Leases[key] = &runtimeLease
-		slog.Debug("Adding lease to state", "source", runtimeLease.Source, "expires_at", runtimeLease.ExpiresAt)
-	}
-
-	if err := d.state.SaveState(d.statePath); err != nil {
-		slog.Error("Failed to save state after grant", "err", err)
-		// Do not return error to client, as the grant itself succeeded
+	actualLeaseCount, err := d.lifecycle.Grant(req)
+	if err != nil {
+		return nil, err
 	}
 
 	resp := ipc.GrantResponse{Messages: []string{}}
-	actualLeaseCount := 0
-	for _, l := range req.Leases {
-		if l.LeaseType == "file" || l.Variable != "" {
-			actualLeaseCount++
-		}
-	}
 	slog.Info("Granted leases", "count", actualLeaseCount)
 	return json.Marshal(resp)
 }
@@ -119,70 +73,15 @@ func (d *Daemon) handleRevoke(payload []byte) ([]byte, error) {
 	}
 	slog.Debug("Received revoke request", "config_file", req.ConfigFile, "all", req.All)
 
-	var count int
-	var shellCommands []string
-
-	if len(req.Leases) > 0 {
-		for _, l := range req.Leases {
-			id := lease.FromIPC(l).Identity()
-			if lease, ok := d.state.Leases[id]; ok {
-				slog.Debug("Revoking lease", "source", lease.Source)
-				if lease.LeaseType == "shell" {
-					if lease.Variable != "" {
-						shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
-					}
-					slog.Debug("Ignoring revoker for shell lease type", "id", id)
-				} else {
-					if err := d.revoker.Revoke(lease); err != nil {
-						slog.Error("Failed to revoke lease", "id", id, "err", err)
-						// Continue trying to revoke other leases
-					}
-				}
-				delete(d.state.Leases, id)
-				if lease.LeaseType == "file" || lease.Variable != "" {
-					count++
-				}
-			}
-		}
-	} else {
-		for id, lease := range d.state.Leases {
-			if req.All || lease.ConfigFile == req.ConfigFile {
-				slog.Debug("Revoking lease", "source", lease.Source)
-				if lease.LeaseType == "shell" {
-					if lease.Variable != "" {
-						shellCommands = append(shellCommands, fmt.Sprintf("unset %s", lease.Variable))
-					}
-					slog.Debug("Ignoring revoker for shell lease type", "id", id)
-				} else {
-					if err := d.revoker.Revoke(lease); err != nil {
-						slog.Error("Failed to revoke lease", "id", id, "err", err)
-						// Continue trying to revoke other leases
-					}
-				}
-				delete(d.state.Leases, id)
-				if lease.LeaseType == "file" || lease.Variable != "" {
-					count++
-				}
-			}
-		}
+	result, err := d.lifecycle.Revoke(req)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := d.state.SaveState(d.statePath); err != nil {
-		slog.Error("Failed to save state after revoke", "err", err)
-	}
-
-	if req.All && count > 0 {
-		title := "Leases Revoked"
-		message := fmt.Sprintf("Revoked %d leases due to system idle.", count)
-		if err := d.notifier.Notify(title, message); err != nil {
-			slog.Error("Failed to send notification", "err", err)
-		}
-	}
-
-	slog.Info("Revoked leases", "count", count, "all", req.All, "project", req.ConfigFile)
+	slog.Info("Revoked leases", "count", result.Count, "all", req.All, "project", req.ConfigFile)
 	resp := ipc.RevokeResponse{
-		Messages:      []string{fmt.Sprintf("Revoked %d leases.", count)},
-		ShellCommands: shellCommands,
+		Messages:      []string{fmt.Sprintf("Revoked %d leases.", result.Count)},
+		ShellCommands: result.ShellCommands,
 	}
 	return json.Marshal(resp)
 }
@@ -193,20 +92,6 @@ func (d *Daemon) handleStatus(payload []byte) ([]byte, error) {
 		return nil, fmt.Errorf("failed to unmarshal status request: %w", err)
 	}
 
-	var leases []ipc.Lease
-	for _, l := range d.state.Leases {
-		if req.ConfigFile == "" || l.ConfigFile == req.ConfigFile {
-			leases = append(leases, ipc.Lease{
-				Source:       l.Source,
-				Destination:  l.Destination,
-				LeaseType:    l.LeaseType,
-				Variable:     l.Variable,
-				ExpiresAt:    l.ExpiresAt,
-				ConfigFile:   l.ConfigFile,
-				ParentSource: l.ParentSource,
-			})
-		}
-	}
-	resp := ipc.StatusResponse{Leases: leases}
+	resp := ipc.StatusResponse{Leases: d.lifecycle.Status(req.ConfigFile)}
 	return json.Marshal(resp)
 }
