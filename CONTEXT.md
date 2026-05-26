@@ -29,11 +29,11 @@ The reversible act of applying or removing a Secret at a Destination during Gran
 _Avoid_: file write, shell output, destination handling
 
 **Provider**:
-The external secret store or CLI that resolves a Secret source into Secret material.
+The external secret store or CLI that resolves a Secret source into Secret material through a lower-level Adapter.
 _Avoid_: backend, vault, service
 
 **Secret Lookup**:
-The act of resolving an approved Lease's Secret source through a Provider before Grant materializes it.
+The act of resolving an approved Lease's Secret source through a selected Provider/account Adapter before Grant materializes it.
 _Avoid_: provider fetch, backend lookup, source read
 
 **Secret Transformation**:
@@ -61,7 +61,7 @@ _Avoid_: manifest, spec, settings
 - A **Config** declares zero or more **Leases**.
 - A **Lease** identifies exactly one **Secret** source and one **Destination**.
 - **Destination Mutation** applies or removes a **Secret** at a **Destination**.
-- A **Provider** performs **Secret Lookup** for an approved **Lease**.
+- A **Provider** Adapter performs **Secret Lookup** for an approved **Lease**.
 - A **Grant** runs a **Grant Workflow**.
 - The **Grant Workflow** uses **Secret Lookup** before **Secret Transformation**.
 - **Secret Transformation** produces one **Secret** or an exploded set of Secrets for the **Grant Workflow** to materialize at their **Destination**.
