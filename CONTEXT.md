@@ -52,6 +52,10 @@ _Avoid_: worker, server, scheduler
 The state transitions that register, expire, retry, reconcile, and revoke active Leases inside the Daemon.
 _Avoid_: state handling, timer logic, daemon cleanup
 
+**IPC Contract**:
+The signed, typed command and response seam between CLI adapters and the Daemon.
+_Avoid_: socket handling, client calls, JSON plumbing
+
 **Config**:
 The TOML declaration that describes desired Leases for a project.
 _Avoid_: manifest, spec, settings
@@ -66,6 +70,7 @@ _Avoid_: manifest, spec, settings
 - The **Grant Workflow** uses **Secret Lookup** before **Secret Transformation**.
 - **Secret Transformation** produces one **Secret** or an exploded set of Secrets for the **Grant Workflow** to materialize at their **Destination**.
 - The **Grant Workflow** produces the request that registers **Leases** with the **Daemon**.
+- The **Grant Workflow** and CLI adapters cross the **IPC Contract** to ask the **Daemon** to register, report, clean up, or revoke **Leases**.
 - The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
 - The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
 

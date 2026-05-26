@@ -5,14 +5,34 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
 
-// Request represents a request sent from the CLI to the daemon.
+// Command identifies the daemon operation carried by an IPC request payload.
+type Command string
+
+const (
+	// CommandGrant registers granted Leases with the Daemon.
+	CommandGrant Command = "grant"
+	// CommandStatus asks the Daemon for active Lease state.
+	CommandStatus Command = "status"
+	// CommandCleanup asks the Daemon to reconcile orphaned Leases.
+	CommandCleanup Command = "cleanup"
+	// CommandRevoke asks the Daemon to revoke active Leases.
+	CommandRevoke Command = "revoke"
+)
+
+// Request represents a signed request sent from the CLI to the daemon.
 type Request struct {
 	Signature string
 	Payload   []byte
+}
+
+// CommandCarrier is implemented by typed daemon request payloads.
+type CommandCarrier interface {
+	IPCCommand() Command
 }
 
 // GrantRequest is the payload for a grant request.
@@ -23,6 +43,9 @@ type GrantRequest struct {
 	Append     bool
 	ConfigFile string
 }
+
+// IPCCommand returns the daemon command represented by GrantRequest.
+func (GrantRequest) IPCCommand() Command { return CommandGrant }
 
 // GrantResponse is the payload for a grant response.
 type GrantResponse struct {
@@ -35,15 +58,23 @@ type StatusRequest struct {
 	ConfigFile string
 }
 
+// IPCCommand returns the daemon command represented by StatusRequest.
+func (StatusRequest) IPCCommand() Command { return CommandStatus }
+
 // StatusResponse is the payload for a status response.
 type StatusResponse struct {
 	Leases []Lease
 }
 
+// CleanupRequest is the payload for a cleanup request.
 type CleanupRequest struct {
 	Command string
 }
 
+// IPCCommand returns the daemon command represented by CleanupRequest.
+func (CleanupRequest) IPCCommand() Command { return CommandCleanup }
+
+// CleanupResponse is the payload for a cleanup response.
 type CleanupResponse struct {
 	Messages []string
 }
@@ -55,6 +86,9 @@ type RevokeRequest struct {
 	All        bool
 	Leases     []Lease
 }
+
+// IPCCommand returns the daemon command represented by RevokeRequest.
+func (RevokeRequest) IPCCommand() Command { return CommandRevoke }
 
 // RevokeResponse is the payload for a revoke response.
 type RevokeResponse struct {
@@ -89,7 +123,7 @@ func Sign(payload []byte, secret []byte) string {
 func Verify(payload []byte, signature string, secret []byte) error {
 	expectedSignature := Sign(payload, secret)
 	if !hmac.Equal([]byte(signature), []byte(expectedSignature)) {
-		return fmt.Errorf("invalid signature")
+		return ErrInvalidSignature
 	}
 	return nil
 }
@@ -99,6 +133,15 @@ type Response struct {
 	Error   string          `json:"error,omitempty"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
+
+var (
+	// ErrInvalidSignature means the request signature did not match the payload.
+	ErrInvalidSignature = errors.New("invalid signature")
+	// ErrNoResponse means the daemon closed the connection before sending a response.
+	ErrNoResponse = errors.New("daemon closed connection without a response")
+	// ErrEmptyPayload means the daemon returned success without a payload for a typed response.
+	ErrEmptyPayload = errors.New("daemon returned no response payload")
+)
 
 // ConnectionError is a custom error for IPC connection errors.
 type ConnectionError struct {
@@ -114,9 +157,27 @@ func (e *ConnectionError) Unwrap() error {
 	return e.Err
 }
 
+// ServerError wraps an error response returned by the daemon.
+type ServerError struct {
+	Message string
+}
+
+func (e *ServerError) Error() string {
+	return fmt.Sprintf("server error: %s", e.Message)
+}
+
+// UserMessage maps low-level IPC failures to stable CLI-facing text.
+func UserMessage(err error) string {
+	var connErr *ConnectionError
+	if errors.As(err, &connErr) {
+		return "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'."
+	}
+	return "Error: could not connect to the env-lease daemon. Is it running?"
+}
+
 // NewRequest creates a new signed request.
 func NewRequest(payload any, secret []byte) (*Request, error) {
-	payloadBytes, err := json.Marshal(payload)
+	payloadBytes, err := json.Marshal(normalizeCommand(payload))
 	if err != nil {
 		return nil, err
 	}
@@ -126,4 +187,65 @@ func NewRequest(payload any, secret []byte) (*Request, error) {
 		Signature: signature,
 		Payload:   payloadBytes,
 	}, nil
+}
+
+func normalizeCommand(payload any) any {
+	switch req := payload.(type) {
+	case GrantRequest:
+		if req.Command == "" {
+			req.Command = string(req.IPCCommand())
+		}
+		return req
+	case *GrantRequest:
+		if req != nil && req.Command == "" {
+			copy := *req
+			copy.Command = string(req.IPCCommand())
+			return copy
+		}
+	case StatusRequest:
+		if req.Command == "" {
+			req.Command = string(req.IPCCommand())
+		}
+		return req
+	case *StatusRequest:
+		if req != nil && req.Command == "" {
+			copy := *req
+			copy.Command = string(req.IPCCommand())
+			return copy
+		}
+	case CleanupRequest:
+		if req.Command == "" {
+			req.Command = string(req.IPCCommand())
+		}
+		return req
+	case *CleanupRequest:
+		if req != nil && req.Command == "" {
+			copy := *req
+			copy.Command = string(req.IPCCommand())
+			return copy
+		}
+	case RevokeRequest:
+		if req.Command == "" {
+			req.Command = string(req.IPCCommand())
+		}
+		return req
+	case *RevokeRequest:
+		if req != nil && req.Command == "" {
+			copy := *req
+			copy.Command = string(req.IPCCommand())
+			return copy
+		}
+	}
+	return payload
+}
+
+// DecodeCommand extracts the command from a signed request payload.
+func DecodeCommand(payload []byte) (Command, error) {
+	var req struct {
+		Command string
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return "", fmt.Errorf("failed to unmarshal command: %w", err)
+	}
+	return Command(req.Command), nil
 }
