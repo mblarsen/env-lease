@@ -310,7 +310,7 @@ duration = "1m"
 	if !ok || exitErr.ExitCode() == 0 {
 		t.Fatalf("expected non-zero exit code, got %v", err)
 	}
-	if !strings.Contains(string(output), "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.") {
+	if !strings.Contains(string(output), "Error: env-lease daemon is not running. Please start it with 'env-lease daemon install'.") {
 		t.Fatalf("expected daemon offline message, got %q", string(output))
 	}
 }

@@ -170,7 +170,7 @@ func (e *ServerError) Error() string {
 func UserMessage(err error) string {
 	var connErr *ConnectionError
 	if errors.As(err, &connErr) {
-		return "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'."
+		return "Error: env-lease daemon is not running. Please start it with 'env-lease daemon install'."
 	}
 	return "Error: could not connect to the env-lease daemon. Is it running?"
 }

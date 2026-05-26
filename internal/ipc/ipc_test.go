@@ -135,7 +135,7 @@ func TestConnectionErrorUserMessage(t *testing.T) {
 		t.Fatalf("error = %v, want ConnectionError", err)
 	}
 
-	want := "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'."
+	want := "Error: env-lease daemon is not running. Please start it with 'env-lease daemon install'."
 	if got := UserMessage(err); got != want {
 		t.Fatalf("UserMessage = %q, want %q", got, want)
 	}

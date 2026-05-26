@@ -40,7 +40,7 @@ func TestTerminalMessagesPreserveUserFacingText(t *testing.T) {
 	for _, want := range []string{
 		"# When using shell lease types run this command like `eval $(env-lease grant)`",
 		"Revoke request sent.",
-		"Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.",
+		"Error: env-lease daemon is not running. Please start it with 'env-lease daemon install'.",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("expected %q in %q", want, text)

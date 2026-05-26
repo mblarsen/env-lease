@@ -122,7 +122,7 @@ func (t Terminal) Print(out io.Writer, message Message, args ...any) {
 	case MessageRevokeSent:
 		t.PrintLine(out, "Revoke request sent.")
 	case MessageDaemonOffline:
-		t.PrintLine(out, "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.")
+		t.PrintLine(out, "Error: env-lease daemon is not running. Please start it with 'env-lease daemon install'.")
 	case MessageDaemonConnectionFailed:
 		t.PrintLine(out, "Error: could not connect to the env-lease daemon. Is it running?")
 	case MessageDirenvModified:
