@@ -52,10 +52,14 @@ type ProviderFactory func(providerName, account string) (provider.SecretProvider
 // BatchPolicy reports whether providerName can batch sourceURI through FetchLeases.
 type BatchPolicy func(providerName, sourceURI string) bool
 
+// ProviderNormalizer returns the canonical name used for Provider grouping and selection.
+type ProviderNormalizer func(providerName string) string
+
 // Lookup resolves Secret material for normalized Leases.
 type Lookup struct {
-	providerFactory ProviderFactory
-	canBatch        BatchPolicy
+	providerFactory   ProviderFactory
+	canBatch          BatchPolicy
+	normalizeProvider ProviderNormalizer
 }
 
 // New creates a Secret lookup Module with the default Provider adapter factory.
@@ -77,7 +81,7 @@ func NewWithProviderFactoryAndBatchPolicy(factory ProviderFactory, canBatch Batc
 	if canBatch == nil {
 		canBatch = defaultBatchPolicy
 	}
-	return &Lookup{providerFactory: factory, canBatch: canBatch}
+	return &Lookup{providerFactory: factory, canBatch: canBatch, normalizeProvider: defaultProviderNormalizer}
 }
 
 // Fetch resolves Secret material for leases using the default lookup Module.
@@ -90,7 +94,7 @@ func Fetch(leases []lease.Lease, opts Options) (Secrets, []Error, error) {
 // deduplicated by Provider, account, and source URI, then fetched once and
 // shared by matching Leases.
 func (lookup *Lookup) Fetch(leases []lease.Lease, opts Options) (Secrets, []Error, error) {
-	plan := buildPlan(leases, lookup.canBatch)
+	plan := buildPlan(leases, lookup.canBatch, lookup.normalizeProvider)
 
 	slog.Debug("secret lookup: start",
 		"mode", opts.Mode,
@@ -217,6 +221,14 @@ func defaultBatchPolicy(providerName, sourceURI string) bool {
 	return provider.DefaultRegistry().CanBatch(providerName, sourceURI)
 }
 
+func defaultProviderNormalizer(providerName string) string {
+	canonical, err := provider.DefaultRegistry().CanonicalName(providerName)
+	if err != nil {
+		return provider.NormalizeName(providerName)
+	}
+	return canonical
+}
+
 type plan struct {
 	batches    []batch
 	singletons []sourceGroup
@@ -248,20 +260,21 @@ type sourceKey struct {
 
 type key sourceKey
 
-func buildPlan(leases []lease.Lease, canBatch BatchPolicy) plan {
+func buildPlan(leases []lease.Lease, canBatch BatchPolicy, normalizeProvider ProviderNormalizer) plan {
 	batchesByAccount := make(map[providerAccount]int)
 	singletonsBySource := make(map[sourceKey]int)
 	plan := plan{}
 
 	for _, l := range leases {
-		if canBatch(l.Provider, l.Source) {
-			accountKey := providerAccount{providerName: l.Provider, account: l.OpAccount}
+		providerName := normalizeProvider(l.Provider)
+		if canBatch(providerName, l.Source) {
+			accountKey := providerAccount{providerName: providerName, account: l.OpAccount}
 			idx, ok := batchesByAccount[accountKey]
 			if !ok {
 				idx = len(plan.batches)
 				batchesByAccount[accountKey] = idx
 				plan.batches = append(plan.batches, batch{
-					providerName: l.Provider,
+					providerName: providerName,
 					account:      l.OpAccount,
 				})
 			}
@@ -269,13 +282,13 @@ func buildPlan(leases []lease.Lease, canBatch BatchPolicy) plan {
 			continue
 		}
 
-		singletonKey := sourceKey{providerName: l.Provider, account: l.OpAccount, source: l.Source}
+		singletonKey := sourceKey{providerName: providerName, account: l.OpAccount, source: l.Source}
 		idx, ok := singletonsBySource[singletonKey]
 		if !ok {
 			idx = len(plan.singletons)
 			singletonsBySource[singletonKey] = idx
 			plan.singletons = append(plan.singletons, sourceGroup{
-				providerName: l.Provider,
+				providerName: providerName,
 				account:      l.OpAccount,
 				source:       l.Source,
 			})

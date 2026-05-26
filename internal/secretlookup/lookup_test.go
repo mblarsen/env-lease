@@ -145,6 +145,37 @@ func TestLookupFetch_GroupsByProviderAccountAndDedupeSource(t *testing.T) {
 	}
 }
 
+func TestLookupFetch_CanonicalizesProviderAliasesBeforeGrouping(t *testing.T) {
+	factory := newRecordingFactory()
+	lookup := NewWithProviderFactory(factory.factory)
+
+	opAlias := lease.Lease{Provider: "op", Source: "op://vault/shared", OpAccount: "account-a", Variable: "OP_ALIAS"}
+	nameAlias := lease.Lease{Provider: "onepassword", Source: "op://vault/shared", OpAccount: "account-a", Variable: "NAME_ALIAS"}
+	caseAlias := lease.Lease{Provider: "1PASSWORD", Source: "op://vault/other", OpAccount: "account-a", Variable: "CASE_ALIAS"}
+
+	_, errs, err := lookup.Fetch([]lease.Lease{opAlias, nameAlias, caseAlias}, Options{})
+	if err != nil {
+		t.Fatalf("unexpected fetch error: %v", err)
+	}
+	if len(errs) != 0 {
+		t.Fatalf("unexpected per-lease errors: %v", errs)
+	}
+
+	canonicalProvider := factory.provider("1password", "account-a")
+	if canonicalProvider == nil {
+		t.Fatal("missing canonical 1password provider")
+	}
+	if got := len(canonicalProvider.fetchLeasesCalls); got != 1 {
+		t.Fatalf("bulk calls = %d, want 1", got)
+	}
+	if got := len(canonicalProvider.fetchLeasesCalls[0]); got != 3 {
+		t.Fatalf("bulk lease count = %d, want 3", got)
+	}
+	if factory.provider("op", "account-a") != nil || factory.provider("onepassword", "account-a") != nil || factory.provider("1PASSWORD", "account-a") != nil {
+		t.Fatal("expected aliases to share only the canonical provider adapter")
+	}
+}
+
 func TestLookupFetch_UsesProviderBatchPolicyForNonOnePasswordSchemes(t *testing.T) {
 	factory := newRecordingFactory()
 	lookup := NewWithProviderFactoryAndBatchPolicy(factory.factory, func(providerName, sourceURI string) bool {
