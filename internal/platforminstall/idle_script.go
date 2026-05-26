@@ -1,4 +1,7 @@
-package cmd
+package platforminstall
+
+const idleScriptName = "env-lease-idle-revoke.sh"
+const scriptDir = ".local/bin"
 
 const idleRevokeScript = `#!/bin/sh
 # This script checks for user idle time and revokes all env-lease leases if the idle time exceeds a given threshold.

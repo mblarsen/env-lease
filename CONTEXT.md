@@ -52,6 +52,10 @@ _Avoid_: worker, server, scheduler
 The state transitions that register, expire, retry, reconcile, and revoke active Leases inside the Daemon.
 _Avoid_: state handling, timer logic, daemon cleanup
 
+**Platform Installation**:
+The rendering and application of OS-specific Daemon and idle-revocation service artifacts, such as launchd plists, systemd units, timers, and helper scripts.
+_Avoid_: command setup, platform glue, service file snippets
+
 **Config**:
 The TOML declaration that describes desired Leases for a project.
 _Avoid_: manifest, spec, settings
@@ -68,6 +72,7 @@ _Avoid_: manifest, spec, settings
 - The **Grant Workflow** produces the request that registers **Leases** with the **Daemon**.
 - The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
 - The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
+- **Platform Installation** prepares and applies OS-specific artifacts that keep the **Daemon** and idle-based **Revoke** checks available outside the CLI process.
 
 ## Example dialogue
 
