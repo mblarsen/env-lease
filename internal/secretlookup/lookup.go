@@ -4,6 +4,7 @@ package secretlookup
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/mblarsen/env-lease/internal/lease"
@@ -64,12 +65,15 @@ type Lookup struct {
 
 // New creates a Secret lookup Module with the default Provider adapter factory.
 func New() *Lookup {
-	return NewWithProviderFactory(defaultProviderFactory)
+	return NewWithProviderFactoryAndBatchPolicy(defaultProviderFactory, defaultBatchPolicy)
 }
 
-// NewWithProviderFactory creates a Secret lookup Module with a custom Provider adapter factory.
+// NewWithProviderFactory creates a Secret lookup Module with a custom Provider
+// adapter factory. It preserves the legacy custom-factory batching behaviour:
+// op:// sources are sent through FetchLeases unless the caller opts into an
+// explicit policy with NewWithProviderFactoryAndBatchPolicy.
 func NewWithProviderFactory(factory ProviderFactory) *Lookup {
-	return NewWithProviderFactoryAndBatchPolicy(factory, nil)
+	return NewWithProviderFactoryAndBatchPolicy(factory, legacyBatchPolicy)
 }
 
 // NewWithProviderFactoryAndBatchPolicy creates a Secret lookup Module with a
@@ -219,6 +223,10 @@ func defaultProviderFactory(providerName, account string) (provider.SecretProvid
 
 func defaultBatchPolicy(providerName, sourceURI string) bool {
 	return provider.DefaultRegistry().CanBatch(providerName, sourceURI)
+}
+
+func legacyBatchPolicy(_ string, sourceURI string) bool {
+	return strings.HasPrefix(strings.TrimSpace(sourceURI), "op://")
 }
 
 func defaultProviderNormalizer(providerName string) string {

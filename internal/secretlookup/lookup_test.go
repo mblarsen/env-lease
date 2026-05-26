@@ -176,6 +176,37 @@ func TestLookupFetch_CanonicalizesProviderAliasesBeforeGrouping(t *testing.T) {
 	}
 }
 
+func TestLookupFetch_CustomProviderFactoryKeepsLegacyOpBatching(t *testing.T) {
+	factory := newRecordingFactory()
+	lookup := NewWithProviderFactory(factory.factory)
+
+	first := lease.Lease{Provider: "vault", Source: "op://vault/first", Variable: "FIRST"}
+	second := lease.Lease{Provider: "vault", Source: "op://vault/second", Variable: "SECOND"}
+	file := lease.Lease{Provider: "vault", Source: "vault://secret/data/app#local", Variable: "LOCAL"}
+
+	_, errs, err := lookup.Fetch([]lease.Lease{first, second, file}, Options{})
+	if err != nil {
+		t.Fatalf("unexpected fetch error: %v", err)
+	}
+	if len(errs) != 0 {
+		t.Fatalf("unexpected per-lease errors: %v", errs)
+	}
+
+	vaultProvider := factory.provider("vault", "")
+	if vaultProvider == nil {
+		t.Fatal("missing vault provider")
+	}
+	if got := len(vaultProvider.fetchLeasesCalls); got != 1 {
+		t.Fatalf("bulk calls = %d, want 1", got)
+	}
+	if got := len(vaultProvider.fetchLeasesCalls[0]); got != 2 {
+		t.Fatalf("bulk lease count = %d, want 2", got)
+	}
+	if got := len(vaultProvider.fetchCalls); got != 1 {
+		t.Fatalf("singleton fetch calls = %d, want 1", got)
+	}
+}
+
 func TestLookupFetch_UsesProviderBatchPolicyForNonOnePasswordSchemes(t *testing.T) {
 	factory := newRecordingFactory()
 	lookup := NewWithProviderFactoryAndBatchPolicy(factory.factory, func(providerName, sourceURI string) bool {
