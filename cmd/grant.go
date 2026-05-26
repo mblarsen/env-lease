@@ -78,8 +78,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var shellMode bool
-
 var grantCmd = &cobra.Command{
 	Use:   "grant",
 	Short: "Grant all leases defined in env-lease.toml.",
@@ -127,12 +125,7 @@ This can be overridden with the --destination-outside-root flag.`,
 				"Please run 'eval $(env-lease grant)' without the interactive flag.")
 		}
 
-		for _, l := range leaseSet.Leases {
-			if l.LeaseType == "shell" {
-				shellMode = true
-				break
-			}
-		}
+		shellMode := leaseSet.HasShellLease()
 
 		client := ensureDaemonClient()
 

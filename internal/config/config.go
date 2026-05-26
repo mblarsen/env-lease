@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"time"
 
 	"os"
 
@@ -21,23 +20,19 @@ type Config struct {
 
 // Lease represents a single lease block in the config.
 type Lease struct {
-	Provider      string     `toml:"provider"`
-	Source        string     `toml:"source"`
-	Destination   string     `toml:"destination"`
-	Duration      string     `toml:"duration"`
-	LeaseType     string     `toml:"lease_type"`
-	Variable      string     `toml:"variable"`
-	Format        string     `toml:"format"`
-	Transform     []string   `toml:"transform"`
-	FileMode      string     `toml:"file_mode"`
-	OpAccount     string     `toml:"op_account" json:"op_account,omitempty"`
-	ExpiresAt     time.Time  `toml:"-" json:"expires_at"`
-	OrphanedSince *time.Time `toml:"-" json:"orphaned_since,omitempty"`
-	ConfigFile    string     `toml:"-" json:"config_file"`
-	ParentSource  string     `toml:"-" json:"parent_source,omitempty"`
+	Provider    string   `toml:"provider"`
+	Source      string   `toml:"source"`
+	Destination string   `toml:"destination"`
+	Duration    string   `toml:"duration"`
+	LeaseType   string   `toml:"lease_type"`
+	Variable    string   `toml:"variable"`
+	Format      string   `toml:"format"`
+	Transform   []string `toml:"transform"`
+	FileMode    string   `toml:"file_mode"`
+	OpAccount   string   `toml:"op_account"`
 }
 
-// Load reads a TOML file from the given path, validates it, and returns a Config struct.
+// Load reads and merges raw TOML config files without applying Lease semantics.
 func Load(path, localPath string) (*Config, error) {
 	return loadAndMerge(path, localPath, 0)
 }
@@ -51,16 +46,11 @@ func loadAndMerge(path, localPath string, depth int) (*Config, error) {
 		Lease []Lease `toml:"lease"`
 	}
 
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not get absolute path for config: %w", err)
-	}
-
 	expandedPath, err := fileutil.ExpandPath(path)
 	if err != nil {
 		return nil, fmt.Errorf("could not expand config path: %w", err)
 	}
-	absPath, err = filepath.Abs(expandedPath)
+	absPath, err := filepath.Abs(expandedPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not get absolute path for config: %w", err)
 	}

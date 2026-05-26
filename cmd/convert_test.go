@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,7 +14,7 @@ import (
 
 func TestConvertCmd(t *testing.T) {
 	// Create a temporary directory for our test files
-	tmpDir, err := ioutil.TempDir("", "env-lease-test")
+	tmpDir, err := os.MkdirTemp("", "env-lease-test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
@@ -28,7 +27,7 @@ export   EXTRA_VAR=op://vault/item3/field3
 INVALID_LINE
 `
 	envrcPath := filepath.Join(tmpDir, ".envrc")
-	err = ioutil.WriteFile(envrcPath, []byte(envrcContent), 0644)
+	err = os.WriteFile(envrcPath, []byte(envrcContent), 0644)
 	require.NoError(t, err)
 
 	// Test case 1: Read from .envrc in current directory
@@ -95,7 +94,7 @@ duration = "1h"
 	// Test case 3: No file found
 	t.Run("no file found", func(t *testing.T) {
 		// Change to a directory with no .env or .envrc
-		emptyDir, err := ioutil.TempDir("", "env-lease-empty")
+		emptyDir, err := os.MkdirTemp("", "env-lease-empty")
 		require.NoError(t, err)
 		defer os.RemoveAll(emptyDir)
 

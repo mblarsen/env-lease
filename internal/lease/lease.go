@@ -30,6 +30,16 @@ type Set struct {
 	Leases     []Lease
 }
 
+// HasShellLease reports whether the set contains at least one shell Lease.
+func (s Set) HasShellLease() bool {
+	for _, l := range s.Leases {
+		if l.LeaseType == TypeShell {
+			return true
+		}
+	}
+	return false
+}
+
 // Lease is the normalized runtime shape used by grant and daemon logic.
 type Lease struct {
 	Provider       string     `json:"provider,omitempty"`
@@ -109,10 +119,7 @@ func normalizeOne(root, configFile string, raw config.Lease) (Lease, error) {
 		Transform:      append([]string(nil), raw.Transform...),
 		FileMode:       raw.FileMode,
 		OpAccount:      raw.OpAccount,
-		ExpiresAt:      raw.ExpiresAt,
-		OrphanedSince:  raw.OrphanedSince,
 		ConfigFile:     configFile,
-		ParentSource:   raw.ParentSource,
 	}
 
 	if l.Source == "" {
