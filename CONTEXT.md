@@ -56,6 +56,10 @@ _Avoid_: state handling, timer logic, daemon cleanup
 The TOML declaration that describes desired Leases for a project.
 _Avoid_: manifest, spec, settings
 
+**Presentation**:
+The command-line output adapter that renders already-derived facts as prompts, status tables, hints, and user-facing messages.
+_Avoid_: command printing, formatting logic, UI glue
+
 ## Relationships
 
 - A **Config** declares zero or more **Leases**.
@@ -68,6 +72,7 @@ _Avoid_: manifest, spec, settings
 - The **Grant Workflow** produces the request that registers **Leases** with the **Daemon**.
 - The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
 - The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
+- **Presentation** consumes facts from commands, the **Grant Workflow**, and the **Daemon** without owning **Grant**, **Revoke**, or **Lease Lifecycle** business rules.
 
 ## Example dialogue
 
@@ -78,3 +83,4 @@ _Avoid_: manifest, spec, settings
 
 - "destination" and "target" were both used for where a **Secret** is written — resolved: use **Destination**.
 - "config lease" and "runtime lease" both describe a **Lease** at different stages — resolved: **Config** declares raw Lease intent; the runtime Lease is the normalized form used by Grant and the Daemon.
+- Command files mixed user-facing formatting with command orchestration — resolved: use **Presentation** for output labels, styling, routing conventions, and common messages.

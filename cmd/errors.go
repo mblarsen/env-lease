@@ -2,20 +2,20 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/presentation"
 )
 
 func handleClientError(err error) {
 	slog.Error("an ipc error occurred", "err", err)
 	var connErr *ipc.ConnectionError
 	if errors.As(err, &connErr) {
-		_, _ = fmt.Fprintln(os.Stderr, "Error: env-lease daemon is not running. Please start it with 'env-lease daemon start'.")
+		presenter.Print(os.Stderr, presentation.MessageDaemonOffline)
 	} else {
-		_, _ = fmt.Fprintln(os.Stderr, "Error: could not connect to the env-lease daemon. Is it running?")
+		presenter.Print(os.Stderr, presentation.MessageDaemonConnectionFailed)
 	}
 	os.Exit(1)
 }

@@ -75,6 +75,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/grantflow"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
+	"github.com/mblarsen/env-lease/internal/presentation"
 	"github.com/spf13/cobra"
 )
 
@@ -143,13 +144,11 @@ This can be overridden with the --destination-outside-root flag.`,
 		flow := grantflow.Flow{
 			Confirm: confirm,
 			Notice: func(message string) {
-				fmt.Fprintln(os.Stderr, message)
+				presenter.PrintLine(os.Stderr, message)
 			},
 			Materialize: func(l lease.Lease, secret string) (grantflow.Materialized, error) {
 				materialized, err := materializer.Materialize(l, secret)
-				for _, notice := range materialized.Notices {
-					fmt.Fprintln(os.Stderr, notice)
-				}
+				presenter.PrintLines(os.Stderr, materialized.Notices)
 				return grantflow.Materialized{Leases: materialized.Leases, ShellCommands: materialized.ShellCommands}, err
 			},
 		}
@@ -168,7 +167,7 @@ This can be overridden with the --destination-outside-root flag.`,
 
 		// If in test mode, don't try to send to the daemon.
 		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			fmt.Fprintln(os.Stderr, "Grant request (test mode) processed successfully.")
+			presenter.PrintLine(os.Stderr, "Grant request (test mode) processed successfully.")
 			return err
 		}
 
@@ -177,11 +176,9 @@ This can be overridden with the --destination-outside-root flag.`,
 			if err := client.Send(result.Request, &resp); err != nil {
 				handleClientError(err)
 			}
-			for _, msg := range resp.Messages {
-				fmt.Fprintln(os.Stderr, msg)
-			}
+			presenter.PrintLines(os.Stderr, resp.Messages)
 		} else {
-			fmt.Fprintln(os.Stderr, "Grant request processed in test mode.")
+			presenter.PrintLine(os.Stderr, "Grant request processed in test mode.")
 		}
 
 		if result.NeedsDirenv() {
@@ -189,12 +186,12 @@ This can be overridden with the --destination-outside-root flag.`,
 		}
 
 		if shellMode {
-			fmt.Fprintln(os.Stderr, "# When using shell lease types run this command like `eval $(env-lease grant)`")
+			presenter.Print(os.Stderr, presentation.MessageGrantShellHint)
 			for _, cmd := range result.ShellCommands {
-				fmt.Println(cmd)
+				presenter.PrintLine(os.Stdout, cmd)
 			}
 		}
-		fmt.Fprintln(os.Stderr, "Grant request sent successfully.")
+		presenter.Print(os.Stderr, presentation.MessageGrantSent)
 		return err
 	},
 }

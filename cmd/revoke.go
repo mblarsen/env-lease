@@ -9,6 +9,7 @@ import (
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
+	"github.com/mblarsen/env-lease/internal/presentation"
 	"github.com/spf13/cobra"
 )
 
@@ -106,7 +107,7 @@ var revokeCmd = &cobra.Command{
 			}
 
 			if len(leasesToRevoke) == 0 {
-				fmt.Println("No leases selected for revocation.")
+				presenter.PrintLine(os.Stdout, "No leases selected for revocation.")
 				return nil
 			}
 
@@ -119,10 +120,8 @@ var revokeCmd = &cobra.Command{
 			if err := client.Send(req, &revokeResp); err != nil {
 				handleClientError(err)
 			}
-			for _, msg := range revokeResp.Messages {
-				fmt.Println(msg)
-			}
-			fmt.Println("Revoke request sent.")
+			presenter.PrintLines(os.Stdout, revokeResp.Messages)
+			presenter.Print(os.Stdout, presentation.MessageRevokeSent)
 			return nil
 		}
 
@@ -138,18 +137,16 @@ var revokeCmd = &cobra.Command{
 
 		isShellMode := len(revokeResp.ShellCommands) > 0
 
-		for _, msg := range revokeResp.Messages {
-			if isShellMode {
-				fmt.Fprintln(os.Stderr, msg)
-			} else {
-				fmt.Println(msg)
-			}
+		if isShellMode {
+			presenter.PrintLines(os.Stderr, revokeResp.Messages)
+		} else {
+			presenter.PrintLines(os.Stdout, revokeResp.Messages)
 		}
 
 		if isShellMode {
-			fmt.Println("# When using shell lease types run this command like `eval $(env-lease revoke)`")
+			presenter.Print(os.Stdout, presentation.MessageRevokeShellHint)
 			for _, shellCmd := range revokeResp.ShellCommands {
-				fmt.Println(shellCmd)
+				presenter.PrintLine(os.Stdout, shellCmd)
 			}
 		}
 
@@ -173,11 +170,10 @@ var revokeCmd = &cobra.Command{
 			}
 		}
 
-		finalMsg := "Revoke request sent."
 		if isShellMode {
-			fmt.Fprintln(os.Stderr, finalMsg)
+			presenter.Print(os.Stderr, presentation.MessageRevokeSent)
 		} else {
-			fmt.Println(finalMsg)
+			presenter.Print(os.Stdout, presentation.MessageRevokeSent)
 		}
 
 		return nil
