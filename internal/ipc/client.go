@@ -22,6 +22,12 @@ func NewClient(socketPath string, secret []byte) *Client {
 	}
 }
 
+// CheckDaemon verifies that the daemon is reachable and can answer status.
+func (c *Client) CheckDaemon() error {
+	var resp StatusResponse
+	return c.Send(StatusRequest{}, &resp)
+}
+
 // Send sends a request to the server and decodes the response.
 func (c *Client) Send(payload any, responsePayload any) error {
 	req, err := NewRequest(payload, c.secret)
@@ -39,26 +45,29 @@ func (c *Client) Send(payload any, responsePayload any) error {
 		return err
 	}
 
-	// Always read the response to properly close the connection and check for errors
 	var resp Response
 	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
-		// If the server sends no body, it's a successful fire-and-forget.
-		// We can treat EOF as a success signal in this specific case.
 		if errors.Is(err, io.EOF) {
-			return nil
+			if responsePayload == nil {
+				return nil
+			}
+			return ErrNoResponse
 		}
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	if resp.Error != "" {
-		return fmt.Errorf("server error: %s", resp.Error)
+		return &ServerError{Message: resp.Error}
 	}
 
-	// Only unmarshal a payload if the caller is expecting one
-	if responsePayload != nil {
-		if err := json.Unmarshal(resp.Payload, responsePayload); err != nil {
-			return fmt.Errorf("failed to unmarshal response payload: %w", err)
-		}
+	if responsePayload == nil {
+		return nil
+	}
+	if len(resp.Payload) == 0 {
+		return ErrEmptyPayload
+	}
+	if err := json.Unmarshal(resp.Payload, responsePayload); err != nil {
+		return fmt.Errorf("failed to unmarshal response payload: %w", err)
 	}
 
 	return nil

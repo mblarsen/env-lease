@@ -9,32 +9,30 @@ import (
 )
 
 func (d *Daemon) handleIPC(payload []byte) ([]byte, error) {
-	var req struct {
-		Command string
-	}
-	if err := json.Unmarshal(payload, &req); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal command: %w", err)
+	command, err := ipc.DecodeCommand(payload)
+	if err != nil {
+		return nil, err
 	}
 
-	switch req.Command {
-	case "grant":
+	switch command {
+	case ipc.CommandGrant:
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		return d.handleGrant(payload)
-	case "revoke":
+	case ipc.CommandRevoke:
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		return d.handleRevoke(payload)
-	case "status":
+	case ipc.CommandStatus:
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		return d.handleStatus(payload)
-	case "cleanup":
+	case ipc.CommandCleanup:
 		d.mu.Lock()
 		defer d.mu.Unlock()
 		return d.handleCleanup(payload)
 	default:
-		return nil, fmt.Errorf("unknown command: %s", req.Command)
+		return nil, fmt.Errorf("unknown command: %s", command)
 	}
 }
 

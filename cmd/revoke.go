@@ -34,7 +34,7 @@ var revokeCmd = &cobra.Command{
 			return nil
 		}
 		if interactive {
-			statusReq := ipc.StatusRequest{Command: "status"}
+			statusReq := ipc.StatusRequest{}
 			if !all {
 				statusReq.ConfigFile = absConfigFile
 			}
@@ -111,7 +111,6 @@ var revokeCmd = &cobra.Command{
 			}
 
 			req := ipc.RevokeRequest{
-				Command:    "revoke",
 				ConfigFile: absConfigFile,
 				Leases:     leasesToRevoke,
 			}
@@ -127,7 +126,6 @@ var revokeCmd = &cobra.Command{
 		}
 
 		req := ipc.RevokeRequest{
-			Command:    "revoke",
 			ConfigFile: absConfigFile,
 			All:        all,
 		}
@@ -155,7 +153,7 @@ var revokeCmd = &cobra.Command{
 
 		// If all leases were revoked, check for .envrc and handle direnv
 		var leasesResp ipc.StatusResponse
-		statusReq := ipc.StatusRequest{Command: "status"}
+		statusReq := ipc.StatusRequest{}
 		if err := client.Send(statusReq, &leasesResp); err != nil {
 			// If we can't get the status, we can't check for .envrc, so we'll just print the message and return.
 			handleClientError(err)

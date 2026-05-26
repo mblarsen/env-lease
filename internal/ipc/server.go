@@ -54,15 +54,20 @@ func (s *Server) handleConnection(conn net.Conn, handler func(payload []byte) ([
 
 	if err := Verify(req.Payload, req.Signature, s.secret); err != nil {
 		fmt.Fprintf(os.Stderr, "invalid signature: %v\n", err)
+		s.writeResponse(conn, nil, err)
 		return
 	}
 
 	responsePayload, err := handler(req.Payload)
+	s.writeResponse(conn, responsePayload, err)
+}
+
+func (s *Server) writeResponse(conn net.Conn, payload []byte, err error) {
 	resp := &Response{}
 	if err != nil {
 		resp.Error = err.Error()
 	} else {
-		resp.Payload = responsePayload
+		resp.Payload = payload
 	}
 
 	if err := json.NewEncoder(conn).Encode(resp); err != nil {
