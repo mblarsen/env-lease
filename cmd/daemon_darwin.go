@@ -4,17 +4,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 
-	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/platforminstall"
 	"github.com/spf13/cobra"
-)
-
-const (
-	daemonServiceName = "com.user.env-lease.plist"
 )
 
 func init() {
@@ -25,109 +20,58 @@ func init() {
 }
 
 func runReloadDaemon(cmd *cobra.Command, args []string) error {
-	homeDir, err := os.UserHomeDir()
+	installer, err := platforminstall.DefaultManager()
 	if err != nil {
 		return err
 	}
-
-	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
-
-	// Unload the service
-	if err := exec.Command("launchctl", "unload", plistPath).Run(); err != nil {
-		return fmt.Errorf("failed to unload launchd service: %w", err)
+	result, err := installer.ReloadDaemon(context.Background())
+	if err != nil {
+		return err
 	}
-
-	// Load the service
-	if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
-		return fmt.Errorf("failed to load launchd service: %w", err)
-	}
-
-	fmt.Printf("Successfully reloaded daemon service.\n")
+	fmt.Println(result.Message)
 	return nil
 }
 
 func runInstallDaemon(cmd *cobra.Command, args []string) error {
-	executable, err := os.Executable()
+	installer, err := platforminstall.DefaultManager()
 	if err != nil {
 		return err
 	}
-
-	homeDir, err := os.UserHomeDir()
+	result, err := installer.InstallDaemon(context.Background(), platforminstall.DaemonOptions{})
 	if err != nil {
 		return err
 	}
-
-	// Write the launchd plist
-	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
-	plistContent := fmt.Sprintf(daemonPlistTemplate, executable, homeDir, homeDir)
-	if _, err := fileutil.AtomicWriteFile(plistPath, []byte(plistContent), 0644); err != nil {
-		return err
-	}
-
-	// Load the service
-	if err := exec.Command("launchctl", "load", plistPath).Run(); err != nil {
-		return fmt.Errorf("failed to load launchd service: %w", err)
-	}
-
-	fmt.Printf("Successfully installed and started daemon service.\n")
+	fmt.Println(result.Message)
 	return nil
 }
 
 func runUninstallDaemon(cmd *cobra.Command, args []string) error {
-	homeDir, err := os.UserHomeDir()
+	installer, err := platforminstall.DefaultManager()
 	if err != nil {
 		return err
 	}
-
-	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
-
-	// Unload the service
-	_ = exec.Command("launchctl", "unload", plistPath).Run()
-
-	// Remove files
-	_ = os.Remove(plistPath)
-
-	fmt.Println("Successfully uninstalled daemon service.")
+	result, err := installer.UninstallDaemon(context.Background())
+	if err != nil {
+		return err
+	}
+	fmt.Println(result.Message)
 	return nil
 }
 
 func runStatusDaemon(cmd *cobra.Command, args []string) error {
-	homeDir, err := os.UserHomeDir()
+	installer, err := platforminstall.DefaultManager()
 	if err != nil {
 		return err
 	}
-
-	plistPath := filepath.Join(homeDir, launchdDir, daemonServiceName)
-	if _, err := os.Stat(plistPath); os.IsNotExist(err) {
+	status, err := installer.StatusDaemon(context.Background())
+	if err != nil {
+		return err
+	}
+	if !status.Installed {
 		fmt.Println("Daemon service is not installed.")
 		return nil
 	}
-
 	fmt.Println("Daemon service is installed.")
-	fmt.Printf("Configuration file: %s\n", plistPath)
+	fmt.Fprintf(os.Stdout, "Configuration file: %s\n", status.File)
 	return nil
 }
-
-const daemonPlistTemplate = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.user.env-lease</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>%s</string>
-        <string>daemon</string>
-        <string>run</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>%s/Library/Logs/env-lease.log</string>
-    <key>StandardErrorPath</key>
-    <string>%s/Library/Logs/env-lease.error.log</string>
-</dict>
-</plist>
-`

@@ -4,79 +4,81 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
 
-	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/platforminstall"
 	"github.com/spf13/cobra"
 )
-
-const daemonServiceTemplate = `[Unit]
-Description=env-lease daemon
-
-[Service]
-ExecStart=%s daemon run
-Restart=always
-Environment="ENV_LEASE_LOG_LEVEL=info"
-
-[Install]
-WantedBy=default.target
-`
 
 func init() {
 	daemonInstallCmd.RunE = runInstallDaemon
 	daemonUninstallCmd.RunE = runUninstallDaemon
+	daemonStatusCmd.RunE = runStatusDaemon
 	daemonInstallCmd.Flags().Bool("print", false, "Print the service configuration to stdout instead of installing it.")
 	daemonReloadCmd.RunE = runReloadDaemon
 }
 
 func runReloadDaemon(cmd *cobra.Command, args []string) error {
-	if err := exec.Command("systemctl", "--user", "reload", "env-lease.service").Run(); err != nil {
-		return fmt.Errorf("failed to reload daemon service: %w", err)
+	installer, err := platforminstall.DefaultManager()
+	if err != nil {
+		return err
 	}
-	fmt.Println("Successfully reloaded env-lease daemon service.")
+	result, err := installer.ReloadDaemon(context.Background())
+	if err != nil {
+		return err
+	}
+	fmt.Println(result.Message)
 	return nil
 }
 
 func runInstallDaemon(cmd *cobra.Command, args []string) error {
-	executable, err := os.Executable()
+	printOnly, _ := cmd.Flags().GetBool("print")
+	installer, err := platforminstall.DefaultManager()
 	if err != nil {
 		return err
 	}
-
-	service := fmt.Sprintf(daemonServiceTemplate, executable)
-	if print, _ := cmd.Flags().GetBool("print"); print {
-		fmt.Fprint(os.Stdout, service)
-		fmt.Fprintln(os.Stderr, "WARNING: Service configuration printed but not installed.")
+	result, err := installer.InstallDaemon(context.Background(), platforminstall.DaemonOptions{PrintOnly: printOnly})
+	if err != nil {
+		return err
+	}
+	if result.Output != "" {
+		fmt.Fprint(os.Stdout, result.Output)
+		fmt.Fprintln(os.Stderr, result.Message)
 		return nil
 	}
-	servicePath := filepath.Join(os.Getenv("HOME"), ".config", "systemd", "user", "env-lease.service")
-
-	if _, err := fileutil.AtomicWriteFile(servicePath, []byte(service), 0644); err != nil {
-		return err
-	}
-
-	if err := exec.Command("systemctl", "--user", "enable", "--now", "env-lease.service").Run(); err != nil {
-		return err
-	}
-
-	fmt.Printf("Successfully installed env-lease daemon service. Configuration file created at: %s\n", servicePath)
+	fmt.Println(result.Message)
 	return nil
 }
 
 func runUninstallDaemon(cmd *cobra.Command, args []string) error {
-	servicePath := filepath.Join(os.Getenv("HOME"), ".config", "systemd", "user", "env-lease.service")
-
-	if err := exec.Command("systemctl", "--user", "disable", "--now", "env-lease.service").Run(); err != nil {
-		// Ignore errors, as the service may not be running
-	}
-
-	if err := os.Remove(servicePath); err != nil {
+	installer, err := platforminstall.DefaultManager()
+	if err != nil {
 		return err
 	}
+	result, err := installer.UninstallDaemon(context.Background())
+	if err != nil {
+		return err
+	}
+	fmt.Println(result.Message)
+	return nil
+}
 
-	fmt.Println("Successfully uninstalled env-lease daemon service.")
+func runStatusDaemon(cmd *cobra.Command, args []string) error {
+	installer, err := platforminstall.DefaultManager()
+	if err != nil {
+		return err
+	}
+	status, err := installer.StatusDaemon(context.Background())
+	if err != nil {
+		return err
+	}
+	if !status.Installed {
+		fmt.Println("Daemon service is not installed.")
+		return nil
+	}
+	fmt.Println("Daemon service is installed.")
+	fmt.Fprintf(os.Stdout, "Configuration file: %s\n", status.File)
 	return nil
 }

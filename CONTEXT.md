@@ -52,6 +52,10 @@ _Avoid_: worker, server, scheduler
 The state transitions that register, expire, retry, reconcile, and revoke active Leases inside the Daemon.
 _Avoid_: state handling, timer logic, daemon cleanup
 
+**Platform Installation**:
+The rendering and application of OS-specific Daemon and idle-revocation service artifacts, such as launchd plists, systemd units, timers, and helper scripts.
+_Avoid_: command setup, platform glue, service file snippets
+
 **IPC Contract**:
 The signed, typed command and response seam between CLI adapters and the Daemon.
 _Avoid_: socket handling, client calls, JSON plumbing
@@ -77,6 +81,7 @@ _Avoid_: command printing, formatting logic, UI glue
 - The **Grant Workflow** and CLI adapters cross the **IPC Contract** to ask the **Daemon** to register, report, clean up, or revoke **Leases**.
 - The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
 - The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
+- **Platform Installation** prepares and applies OS-specific artifacts that keep the **Daemon** and idle-based **Revoke** checks available outside the CLI process.
 - **Presentation** consumes facts from commands, the **Grant Workflow**, and the **Daemon** without owning **Grant**, **Revoke**, or **Lease Lifecycle** business rules.
 
 ## Example dialogue
