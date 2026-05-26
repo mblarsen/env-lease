@@ -61,6 +61,43 @@ func TestDefaultRegistryBatchPolicyIsSchemeSpecific(t *testing.T) {
 	}
 }
 
+func TestNewRegistrySkipsBlankAliases(t *testing.T) {
+	registry, err := NewRegistry(
+		AdapterSpec{
+			Name:             DefaultProviderName,
+			BatchableSchemes: []string{"op"},
+			New: func(account string) (SecretProvider, error) {
+				return &OnePasswordCLI{Account: account}, nil
+			},
+		},
+		AdapterSpec{
+			Name:    "vault",
+			Aliases: []string{"", "   "},
+			New: func(account string) (SecretProvider, error) {
+				return &MockProvider{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewRegistry returned error: %v", err)
+	}
+
+	canonical, err := registry.CanonicalName("")
+	if err != nil {
+		t.Fatalf("CanonicalName returned error: %v", err)
+	}
+	if canonical != DefaultProviderName {
+		t.Fatalf("CanonicalName(\"\") = %q, want %q", canonical, DefaultProviderName)
+	}
+	adapter, err := registry.NewAdapter("", "team-account")
+	if err != nil {
+		t.Fatalf("NewAdapter returned error: %v", err)
+	}
+	if _, ok := adapter.(*OnePasswordCLI); !ok {
+		t.Fatalf("adapter type = %T, want *OnePasswordCLI", adapter)
+	}
+}
+
 func TestNewRegistrySupportsAdditionalProviderWithoutLookupChanges(t *testing.T) {
 	registry, err := NewRegistry(AdapterSpec{
 		Name:             "vault",

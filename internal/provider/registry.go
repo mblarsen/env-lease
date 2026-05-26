@@ -54,11 +54,12 @@ func NewRegistry(specs ...AdapterSpec) (*Registry, error) {
 			batchableSchemes: normalizeSchemes(spec.BatchableSchemes),
 			new:              spec.New,
 		}
-		for _, name := range append([]string{spec.Name}, spec.Aliases...) {
-			key := NormalizeName(name)
-			if key == "" {
+		names := append([]string{spec.Name}, spec.Aliases...)
+		for i, name := range names {
+			if i > 0 && strings.TrimSpace(name) == "" {
 				continue
 			}
+			key := NormalizeName(name)
 			if existing, ok := r.adapters[key]; ok {
 				return nil, fmt.Errorf("provider registry: provider %q already registered as %q", key, existing.name)
 			}
