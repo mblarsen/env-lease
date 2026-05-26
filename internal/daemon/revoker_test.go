@@ -25,7 +25,7 @@ func TestFileRevoker_Revoke(t *testing.T) {
 		}
 
 		revoker := &FileRevoker{}
-		err = revoker.Revoke(lease)
+		_, err = revoker.Revoke(lease)
 		if err != nil {
 			t.Fatalf("expected no error, but got: %v", err)
 		}
@@ -45,7 +45,7 @@ func TestFileRevoker_Revoke(t *testing.T) {
 		}
 
 		revoker := &FileRevoker{}
-		err := revoker.Revoke(lease)
+		_, err := revoker.Revoke(lease)
 		if err != nil {
 			t.Fatalf("expected no error when file is already deleted, but got: %v", err)
 		}

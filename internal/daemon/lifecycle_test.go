@@ -73,6 +73,6 @@ func TestLifecycleRevokeAllReturnsShellCommands(t *testing.T) {
 
 	assert.Equal(t, 2, result.Count)
 	assert.Equal(t, []string{"unset SHELL_VAR"}, result.ShellCommands)
-	assert.Equal(t, 1, revoker.RevokeCount)
+	assert.Equal(t, 2, revoker.RevokeCount)
 	assert.Empty(t, state.Leases)
 }

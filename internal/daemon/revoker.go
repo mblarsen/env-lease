@@ -1,84 +1,19 @@
 package daemon
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
-	"log/slog"
-	"os"
-	"strings"
-
-	"github.com/mblarsen/env-lease/internal/fileutil"
+	"github.com/mblarsen/env-lease/internal/destination"
 	"github.com/mblarsen/env-lease/internal/lease"
 )
 
-// Revoker is an interface for revoking leases.
+// Revoker is an interface for revoking lease destination effects.
 type Revoker interface {
-	Revoke(lease *lease.Lease) error
+	Revoke(lease *lease.Lease) (destination.Revoked, error)
 }
 
-// FileRevoker is a revoker that modifies the filesystem.
+// FileRevoker is a revoker that modifies filesystem and shell destinations.
 type FileRevoker struct{}
 
-// Revoke revokes a lease by either deleting a file or clearing a variable in a file.
-func (r *FileRevoker) Revoke(lease *lease.Lease) error {
-	switch lease.LeaseType {
-	case "file":
-		if _, err := os.Stat(lease.Destination); os.IsNotExist(err) {
-			slog.Info("Lease target file not found, proceeding with revocation", "path", lease.Destination)
-			return nil // File is already gone, consider it revoked.
-		}
-		slog.Debug("Revoking file lease", "path", lease.Destination)
-		return os.Remove(lease.Destination)
-	case "env":
-		slog.Debug("Revoking env lease", "path", lease.Destination, "variable", lease.Variable)
-		return r.clearEnvVar(lease.Destination, lease.Variable)
-	default:
-		return fmt.Errorf("unknown lease type: %s", lease.LeaseType)
-	}
-}
-
-func (r *FileRevoker) clearEnvVar(path, keyToRevoke string) error {
-	f, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil // File is already gone, consider it revoked.
-		}
-		return err
-	}
-	defer f.Close()
-
-	var out bytes.Buffer
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) < 2 {
-			out.WriteString(line + "\n")
-			continue
-		}
-
-		keyPart := strings.TrimSpace(parts[0])
-		keyPart = strings.TrimPrefix(keyPart, "export ")
-
-		if keyPart == keyToRevoke {
-			originalKeyPart := parts[0]
-			out.WriteString(originalKeyPart + "=\n")
-		} else {
-			out.WriteString(line + "\n")
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	info, err := f.Stat()
-	if err != nil {
-		return err
-	}
-
-	_, err = fileutil.AtomicWriteFile(path, out.Bytes(), info.Mode())
-	return err
+// Revoke revokes a lease by delegating destination mutation to the destination module.
+func (r *FileRevoker) Revoke(l *lease.Lease) (destination.Revoked, error) {
+	return (destination.Revoker{}).Revoke(l)
 }

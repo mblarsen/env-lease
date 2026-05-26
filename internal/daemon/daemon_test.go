@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/mblarsen/env-lease/internal/destination"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
 	"github.com/stretchr/testify/assert"
@@ -502,8 +503,8 @@ func TestDaemon_processRetryQueue_PersistsBackoffUpdate(t *testing.T) {
 	}
 	require.NoError(t, state.SaveState(statePath))
 
-	revoker := &mockRevoker{RevokeFunc: func(lease *lease.Lease) error {
-		return fmt.Errorf("revoke failed")
+	revoker := &mockRevoker{RevokeFunc: func(lease *lease.Lease) (destination.Revoked, error) {
+		return destination.Revoked{}, fmt.Errorf("revoke failed")
 	}}
 	d := NewDaemon(state, statePath, &mockClock{now: now}, nil, revoker, nil)
 
