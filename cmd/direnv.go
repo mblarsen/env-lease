@@ -1,17 +1,18 @@
 package cmd
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"os/exec"
+
+	"github.com/mblarsen/env-lease/internal/presentation"
 )
 
 func HandleDirenv(noDirenv bool, out io.Writer) {
 	if noDirenv {
 		slog.Debug("`--no-direnv` flag is set, skipping direnv execution.")
-		fmt.Fprintln(out, ".envrc modified. Run 'direnv allow' to apply changes.")
+		presenter.Print(out, presentation.MessageDirenvModified)
 		return
 	}
 
@@ -19,14 +20,14 @@ func HandleDirenv(noDirenv bool, out io.Writer) {
 		cmd := exec.Command("direnv", "allow")
 		tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 		if err != nil {
-			fmt.Fprintf(out, "Failed to open tty: %v\n", err)
+			presenter.Print(out, presentation.MessageDirenvTTYFailed, err)
 			return
 		}
 		defer tty.Close()
 		cmd.Stdout = tty
 		cmd.Stderr = tty
 		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(out, "direnv allow failed: %v\n", err)
+			presenter.Print(out, presentation.MessageDirenvAllowFailed, err)
 		}
 	}
 }

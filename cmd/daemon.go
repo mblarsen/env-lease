@@ -139,9 +139,7 @@ var cleanupCmd = &cobra.Command{
 			handleClientError(err)
 		}
 
-		for _, msg := range resp.Messages {
-			fmt.Println(msg)
-		}
+		presenter.PrintLines(os.Stdout, resp.Messages)
 		return nil
 	},
 }

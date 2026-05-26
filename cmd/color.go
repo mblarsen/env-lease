@@ -3,20 +3,13 @@ package cmd
 import (
 	"os"
 
-	"github.com/charmbracelet/x/term"
+	"github.com/mblarsen/env-lease/internal/presentation"
 )
 
 func colorsEnabled(output *os.File) bool {
-	return colorsEnabledWithEnv(output, os.LookupEnv)
+	return presentation.ColorsEnabled(output)
 }
 
 func colorsEnabledWithEnv(output *os.File, lookupEnv func(string) (string, bool)) bool {
-	if _, disabled := lookupEnv("NO_COLOR"); disabled {
-		return false
-	}
-	if output == nil {
-		return false
-	}
-
-	return term.IsTerminal(output.Fd())
+	return presentation.ColorsEnabledWithEnv(output, lookupEnv)
 }
