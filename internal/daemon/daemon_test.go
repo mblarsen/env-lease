@@ -31,8 +31,7 @@ func (m *mockClock) Advance(d time.Duration) {
 	m.now = m.now.Add(d)
 }
 
-// TODO: This is a placeholder test. A real test would need to capture stdout.
-func TestDaemon_Run(t *testing.T) {
+func TestDaemon_RunStopsWhenContextIsCancelled(t *testing.T) {
 	state := NewState()
 	clock := &mockClock{now: time.Now()}
 	revoker := &mockRevoker{}

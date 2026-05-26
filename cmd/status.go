@@ -10,6 +10,7 @@ import (
 
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/lease"
 	"github.com/spf13/cobra"
 )
 
@@ -41,15 +42,7 @@ var statusCmd = &cobra.Command{
 			return err
 		}
 
-		// The status command doesn't need to load the config, it just needs the path
-		// to filter leases. So we don't call config.Load here. But if we did, it
-		// would look like this:
-		// localConfigFileFlag, _ := cmd.Flags().GetString("local-config")
-		// _, err = config.Load(absConfigFile, localConfigFileFlag)
-		// if err != nil {
-		// 	return err
-		// }
-
+		// Status filters daemon state by config path without loading the Config.
 		showAll, _ := cmd.Flags().GetBool("all")
 
 		// Group all leases hierarchically first
@@ -88,9 +81,9 @@ var statusCmd = &cobra.Command{
 		// Calculate other leases count, excluding parent leases from the count
 		if !showAll {
 			var allLeasesCount int
-			for _, lease := range allTopLevelLeases {
-				uniqueParentID := lease.Source + "->" + lease.Destination
-				if children, isParent := groupedLeases[uniqueParentID]; isParent {
+			for _, topLevel := range allTopLevelLeases {
+				parentID := lease.ParentIdentity(topLevel.Source, topLevel.Destination)
+				if children, isParent := groupedLeases[parentID]; isParent {
 					allLeasesCount += len(children)
 				} else {
 					allLeasesCount++
@@ -98,9 +91,9 @@ var statusCmd = &cobra.Command{
 			}
 
 			var displayedLeasesCount int
-			for _, lease := range leasesToDisplay {
-				uniqueParentID := lease.Source + "->" + lease.Destination
-				if children, isParent := groupedLeases[uniqueParentID]; isParent {
+			for _, displayed := range leasesToDisplay {
+				parentID := lease.ParentIdentity(displayed.Source, displayed.Destination)
+				if children, isParent := groupedLeases[parentID]; isParent {
 					displayedLeasesCount += len(children)
 				} else {
 					displayedLeasesCount++
@@ -123,21 +116,20 @@ func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
 	w := tabwriter.NewWriter(&output, 0, 0, 3, ' ', 0)
 	fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
 
-	for _, lease := range leases {
-		expiresIn := time.Until(lease.ExpiresAt).Round(time.Second)
-		variable := lease.Variable
+	for _, displayed := range leases {
+		expiresIn := time.Until(displayed.ExpiresAt).Round(time.Second)
+		variable := displayed.Variable
 		if variable == "" {
-			if lease.LeaseType == "file" {
+			if displayed.LeaseType == "file" {
 				variable = "<file>"
 			} else {
 				variable = "<exploded>"
 			}
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", variable, lease.Source, lease.Destination, expiresIn)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", variable, displayed.Source, displayed.Destination, expiresIn)
 
-		// Create a unique ID for the parent to find children
-		uniqueParentID := lease.Source + "->" + lease.Destination
-		if childLeases, ok := children[uniqueParentID]; ok {
+		parentID := lease.ParentIdentity(displayed.Source, displayed.Destination)
+		if childLeases, ok := children[parentID]; ok {
 			// Sort children by variable name
 			sort.Slice(childLeases, func(i, j int) bool {
 				return childLeases[i].Variable < childLeases[j].Variable

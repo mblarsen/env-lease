@@ -263,7 +263,6 @@ duration = "1m"
 
 func TestGrantPreflightDaemonNotRunning(t *testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") == "1" {
-		shellMode = false
 		resetConfirmState()
 		_ = os.Unsetenv("ENV_LEASE_TEST")
 

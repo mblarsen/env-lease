@@ -8,6 +8,7 @@ import (
 
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
+	"github.com/mblarsen/env-lease/internal/lease"
 	"github.com/spf13/cobra"
 )
 
@@ -60,8 +61,8 @@ var revokeCmd = &cobra.Command{
 
 			// Second pass: separate actual parents from normal leases
 			for _, l := range potentialParentsAndNormalLeases {
-				uniqueID := l.Source + "->" + l.Destination
-				if _, isParent := childrenOfParent[uniqueID]; isParent {
+				parentID := lease.ParentIdentity(l.Source, l.Destination)
+				if _, isParent := childrenOfParent[parentID]; isParent {
 					parents = append(parents, l)
 				} else {
 					normalLeases = append(normalLeases, l)
@@ -70,8 +71,8 @@ var revokeCmd = &cobra.Command{
 
 			// Process parents and their children
 			for _, p := range parents {
-				uniqueID := p.Source + "->" + p.Destination
-				children := childrenOfParent[uniqueID]
+				parentID := lease.ParentIdentity(p.Source, p.Destination)
+				children := childrenOfParent[parentID]
 				sort.Slice(children, func(i, j int) bool {
 					return children[i].Variable < children[j].Variable
 				})

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -27,20 +26,20 @@ It looks for variable assignments with 1Password secret URIs (e.g., export API_K
 
 		if len(args) > 0 {
 			filename = args[0]
-			input, err = ioutil.ReadFile(filename)
+			input, err = os.ReadFile(filename)
 			if err != nil {
 				return fmt.Errorf("could not read file %s: %w", filename, err)
 			}
 		} else {
 			if _, err := os.Stat(".envrc"); err == nil {
 				filename = ".envrc"
-				input, err = ioutil.ReadFile(filename)
+				input, err = os.ReadFile(filename)
 				if err != nil {
 					return fmt.Errorf("could not read .envrc: %w", err)
 				}
 			} else if _, err := os.Stat(".env"); err == nil {
 				filename = ".env"
-				input, err = ioutil.ReadFile(filename)
+				input, err = os.ReadFile(filename)
 				if err != nil {
 					return fmt.Errorf("could not read .env: %w", err)
 				}
