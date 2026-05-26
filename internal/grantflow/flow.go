@@ -83,7 +83,6 @@ func (f Flow) Run(set *lease.Set, opts Options) (Result, error) {
 	}
 
 	result.Request = ipc.GrantRequest{
-		Command:    "grant",
 		Leases:     result.Request.Leases,
 		Override:   opts.Override,
 		Append:     opts.Append,

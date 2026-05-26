@@ -29,11 +29,11 @@ The reversible act of applying or removing a Secret at a Destination during Gran
 _Avoid_: file write, shell output, destination handling
 
 **Provider**:
-The external secret store or CLI that resolves a Secret source into Secret material.
+The external secret store or CLI that resolves a Secret source into Secret material through a lower-level Adapter.
 _Avoid_: backend, vault, service
 
 **Secret Lookup**:
-The act of resolving an approved Lease's Secret source through a Provider before Grant materializes it.
+The act of resolving an approved Lease's Secret source through a selected Provider/account Adapter before Grant materializes it.
 _Avoid_: provider fetch, backend lookup, source read
 
 **Secret Transformation**:
@@ -52,6 +52,10 @@ _Avoid_: worker, server, scheduler
 The state transitions that register, expire, retry, reconcile, and revoke active Leases inside the Daemon.
 _Avoid_: state handling, timer logic, daemon cleanup
 
+**IPC Contract**:
+The signed, typed command and response seam between CLI adapters and the Daemon.
+_Avoid_: socket handling, client calls, JSON plumbing
+
 **Config**:
 The TOML declaration that describes desired Leases for a project.
 _Avoid_: manifest, spec, settings
@@ -65,11 +69,12 @@ _Avoid_: command printing, formatting logic, UI glue
 - A **Config** declares zero or more **Leases**.
 - A **Lease** identifies exactly one **Secret** source and one **Destination**.
 - **Destination Mutation** applies or removes a **Secret** at a **Destination**.
-- A **Provider** performs **Secret Lookup** for an approved **Lease**.
+- A **Provider** Adapter performs **Secret Lookup** for an approved **Lease**.
 - A **Grant** runs a **Grant Workflow**.
 - The **Grant Workflow** uses **Secret Lookup** before **Secret Transformation**.
 - **Secret Transformation** produces one **Secret** or an exploded set of Secrets for the **Grant Workflow** to materialize at their **Destination**.
 - The **Grant Workflow** produces the request that registers **Leases** with the **Daemon**.
+- The **Grant Workflow** and CLI adapters cross the **IPC Contract** to ask the **Daemon** to register, report, clean up, or revoke **Leases**.
 - The **Daemon** owns the **Lease Lifecycle** for active **Leases**.
 - The **Lease Lifecycle** performs **Revoke** when a **Lease** expires or is removed from **Config**.
 - **Presentation** consumes facts from commands, the **Grant Workflow**, and the **Daemon** without owning **Grant**, **Revoke**, or **Lease Lifecycle** business rules.

@@ -22,7 +22,7 @@ var statusCmd = &cobra.Command{
 			return nil
 		}
 
-		req := ipc.StatusRequest{Command: "status"}
+		req := ipc.StatusRequest{}
 		var resp ipc.StatusResponse
 		if err := client.Send(req, &resp); err != nil {
 			handleClientError(err)
