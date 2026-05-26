@@ -4,8 +4,6 @@ package secretlookup
 import (
 	"fmt"
 	"log/slog"
-	"os"
-	"strings"
 	"sync"
 
 	"github.com/mblarsen/env-lease/internal/lease"
@@ -51,9 +49,13 @@ func (s *Secrets) set(l lease.Lease, secret string) {
 // ProviderFactory creates Provider adapters for a normalized provider/account pair.
 type ProviderFactory func(providerName, account string) (provider.SecretProvider, error)
 
+// BatchPolicy reports whether providerName can batch sourceURI through FetchLeases.
+type BatchPolicy func(providerName, sourceURI string) bool
+
 // Lookup resolves Secret material for normalized Leases.
 type Lookup struct {
 	providerFactory ProviderFactory
+	canBatch        BatchPolicy
 }
 
 // New creates a Secret lookup Module with the default Provider adapter factory.
@@ -63,10 +65,19 @@ func New() *Lookup {
 
 // NewWithProviderFactory creates a Secret lookup Module with a custom Provider adapter factory.
 func NewWithProviderFactory(factory ProviderFactory) *Lookup {
+	return NewWithProviderFactoryAndBatchPolicy(factory, nil)
+}
+
+// NewWithProviderFactoryAndBatchPolicy creates a Secret lookup Module with a
+// custom Provider adapter factory and explicit provider URI batching policy.
+func NewWithProviderFactoryAndBatchPolicy(factory ProviderFactory, canBatch BatchPolicy) *Lookup {
 	if factory == nil {
 		factory = defaultProviderFactory
 	}
-	return &Lookup{providerFactory: factory}
+	if canBatch == nil {
+		canBatch = defaultBatchPolicy
+	}
+	return &Lookup{providerFactory: factory, canBatch: canBatch}
 }
 
 // Fetch resolves Secret material for leases using the default lookup Module.
@@ -74,16 +85,17 @@ func Fetch(leases []lease.Lease, opts Options) (Secrets, []Error, error) {
 	return New().Fetch(leases, opts)
 }
 
-// Fetch resolves Secret material for leases. op:// sources are batched by
-// Provider and account. Other sources are deduplicated by Provider, account, and
-// source URI, then fetched once and shared by matching Leases.
+// Fetch resolves Secret material for leases. Sources with Provider-registered
+// batchable schemes are batched by Provider and account. Other sources are
+// deduplicated by Provider, account, and source URI, then fetched once and
+// shared by matching Leases.
 func (lookup *Lookup) Fetch(leases []lease.Lease, opts Options) (Secrets, []Error, error) {
-	plan := buildPlan(leases)
+	plan := buildPlan(leases, lookup.canBatch)
 
 	slog.Debug("secret lookup: start",
 		"mode", opts.Mode,
 		"lease_count", len(leases),
-		"op_batches", len(plan.opBatches),
+		"batches", len(plan.batches),
 		"single_sources", len(plan.singletons))
 
 	secrets := Secrets{byKey: make(map[key]string, len(leases))}
@@ -92,7 +104,7 @@ func (lookup *Lookup) Fetch(leases []lease.Lease, opts Options) (Secrets, []Erro
 	var mu sync.Mutex
 	var group errgroup.Group
 
-	for _, batch := range plan.opBatches {
+	for _, batch := range plan.batches {
 		batch := batch
 		group.Go(func() error {
 			providerAdapter, err := lookup.providerFactory(batch.providerName, batch.account)
@@ -132,7 +144,7 @@ func (lookup *Lookup) Fetch(leases []lease.Lease, opts Options) (Secrets, []Erro
 			}
 			mu.Unlock()
 
-			slog.Debug("secret lookup: fetched op batch",
+			slog.Debug("secret lookup: fetched batch",
 				"mode", opts.Mode,
 				"provider", batch.providerName,
 				"account", batch.account,
@@ -141,7 +153,7 @@ func (lookup *Lookup) Fetch(leases []lease.Lease, opts Options) (Secrets, []Erro
 				"error_count", len(providerErrs))
 
 			if len(lookupErrs) > 0 && !opts.ContinueOnError {
-				return fmt.Errorf("secret lookup: failed op batch provider %s account %s", batch.providerName, batch.account)
+				return fmt.Errorf("secret lookup: failed batch provider %s account %s", batch.providerName, batch.account)
 			}
 			return nil
 		})
@@ -198,23 +210,19 @@ func (lookup *Lookup) Fetch(leases []lease.Lease, opts Options) (Secrets, []Erro
 }
 
 func defaultProviderFactory(providerName, account string) (provider.SecretProvider, error) {
-	switch providerName {
-	case "", "1password":
-		if os.Getenv("ENV_LEASE_TEST") == "1" {
-			return &provider.MockProvider{}, nil
-		}
-		return &provider.OnePasswordCLI{Account: account}, nil
-	default:
-		return nil, fmt.Errorf("unknown provider %q", providerName)
-	}
+	return provider.DefaultRegistry().NewAdapter(providerName, account)
+}
+
+func defaultBatchPolicy(providerName, sourceURI string) bool {
+	return provider.DefaultRegistry().CanBatch(providerName, sourceURI)
 }
 
 type plan struct {
-	opBatches  []opBatch
+	batches    []batch
 	singletons []sourceGroup
 }
 
-type opBatch struct {
+type batch struct {
 	providerName string
 	account      string
 	leases       []lease.Lease
@@ -240,24 +248,24 @@ type sourceKey struct {
 
 type key sourceKey
 
-func buildPlan(leases []lease.Lease) plan {
-	opByAccount := make(map[providerAccount]int)
+func buildPlan(leases []lease.Lease, canBatch BatchPolicy) plan {
+	batchesByAccount := make(map[providerAccount]int)
 	singletonsBySource := make(map[sourceKey]int)
 	plan := plan{}
 
 	for _, l := range leases {
-		if strings.HasPrefix(l.Source, "op://") {
+		if canBatch(l.Provider, l.Source) {
 			accountKey := providerAccount{providerName: l.Provider, account: l.OpAccount}
-			idx, ok := opByAccount[accountKey]
+			idx, ok := batchesByAccount[accountKey]
 			if !ok {
-				idx = len(plan.opBatches)
-				opByAccount[accountKey] = idx
-				plan.opBatches = append(plan.opBatches, opBatch{
+				idx = len(plan.batches)
+				batchesByAccount[accountKey] = idx
+				plan.batches = append(plan.batches, batch{
 					providerName: l.Provider,
 					account:      l.OpAccount,
 				})
 			}
-			plan.opBatches[idx].leases = append(plan.opBatches[idx].leases, l)
+			plan.batches[idx].leases = append(plan.batches[idx].leases, l)
 			continue
 		}
 
