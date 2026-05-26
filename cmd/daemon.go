@@ -132,16 +132,14 @@ var cleanupCmd = &cobra.Command{
 			return nil
 		}
 
-		req := ipc.CleanupRequest{Command: "cleanup"}
+		req := ipc.CleanupRequest{}
 		var resp ipc.CleanupResponse
 
 		if err := client.Send(req, &resp); err != nil {
 			handleClientError(err)
 		}
 
-		for _, msg := range resp.Messages {
-			fmt.Println(msg)
-		}
+		presenter.PrintLines(os.Stdout, resp.Messages)
 		return nil
 	},
 }

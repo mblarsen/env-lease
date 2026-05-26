@@ -24,8 +24,7 @@ func ensureDaemonClient() *ipc.Client {
 		return nil
 	}
 
-	var resp ipc.StatusResponse
-	if err := client.Send(ipc.StatusRequest{Command: "status"}, &resp); err != nil {
+	if err := client.CheckDaemon(); err != nil {
 		handleClientError(err)
 	}
 	return client

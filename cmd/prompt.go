@@ -55,7 +55,7 @@ func doConfirm(prompt string, in io.Reader) bool {
 	reader := bufio.NewReader(in)
 
 	for {
-		fmt.Print(formatConfirmPrompt(prompt))
+		fmt.Print(presenter.ConfirmPrompt(prompt))
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			// On EOF, default to "no"
@@ -81,13 +81,9 @@ func doConfirm(prompt string, in io.Reader) bool {
 			confirmState = stateDeny
 			return false
 		case "?", "help":
-			fmt.Println("y: yes")
-			fmt.Println("n: no (default)")
-			fmt.Println("a: yes to all subsequent prompts")
-			fmt.Println("d: no to all subsequent prompts")
-			fmt.Println("?: show this help message")
+			presenter.ConfirmHelp(os.Stdout)
 		default:
-			fmt.Printf("Invalid input: %q. Please try again.\n", input)
+			presenter.InvalidPromptInput(os.Stdout, input)
 		}
 	}
 }

@@ -1,16 +1,13 @@
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
-	"sort"
-	"text/tabwriter"
-	"time"
 
 	"github.com/mblarsen/env-lease/internal/config"
 	"github.com/mblarsen/env-lease/internal/ipc"
 	"github.com/mblarsen/env-lease/internal/lease"
+	"github.com/mblarsen/env-lease/internal/presentation"
 	"github.com/spf13/cobra"
 )
 
@@ -25,14 +22,14 @@ var statusCmd = &cobra.Command{
 			return nil
 		}
 
-		req := ipc.StatusRequest{Command: "status"}
+		req := ipc.StatusRequest{}
 		var resp ipc.StatusResponse
 		if err := client.Send(req, &resp); err != nil {
 			handleClientError(err)
 		}
 
 		if len(resp.Leases) == 0 {
-			fmt.Println("No active leases.")
+			presenter.Print(os.Stdout, presentation.MessageNoActiveLeases)
 			return nil
 		}
 
@@ -69,13 +66,9 @@ var statusCmd = &cobra.Command{
 		}
 
 		if len(leasesToDisplay) == 0 {
-			fmt.Println("No active leases for this project.")
+			presenter.Print(os.Stdout, presentation.MessageNoActiveLeasesForProject)
 		} else {
-			// Sort top-level leases by destination
-			sort.Slice(leasesToDisplay, func(i, j int) bool {
-				return leasesToDisplay[i].Destination < leasesToDisplay[j].Destination
-			})
-			printLeases(leasesToDisplay, groupedLeases)
+			presenter.RenderStatus(statusPresentationLeases(leasesToDisplay, groupedLeases), os.Stdout)
 		}
 
 		// Calculate other leases count, excluding parent leases from the count
@@ -102,8 +95,7 @@ var statusCmd = &cobra.Command{
 
 			otherLeasesCount := allLeasesCount - displayedLeasesCount
 			if otherLeasesCount > 0 {
-				fmt.Println("-------------------------------------------------------")
-				fmt.Printf("%d more active leases. Use --all to show all leases.\n", otherLeasesCount)
+				presenter.Print(os.Stdout, presentation.MessageOtherActiveLeases, otherLeasesCount)
 			}
 		}
 
@@ -111,41 +103,28 @@ var statusCmd = &cobra.Command{
 	},
 }
 
-func printLeases(leases []ipc.Lease, children map[string][]ipc.Lease) {
-	var output bytes.Buffer
-	w := tabwriter.NewWriter(&output, 0, 0, 3, ' ', 0)
-	fmt.Fprintln(w, "VARIABLE\tSOURCE\tDESTINATION\tEXPIRES IN")
-
-	for _, displayed := range leases {
-		expiresIn := time.Until(displayed.ExpiresAt).Round(time.Second)
-		variable := displayed.Variable
-		if variable == "" {
-			if displayed.LeaseType == "file" {
-				variable = "<file>"
-			} else {
-				variable = "<exploded>"
-			}
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", variable, displayed.Source, displayed.Destination, expiresIn)
-
+func statusPresentationLeases(topLevel []ipc.Lease, children map[string][]ipc.Lease) []presentation.StatusLease {
+	leases := make([]presentation.StatusLease, 0, len(topLevel))
+	for _, displayed := range topLevel {
+		leases = append(leases, statusPresentationLease(displayed))
 		parentID := lease.ParentIdentity(displayed.Source, displayed.Destination)
-		if childLeases, ok := children[parentID]; ok {
-			// Sort children by variable name
-			sort.Slice(childLeases, func(i, j int) bool {
-				return childLeases[i].Variable < childLeases[j].Variable
-			})
-			for i, child := range childLeases {
-				expiresInChild := time.Until(child.ExpiresAt).Round(time.Second)
-				connector := "├─"
-				if i == len(childLeases)-1 {
-					connector = "└─"
-				}
-				fmt.Fprintf(w, " %s %s\t\t%s\t%s\n", connector, child.Variable, child.Destination, expiresInChild)
-			}
+		for _, child := range children[parentID] {
+			leases = append(leases, statusPresentationLease(child))
 		}
 	}
-	w.Flush()
-	fmt.Fprint(os.Stdout, formatStatusOutput(output.String()))
+	return leases
+}
+
+func statusPresentationLease(l ipc.Lease) presentation.StatusLease {
+	return presentation.StatusLease{
+		ID:          lease.ParentIdentity(l.Source, l.Destination),
+		ParentID:    l.ParentSource,
+		Variable:    l.Variable,
+		Source:      l.Source,
+		Destination: l.Destination,
+		LeaseType:   l.LeaseType,
+		ExpiresAt:   l.ExpiresAt,
+	}
 }
 
 func init() {
